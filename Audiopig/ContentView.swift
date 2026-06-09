@@ -2,23 +2,15 @@
 //  ContentView.swift
 //  Audiopig
 //
-//  Created by Nitay A. on 08/06/2026.
+//  Retained as a navigation host placeholder for future top-level routing.
+//  The app's root view is LibraryView, wired directly in AudiopigApp.
 //
 
 import SwiftUI
 
+/// Empty placeholder — not currently used as the app root.
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+        EmptyView()
     }
-}
-
-#Preview {
-    ContentView()
 }
