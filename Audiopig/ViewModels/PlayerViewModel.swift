@@ -100,6 +100,31 @@ final class PlayerViewModel {
 
     @ObservationIgnored private var sleepTimerCancellable: AnyCancellable?
 
+    // MARK: - Lull Analysis State
+
+    private(set) var lullAnalysisState: LullAnalysisState = .idle
+
+    @ObservationIgnored
+    private let lullDetector = LullDetector()
+
+    /// Raw current time exposed for lull-label computation.
+    /// Not a stored property so it doesn't register as an @Observable dependency;
+    /// label views re-render as a side-effect of scrubPosition ticks.
+    var currentTime: TimeInterval { audioEngine.currentTime }
+
+    /// The ID of the lull with the longest duration (most structurally significant).
+    var longestLullID: UUID? {
+        guard case .results(let lulls) = lullAnalysisState, !lulls.isEmpty else { return nil }
+        return lulls.max(by: { $0.duration < $1.duration })?.id
+    }
+
+    /// Formatted label for a lull button: how far back it is from the current position.
+    func lullLabel(for lull: LullResult) -> String {
+        let delta = max(0, audioEngine.currentTime - lull.endTime)
+        let secs = Int(delta)
+        return String(format: "-%d:%02d", secs / 60, secs % 60)
+    }
+
     /// Display label shown on the sleep timer button when the timer is active.
     var sleepTimerLabel: String {
         switch sleepTimerOption {
@@ -219,6 +244,7 @@ final class PlayerViewModel {
     // MARK: - Lifecycle
 
     func loadAudiobook(_ audiobook: Audiobook, autoPlay: Bool = false) async {
+        lullAnalysisState = .idle
         self.audiobook = audiobook
         self.chapters = audiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
         self.bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
@@ -262,6 +288,24 @@ final class PlayerViewModel {
     func seekToChapter(_ chapter: Chapter) {
         isChaptersPresented = false
         Task { try? await audioEngine.seek(to: chapter.startTime) }
+    }
+
+    // MARK: - Lull Analysis
+
+    func analyzeLulls() {
+        guard case .idle = lullAnalysisState, audiobook != nil else { return }
+        lullAnalysisState = .analyzing
+        let to = audioEngine.currentTime
+        let from = max(0, to - 300)  // last 5 minutes
+        let chapters = audioEngine.resolvedChapters
+        Task {
+            let lulls = (try? await lullDetector.findLulls(in: chapters, from: from, to: to)) ?? []
+            lullAnalysisState = .results(lulls)
+        }
+    }
+
+    func seekToLull(_ lull: LullResult) {
+        Task { try? await audioEngine.seek(to: max(0, lull.endTime - 0.5)) }
     }
 
     // MARK: - Bookmarks

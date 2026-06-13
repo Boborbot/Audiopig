@@ -48,7 +48,7 @@ final class AudioEngine: AudioEngineProtocol {
     // MARK: - Private Playback State
 
     private let player: AVPlayer = AVPlayer()
-    private var resolvedChapters: [ResolvedChapter] = []
+    private(set) var resolvedChapters: [ResolvedChapter] = []
     private var fileGlobalOffsets: [URL: TimeInterval] = [:]
     private var currentChapterIndex: Int = 0
     private var _loadedAudiobookID: UUID?

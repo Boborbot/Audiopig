@@ -19,6 +19,10 @@ protocol AudioEngineProtocol: AnyObject {
     var playbackSpeed: Float { get }
     var loadedAudiobookID: UUID? { get }
 
+    /// Ordered, immutable snapshots of all chapters in the currently loaded book.
+    /// Used by LullDetector to map file URLs and global offsets without re-reading SwiftData.
+    var resolvedChapters: [ResolvedChapter] { get }
+
     // MARK: - Combine Observation
 
     /// Emits the current global timeline position at ~0.5 s intervals during playback.

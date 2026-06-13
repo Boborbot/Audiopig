@@ -122,6 +122,10 @@ struct PlayerView: View {
 
             bottomRow
                 .padding(.top, DS.Spacing.lg + DS.Spacing.sm)
+
+            lullAnalysisSection
+                .padding(.top, DS.Spacing.sm)
+                .padding(.horizontal, DS.Spacing.md)
                 .padding(.bottom, DS.Spacing.lg)
         }
         .padding(.top, DS.Spacing.lg)
@@ -315,6 +319,60 @@ struct PlayerView: View {
                 }
             }
             .pillAppearance(isActive: viewModel.sleepTimerOption != .off)
+        }
+    }
+
+    // MARK: - Lull Analysis Section
+
+    @ViewBuilder
+    private var lullAnalysisSection: some View {
+        switch viewModel.lullAnalysisState {
+        case .idle:
+            Button {
+                viewModel.analyzeLulls()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform.and.magnifyingglass")
+                    Text("Find Paragraph Breaks")
+                }
+                .frame(maxWidth: .infinity)
+                .pillAppearance()
+            }
+            .buttonStyle(.plain)
+            .disabled(!viewModel.isActive)
+
+        case .analyzing:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .scaleEffect(0.8)
+                Text("Analyzing…")
+            }
+            .frame(maxWidth: .infinity)
+            .pillAppearance()
+
+        case .results(let lulls):
+            if lulls.isEmpty {
+                Text("No breaks found")
+                    .frame(maxWidth: .infinity)
+                    .pillAppearance()
+            } else {
+                // Buttons are already sorted by endTime ascending from LullDetector,
+                // so left = biggest jump back, right = smallest jump back.
+                HStack(spacing: DS.Spacing.sm) {
+                    ForEach(lulls) { lull in
+                        Button {
+                            viewModel.seekToLull(lull)
+                        } label: {
+                            Text(viewModel.lullLabel(for: lull))
+                                .frame(maxWidth: .infinity)
+                                // The longest lull (most structurally significant) is
+                                // highlighted in coral; others stay in the default pill tint.
+                                .pillAppearance(isActive: lull.id == viewModel.longestLullID)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
     }
 }
