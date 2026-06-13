@@ -13,6 +13,7 @@ struct AudiopigApp: App {
 
     private let container: DependencyContainer
     private let libraryViewModel: LibraryViewModel
+    private let statsViewModel: StatsViewModel
 
     init() {
         do {
@@ -33,6 +34,9 @@ struct AudiopigApp: App {
                 audioEngine: dc.audioEngine,
                 appSettings: dc.appSettings
             )
+            self.statsViewModel = StatsViewModel(
+                modelContext: dc.modelContainer.mainContext
+            )
         } catch {
             fatalError("Audiopig failed to initialise core services: \(error.localizedDescription)")
         }
@@ -42,7 +46,8 @@ struct AudiopigApp: App {
         WindowGroup {
             MainTabView(
                 libraryViewModel: libraryViewModel,
-                appSettings: container.appSettings
+                appSettings: container.appSettings,
+                statsViewModel: statsViewModel
             )
             .modelContainer(container.modelContainer)
             .preferredColorScheme(container.appSettings.appearance.colorScheme)

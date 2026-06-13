@@ -24,6 +24,7 @@ struct MainTabView: View {
     @State private var viewModel: LibraryViewModel
     @State private var isPlayerPresented: Bool = false
     private let appSettings: AppSettings
+    private let statsViewModel: StatsViewModel
 
     /// Standard iOS tab-bar height (does not vary by device type or screen size).
     private static let tabBarHeight: CGFloat = 49
@@ -32,9 +33,10 @@ struct MainTabView: View {
     /// plus the 6 pt floating gap between the pill's bottom edge and the tab bar.
     private static let miniPlayerHeight: CGFloat = 68
 
-    init(libraryViewModel: LibraryViewModel, appSettings: AppSettings) {
+    init(libraryViewModel: LibraryViewModel, appSettings: AppSettings, statsViewModel: StatsViewModel) {
         _viewModel = State(initialValue: libraryViewModel)
         self.appSettings = appSettings
+        self.statsViewModel = statsViewModel
     }
 
     var body: some View {
@@ -43,6 +45,10 @@ struct MainTabView: View {
                 LibraryView(viewModel: viewModel)
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }
                     .tabItem { Label("Library", systemImage: "books.vertical") }
+
+                StatsView(viewModel: statsViewModel)
+                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }
+                    .tabItem { Label("Stats", systemImage: "chart.bar.fill") }
 
                 SettingsView(settings: appSettings)
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }

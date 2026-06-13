@@ -66,8 +66,12 @@ final class LibraryViewModel {
 
     // MARK: - Finish Celebration
 
-    /// Set when the user marks a book finished — drives the pig celebration overlay.
+    /// Set when the user marks a book finished — drives the confetti overlay.
     var celebratedBook: Audiobook?
+
+    /// When `autoDeleteOnFinish` is on, the book is held here until the celebration
+    /// completes so the overlay can still reference its title during the animation.
+    private var pendingAutoDeleteBook: Audiobook?
 
     // MARK: - Pending Delete
 
@@ -78,6 +82,7 @@ final class LibraryViewModel {
 
     private let modelContext: ModelContext
     private let libraryManager: any LibraryManagerProtocol
+    private let appSettings: AppSettings
 
     // MARK: - Init
 
@@ -89,6 +94,7 @@ final class LibraryViewModel {
     ) {
         self.modelContext = modelContext
         self.libraryManager = libraryManager
+        self.appSettings = appSettings
         self.playerViewModel = PlayerViewModel(
             audioEngine: audioEngine,
             modelContext: modelContext,
@@ -133,10 +139,32 @@ final class LibraryViewModel {
 
     // MARK: - Finish
 
-    /// Marks a book as manually finished and fires the pig celebration.
+    /// Marks a book as manually finished, optionally records the event, and fires the celebration.
+    /// Idempotent — calling it on an already-finished book is a no-op.
     func markFinished(_ audiobook: Audiobook) {
+        guard !audiobook.isManuallyFinished else { return }
+
         audiobook.isManuallyFinished = true
+
+        if appSettings.trackReadingStats {
+            let record = FinishedRecord(
+                audiobookID:       audiobook.id,
+                title:             audiobook.title,
+                author:            audiobook.author,
+                totalSeconds:      audiobook.duration,
+                listenedSeconds:   audiobook.currentPlaybackTime,
+                chapterCount:      audiobook.chapters.count,
+                wasManuallyMarked: true
+            )
+            modelContext.insert(record)
+        }
+
         saveContext(errorContext: "mark finished")
+
+        if appSettings.autoDeleteOnFinish {
+            pendingAutoDeleteBook = audiobook
+        }
+
         celebratedBook = audiobook
     }
 
@@ -146,9 +174,13 @@ final class LibraryViewModel {
         saveContext(errorContext: "mark unfinished")
     }
 
-    /// Clears the celebration overlay.
+    /// Clears the celebration overlay; if auto-delete is pending, deletes the book now.
     func dismissCelebration() {
         celebratedBook = nil
+        if let book = pendingAutoDeleteBook {
+            pendingAutoDeleteBook = nil
+            delete(book)
+        }
     }
 
     // MARK: - Delete

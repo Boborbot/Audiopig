@@ -13,6 +13,7 @@ enum AudiopigModelContainer {
         Audiobook.self,
         Chapter.self,
         Bookmark.self,
+        FinishedRecord.self,
     ])
 
     static func make(isStoredInMemoryOnly: Bool = false) throws -> ModelContainer {

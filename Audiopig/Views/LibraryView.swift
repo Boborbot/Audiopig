@@ -5,6 +5,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import AudioToolbox
 
 struct LibraryView: View {
     @State private var viewModel: LibraryViewModel
@@ -124,6 +125,13 @@ struct LibraryView: View {
             .safeAreaInset(edge: .bottom) { mergeBar }
             .overlay { importOverlay }
             .overlay { celebrationOverlay }
+            .onChange(of: viewModel.celebratedBook?.id) { _, bookID in
+                guard bookID != nil else { return }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                // System sound 1073 ("mail sent" ascending chime) — plays over existing
+                // audio via its own ambient session; silently ignored if unavailable.
+                AudioServicesPlaySystemSound(SystemSoundID(1073))
+            }
             .sheet(isPresented: $viewModel.isMergeSheetPresented) { mergeSheet }
         }
     }
@@ -132,10 +140,12 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var celebrationOverlay: some View {
-        if let book = viewModel.celebratedBook {
-            PigCelebrationView(book: book) {
+        if viewModel.celebratedBook != nil {
+            ConfettiBurstView {
                 viewModel.dismissCelebration()
             }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
         }
     }
 

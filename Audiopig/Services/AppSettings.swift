@@ -54,6 +54,8 @@ final class AppSettings {
         static let skipForwardInterval  = "settings.skipForwardInterval"
         static let skipBackwardInterval = "settings.skipBackwardInterval"
         static let appearance           = "settings.appearance"
+        static let autoDeleteOnFinish   = "settings.autoDeleteOnFinish"
+        static let trackReadingStats    = "settings.trackReadingStats"
     }
 
     // MARK: - Backing Stores (not observed individually)
@@ -81,6 +83,19 @@ final class AppSettings {
         guard let raw = UserDefaults.standard.string(forKey: Keys.appearance),
               let stored = AppAppearance(rawValue: raw) else { return .system }
         return stored
+    }()
+
+    @ObservationIgnored
+    private var _autoDeleteOnFinish: Bool = {
+        // Key must exist; absence means the default (false) applies.
+        guard UserDefaults.standard.object(forKey: Keys.autoDeleteOnFinish) != nil else { return false }
+        return UserDefaults.standard.bool(forKey: Keys.autoDeleteOnFinish)
+    }()
+
+    @ObservationIgnored
+    private var _trackReadingStats: Bool = {
+        guard UserDefaults.standard.object(forKey: Keys.trackReadingStats) != nil else { return true }
+        return UserDefaults.standard.bool(forKey: Keys.trackReadingStats)
     }()
 
     // MARK: - Observable Properties
@@ -123,6 +138,36 @@ final class AppSettings {
             withMutation(keyPath: \.skipBackwardInterval) {
                 _skipBackwardInterval = newValue
                 UserDefaults.standard.set(newValue, forKey: Keys.skipBackwardInterval)
+            }
+        }
+    }
+
+    /// When `true`, a book is automatically deleted from the library after being marked finished.
+    /// Default: `false`.
+    var autoDeleteOnFinish: Bool {
+        get {
+            access(keyPath: \.autoDeleteOnFinish)
+            return _autoDeleteOnFinish
+        }
+        set {
+            withMutation(keyPath: \.autoDeleteOnFinish) {
+                _autoDeleteOnFinish = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.autoDeleteOnFinish)
+            }
+        }
+    }
+
+    /// When `true`, a `FinishedRecord` is created every time a book is marked finished.
+    /// Default: `true`.
+    var trackReadingStats: Bool {
+        get {
+            access(keyPath: \.trackReadingStats)
+            return _trackReadingStats
+        }
+        set {
+            withMutation(keyPath: \.trackReadingStats) {
+                _trackReadingStats = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.trackReadingStats)
             }
         }
     }
