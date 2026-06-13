@@ -78,40 +78,30 @@ enum DS {
         })
     }
 
-    // MARK: - Custom Fonts
+    // MARK: - Rounded System Font Helpers
+    //
+    // Replaces the previous ClashDisplay custom font.
+    // SF Pro Rounded ships on every iOS device — no licensing, no bundled files.
+    // The API is identical to the old ClashDisplay helpers so call sites compile
+    // unchanged (just swap DS.ClashDisplay → DS.Rounded).
 
-    enum ClashDisplay {
-        enum Weight: String {
-            case extralight = "ClashDisplay-Extralight"
-            case light      = "ClashDisplay-Light"
-            case regular    = "ClashDisplay-Regular"
-            case medium     = "ClashDisplay-Medium"
-            case semibold   = "ClashDisplay-Semibold"
-            case bold       = "ClashDisplay-Bold"
+    enum Rounded {
+        static func font(_ weight: SwiftUI.Font.Weight = .regular, size: CGFloat) -> SwiftUI.Font {
+            .system(size: size, weight: weight, design: .rounded)
         }
 
-        static func font(_ weight: Weight = .regular, size: CGFloat) -> SwiftUI.Font {
-            .custom(weight.rawValue, size: size)
+        static func font(_ weight: SwiftUI.Font.Weight = .regular, relativeTo textStyle: SwiftUI.Font.TextStyle) -> SwiftUI.Font {
+            .system(textStyle, design: .rounded).weight(weight)
         }
 
-        /// Returns a Dynamic-Type–scaled ClashDisplay font anchored to `textStyle`.
-        static func font(_ weight: Weight = .regular, relativeTo textStyle: SwiftUI.Font.TextStyle) -> SwiftUI.Font {
-            let baseSize: CGFloat
-            switch textStyle {
-            case .largeTitle:  baseSize = 34
-            case .title:       baseSize = 28
-            case .title2:      baseSize = 22
-            case .title3:      baseSize = 20
-            case .headline:    baseSize = 17
-            case .body:        baseSize = 17
-            case .callout:     baseSize = 16
-            case .subheadline: baseSize = 15
-            case .footnote:    baseSize = 13
-            case .caption:     baseSize = 12
-            case .caption2:    baseSize = 11
-            @unknown default:  baseSize = 17
-            }
-            return .custom(weight.rawValue, size: baseSize, relativeTo: textStyle)
+        /// Returns a `UIFont` in SF Rounded for use with UIKit APIs (e.g. navigation bar appearance).
+        static func uiFont(size: CGFloat, weight: UIFont.Weight = .bold) -> UIFont {
+            let descriptor = UIFontDescriptor
+                .preferredFontDescriptor(withTextStyle: .largeTitle)
+                .withDesign(.rounded)?
+                .withSymbolicTraits(weight == .bold ? .traitBold : [])
+                ?? UIFontDescriptor.preferredFontDescriptor(withTextStyle: .largeTitle)
+            return UIFont(descriptor: descriptor, size: size)
         }
     }
 
@@ -262,23 +252,21 @@ extension View {
 // MARK: - Navigation Bar Appearance
 
 extension DS {
-    /// Configures the UINavigationBar to use iOS 26 Liquid Glass with coral brand typography.
+    /// Configures the UINavigationBar with coral brand typography.
     ///
-    /// Uses `configureWithTransparentBackground()` so the system's native Liquid Glass material
-    /// renders behind the bar — no opaque fill. The large title and compact title are styled in
-    /// `DS.Color.coral` (Clash Display Bold for large, system for compact). Bar button items
-    /// and the back chevron are tinted coral to match.
+    /// Uses `configureWithTransparentBackground()` so the system's native material
+    /// renders behind the bar — no opaque fill. The large title is styled in
+    /// `DS.Color.coral` using SF Rounded Bold; the compact title uses the system font
+    /// in coral. Bar button items and the back chevron are tinted coral to match.
     ///
     /// All four appearance variants are set explicitly to prevent the compact title from
-    /// disappearing when the large title collapses — a known iOS 26 regression with SwiftUI's
-    /// `toolbarBackground`/`toolbarColorScheme` modifiers.
+    /// disappearing when the large title collapses.
     ///
     /// Safe to call multiple times — idempotent.
     static func applyCoralNavigationBarAppearance() {
         let coral = UIColor(red: 0xF1 / 255.0, green: 0x84 / 255.0, blue: 0x70 / 255.0, alpha: 1)
 
-        let largeTitleFont = UIFont(name: "ClashDisplay-Bold", size: 34)
-            ?? UIFont.boldSystemFont(ofSize: 34)
+        let largeTitleFont = DS.Rounded.uiFont(size: 34, weight: .bold)
 
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()

@@ -66,7 +66,7 @@ private struct StatCard: View {
                 .frame(height: 36)
 
             Text(value)
-                .font(DS.ClashDisplay.font(.bold, size: 30))
+                .font(DS.Rounded.font(.bold, size: 30))
                 .foregroundStyle(DS.Color.primary)
                 .minimumScaleFactor(0.45)
                 .lineLimit(1)
