@@ -10,7 +10,12 @@ struct LibraryView: View {
     @State private var viewModel: LibraryViewModel
     @FocusState private var isSearchFocused: Bool
 
-    private static let allowedTypes: [UTType] = {
+    /// Drives the single shared .fileImporter modifier.
+    @State private var isImporterPresented: Bool = false
+    /// When true the importer shows folders; when false it shows audio files.
+    @State private var isImportingFolder: Bool = false
+
+    private static let allowedAudioTypes: [UTType] = {
         var types: [UTType] = [.mp3, .mpeg4Audio]
         if let m4b = UTType(filenameExtension: "m4b") { types.append(m4b) }
         return types
@@ -20,35 +25,42 @@ struct LibraryView: View {
         _viewModel = State(initialValue: viewModel)
     }
 
+    private func presentFileImporter() {
+        isImportingFolder = false
+        isImporterPresented = true
+    }
+
+    private func presentFolderImporter() {
+        isImportingFolder = true
+        isImporterPresented = true
+    }
+
     var body: some View {
         navigationContent
             .fileImporter(
-                isPresented: $viewModel.isFileImporterPresented,
-                allowedContentTypes: Self.allowedTypes,
-                allowsMultipleSelection: true
+                isPresented: $isImporterPresented,
+                allowedContentTypes: isImportingFolder ? [.folder] : Self.allowedAudioTypes,
+                allowsMultipleSelection: !isImportingFolder
             ) { result in
-                switch result {
-                case .success(let urls):
-                    Task { await viewModel.importFiles(urls) }
-                case .failure(let error):
-                    if (error as NSError).code != NSUserCancelledError {
-                        Task { await viewModel.importFiles([]) }
+                if isImportingFolder {
+                    switch result {
+                    case .success(let urls):
+                        if let url = urls.first {
+                            Task { await viewModel.importFolder(url) }
+                        }
+                    case .failure(let error):
+                        if (error as NSError).code != NSUserCancelledError {
+                            viewModel.reportError("Could not open the selected folder.")
+                        }
                     }
-                }
-            }
-            .fileImporter(
-                isPresented: $viewModel.isFolderImporterPresented,
-                allowedContentTypes: [.folder],
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case .success(let urls):
-                    if let url = urls.first {
-                        Task { await viewModel.importFolder(url) }
-                    }
-                case .failure(let error):
-                    if (error as NSError).code != NSUserCancelledError {
-                        viewModel.reportError("Could not open the selected folder.")
+                } else {
+                    switch result {
+                    case .success(let urls):
+                        Task { await viewModel.importFiles(urls) }
+                    case .failure(let error):
+                        if (error as NSError).code != NSUserCancelledError {
+                            Task { await viewModel.importFiles([]) }
+                        }
                     }
                 }
             }
@@ -280,7 +292,7 @@ struct LibraryView: View {
                 .multilineTextAlignment(.center)
 
             Button {
-                viewModel.isFileImporterPresented = true
+                presentFileImporter()
             } label: {
                 Label("Add Audiobooks", systemImage: "plus")
             }
@@ -349,12 +361,12 @@ struct LibraryView: View {
             if !viewModel.isSelectionModeActive {
                 Menu {
                     Button {
-                        viewModel.isFileImporterPresented = true
+                        presentFileImporter()
                     } label: {
                         Label("Add Files", systemImage: "doc.badge.plus")
                     }
                     Button {
-                        viewModel.isFolderImporterPresented = true
+                        presentFolderImporter()
                     } label: {
                         Label("Add Folder", systemImage: "folder.badge.plus")
                     }

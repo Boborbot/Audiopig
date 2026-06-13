@@ -43,8 +43,6 @@ final class LibraryViewModel {
 
     var isMergeSheetPresented: Bool = false
     var pendingMergeTitle: String = ""
-    var isFileImporterPresented: Bool = false
-    var isFolderImporterPresented: Bool = false
     var isBulkDeleteConfirmationPresented: Bool = false
     var isSwipeDeleteConfirmationPresented: Bool = false
 
