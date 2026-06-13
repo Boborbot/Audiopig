@@ -94,12 +94,12 @@ extension View {
 extension View {
     /// Applies the pill visual appearance without button interaction behavior.
     /// Use this on Menu labels and any non-Button element that should look like a pill control.
-    func pillAppearance(isActive: Bool = false) -> some View {
+    func pillAppearance(isActive: Bool = false, verticalPadding: CGFloat = 9) -> some View {
         self
             .font(DS.Typography.controlLabel)
             .foregroundStyle(isActive ? DS.Color.coral : DS.Color.primary)
             .padding(.horizontal, 18)
-            .padding(.vertical, 9)
+            .padding(.vertical, verticalPadding)
             .background(Capsule().fill(Color(UIColor.secondarySystemBackground)))
     }
 }

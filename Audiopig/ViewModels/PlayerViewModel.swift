@@ -294,18 +294,32 @@ final class PlayerViewModel {
 
     func analyzeLulls() {
         guard case .idle = lullAnalysisState, audiobook != nil else { return }
+        startLullAnalysis()
+    }
+
+    func lookAgainLulls() {
+        guard audiobook != nil else { return }
+        startLullAnalysis()
+    }
+
+    func cancelLullAnalysis() {
+        lullAnalysisState = .idle
+    }
+
+    func seekToLull(_ lull: LullResult) {
+        lullAnalysisState = .idle
+        Task { try? await audioEngine.seek(to: max(0, lull.endTime - 0.5)) }
+    }
+
+    private func startLullAnalysis() {
         lullAnalysisState = .analyzing
         let to = audioEngine.currentTime
-        let from = max(0, to - 300)  // last 5 minutes
+        let from = max(0, to - 300)
         let chapters = audioEngine.resolvedChapters
         Task {
             let lulls = (try? await lullDetector.findLulls(in: chapters, from: from, to: to)) ?? []
             lullAnalysisState = .results(lulls)
         }
-    }
-
-    func seekToLull(_ lull: LullResult) {
-        Task { try? await audioEngine.seek(to: max(0, lull.endTime - 0.5)) }
     }
 
     // MARK: - Bookmarks

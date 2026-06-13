@@ -336,7 +336,7 @@ struct PlayerView: View {
                     Text("Find Paragraph Breaks")
                 }
                 .frame(maxWidth: .infinity)
-                .pillAppearance()
+                .pillAppearance(verticalPadding: 14)
             }
             .buttonStyle(.plain)
             .disabled(!viewModel.isActive)
@@ -348,29 +348,55 @@ struct PlayerView: View {
                 Text("Analyzing…")
             }
             .frame(maxWidth: .infinity)
-            .pillAppearance()
+            .pillAppearance(verticalPadding: 14)
 
         case .results(let lulls):
-            if lulls.isEmpty {
-                Text("No breaks found")
-                    .frame(maxWidth: .infinity)
-                    .pillAppearance()
-            } else {
-                // Buttons are already sorted by endTime ascending from LullDetector,
-                // so left = biggest jump back, right = smallest jump back.
-                HStack(spacing: DS.Spacing.sm) {
-                    ForEach(lulls) { lull in
-                        Button {
-                            viewModel.seekToLull(lull)
-                        } label: {
-                            Text(viewModel.lullLabel(for: lull))
-                                .frame(maxWidth: .infinity)
-                                // The longest lull (most structurally significant) is
-                                // highlighted in coral; others stay in the default pill tint.
-                                .pillAppearance(isActive: lull.id == viewModel.longestLullID)
+            VStack(spacing: DS.Spacing.sm) {
+                // Primary row: lull jump buttons (biggest jump left, smallest right).
+                if lulls.isEmpty {
+                    Text("No breaks found")
+                        .frame(maxWidth: .infinity)
+                        .pillAppearance(verticalPadding: 14)
+                } else {
+                    HStack(spacing: DS.Spacing.sm) {
+                        ForEach(lulls) { lull in
+                            Button {
+                                viewModel.seekToLull(lull)
+                            } label: {
+                                Text(viewModel.lullLabel(for: lull))
+                                    .frame(maxWidth: .infinity)
+                                    .pillAppearance(
+                                        isActive: lull.id == viewModel.longestLullID,
+                                        verticalPadding: 14
+                                    )
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                }
+
+                // Secondary row: cancel and re-analyze.
+                HStack(spacing: DS.Spacing.sm) {
+                    Button {
+                        viewModel.cancelLullAnalysis()
+                    } label: {
+                        Text("Cancel")
+                            .frame(maxWidth: .infinity)
+                            .pillAppearance()
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        viewModel.lookAgainLulls()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("Look Again")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .pillAppearance()
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
