@@ -49,6 +49,7 @@ final class AudioEngine: AudioEngineProtocol {
 
     private let player: AVPlayer = AVPlayer()
     private var resolvedChapters: [ResolvedChapter] = []
+    private var fileGlobalOffsets: [URL: TimeInterval] = [:]
     private var currentChapterIndex: Int = 0
     private var _loadedAudiobookID: UUID?
     private var _loadedDuration: TimeInterval = 0
@@ -70,6 +71,11 @@ final class AudioEngine: AudioEngineProtocol {
     private var _nowPlayingTitle: String = ""
     private var _nowPlayingAuthor: String = ""
     private var _nowPlayingArtwork: MPMediaItemArtwork?
+
+    // MARK: - Remote Skip Intervals (updated via updateRemoteSkipIntervals)
+
+    private var _remoteSkipForwardInterval: TimeInterval = 15
+    private var _remoteSkipBackwardInterval: TimeInterval = 15
 
     // MARK: - Init / Deinit
 
@@ -114,6 +120,18 @@ final class AudioEngine: AudioEngineProtocol {
             .map(ResolvedChapter.init(from:))
 
         resolvedChapters = snapshots
+        // Build a URL → earliest-startTime map once so the time observer and seek
+        // logic can look up the file-global offset in O(1) instead of scanning every tick.
+        var offsets: [URL: TimeInterval] = [:]
+        for chapter in snapshots {
+            if let existing = offsets[chapter.fileURL] {
+                if chapter.startTime < existing { offsets[chapter.fileURL] = chapter.startTime }
+            } else {
+                offsets[chapter.fileURL] = chapter.startTime
+            }
+        }
+        fileGlobalOffsets = offsets
+
         _loadedAudiobookID = audiobook.id
         _loadedDuration = audiobook.duration
         _playbackState.send(.loading)
@@ -276,9 +294,10 @@ final class AudioEngine: AudioEngineProtocol {
         let item = AVPlayerItem(url: chapter.fileURL)
         player.replaceCurrentItem(with: item)
 
-        // Snap the UI to the target global time immediately.
+        // Snap the UI to the target global time immediately and refresh Now Playing.
         installTimeObserver()
         _currentTime.send(globalSeekTime)
+        updateNowPlayingInfo(elapsedTime: globalSeekTime)
 
         if autoPlay {
             player.rate = _playbackSpeed
@@ -367,10 +386,16 @@ final class AudioEngine: AudioEngineProtocol {
             guard let self else { return }
             let localSeconds = CMTimeGetSeconds(time)
             guard localSeconds.isFinite, localSeconds >= 0 else { return }
-            let startTime = self.resolvedChapters[safe: self.currentChapterIndex]?.startTime ?? 0
-            let globalTime = startTime + localSeconds
-            self._currentTime.send(globalTime)
-            self.updateNowPlayingInfo(elapsedTime: globalTime)
+            // fileGlobalOffset is the global timeline position at which the PHYSICAL FILE
+            // begins. Looked up from the precomputed map — O(1) instead of O(n) per tick.
+            let fileGlobalOffset: TimeInterval = {
+                guard let chapter = self.resolvedChapters[safe: self.currentChapterIndex] else { return 0 }
+                return self.fileGlobalOffsets[chapter.fileURL] ?? 0
+            }()
+            self._currentTime.send(fileGlobalOffset + localSeconds)
+            // Now Playing elapsed time is NOT updated here; the system extrapolates position
+            // automatically from the rate set at play/pause/seek. Updates only happen at
+            // state transitions (play, pause, seek, speed change, chapter load).
         }
     }
 
@@ -385,8 +410,10 @@ final class AudioEngine: AudioEngineProtocol {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
+        ) { [weak self] notification in
+            guard let self,
+                  let endedItem = notification.object as? AVPlayerItem,
+                  endedItem === self.player.currentItem else { return }
             Task { @MainActor [weak self] in
                 await self?.handleChapterEnd()
             }
@@ -403,6 +430,7 @@ final class AudioEngine: AudioEngineProtocol {
         player.pause()
         player.replaceCurrentItem(with: nil)
         currentChapterIndex = 0
+        fileGlobalOffsets = [:]
     }
 
     // MARK: - Private — Chapter Resolution
@@ -418,11 +446,7 @@ final class AudioEngine: AudioEngineProtocol {
     ///   offset and subsequent chapters in the same file get their correct in-file position.
     private func fileSeekTime(forGlobalTime globalTime: TimeInterval, inChapterAt index: Int) -> TimeInterval {
         guard let chapter = resolvedChapters[safe: index] else { return 0 }
-        let fileGlobalOffset = resolvedChapters
-            .lazy
-            .filter { $0.fileURL == chapter.fileURL }
-            .map(\.startTime)
-            .min() ?? chapter.startTime
+        let fileGlobalOffset = fileGlobalOffsets[chapter.fileURL] ?? chapter.startTime
         return max(0, globalTime - fileGlobalOffset)
     }
 
@@ -508,6 +532,14 @@ final class AudioEngine: AudioEngineProtocol {
 
     // MARK: - Private — Remote Command Center
 
+    func updateRemoteSkipIntervals(forward: TimeInterval, backward: TimeInterval) {
+        _remoteSkipForwardInterval = forward
+        _remoteSkipBackwardInterval = backward
+        let center = MPRemoteCommandCenter.shared()
+        center.skipForwardCommand.preferredIntervals = [NSNumber(value: forward)]
+        center.skipBackwardCommand.preferredIntervals = [NSNumber(value: backward)]
+    }
+
     /// Registers handlers for hardware/software transport controls (lock screen, headphones,
     /// CarPlay, etc.). Called once at init; tokens are discarded because AudioEngine lives
     /// for the app's lifetime and we never need to deregister.
@@ -527,16 +559,22 @@ final class AudioEngine: AudioEngineProtocol {
         }
 
         center.skipForwardCommand.isEnabled = true
-        center.skipForwardCommand.preferredIntervals = [15]
+        center.skipForwardCommand.preferredIntervals = [NSNumber(value: _remoteSkipForwardInterval)]
         center.skipForwardCommand.addTarget { [weak self] _ in
-            Task { @MainActor [weak self] in try? await self?.skipForward(by: 15) }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                try? await self.skipForward(by: self._remoteSkipForwardInterval)
+            }
             return .success
         }
 
         center.skipBackwardCommand.isEnabled = true
-        center.skipBackwardCommand.preferredIntervals = [15]
+        center.skipBackwardCommand.preferredIntervals = [NSNumber(value: _remoteSkipBackwardInterval)]
         center.skipBackwardCommand.addTarget { [weak self] _ in
-            Task { @MainActor [weak self] in try? await self?.skipBackward(by: 15) }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                try? await self.skipBackward(by: self._remoteSkipBackwardInterval)
+            }
             return .success
         }
 

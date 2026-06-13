@@ -21,10 +21,19 @@ enum AudiobookProgressFormatter {
 
     /// E.g. "2 hr 14 min left · 11 hr 32 min total"
     /// Edge cases: unstarted → "Not started · X total", finished → "Finished · X total"
-    static func progressText(currentTime: TimeInterval, duration: TimeInterval) -> String {
+    /// Pass `isManuallyFinished: true` to short-circuit to the finished label regardless of position.
+    static func progressText(
+        currentTime: TimeInterval,
+        duration: TimeInterval,
+        isManuallyFinished: Bool = false
+    ) -> String {
         guard duration > 0 else { return "Unknown duration" }
 
         let totalText = shortDuration(duration)
+
+        if isManuallyFinished {
+            return "Finished · \(totalText)"
+        }
 
         if currentTime <= 0 {
             return "Not started · \(totalText)"

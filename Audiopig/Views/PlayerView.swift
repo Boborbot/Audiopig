@@ -11,29 +11,26 @@ struct PlayerView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Drag indicator
-            Capsule()
-                .fill(Color(.systemGray4))
-                .frame(width: 36, height: 5)
-                .padding(.top, 10)
-                .zIndex(1)
+            // Ambient blurred cover art fills the entire background
+            Color.clear
+                .playerBackground(image: viewModel.coverImage)
 
             ScrollView {
                 VStack(spacing: 0) {
-                    Spacer().frame(height: 32)
+                    Spacer().frame(height: DS.Spacing.xl)
                     artworkSection
                     titleSection
-                    scrubberSection
-                    controlsSection
-                    bottomRow
-                    Spacer().frame(height: 32)
+                    controlsPanel
+                    Spacer().frame(height: DS.Spacing.xl)
                 }
-                .padding(.horizontal, 28)
+                .padding(.horizontal, DS.Spacing.playerH)
             }
         }
-        .background(Color(.systemBackground))
         .sheet(isPresented: $viewModel.isChaptersPresented) {
             ChaptersListView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $viewModel.isBookmarksPresented) {
+            BookmarksListView(viewModel: viewModel)
         }
     }
 
@@ -41,31 +38,29 @@ struct PlayerView: View {
 
     private var artworkSection: some View {
         Group {
-            if let data = viewModel.audiobook?.coverArtwork,
-               let uiImage = UIImage(data: data) {
+            if let uiImage = viewModel.coverImage {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(maxWidth: .infinity)
                     .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .playerCoverArtClip()
             } else {
                 artworkPlaceholder
             }
         }
-        .shadow(color: .black.opacity(0.22), radius: 24, x: 0, y: 10)
-        .shadow(color: .black.opacity(0.08), radius: 6,  x: 0, y: 2)
-        .padding(.top, 8)
+        .applyShadows(DS.Shadow.coverArt)
+        .padding(.top, DS.Spacing.sm)
         .scaleEffect(viewModel.playbackState == .playing ? 1.0 : 0.94)
-        .animation(.spring(response: 0.4, dampingFraction: 0.72), value: viewModel.playbackState == .playing)
+        .animation(DS.Animation.reveal, value: viewModel.playbackState == .playing)
     }
 
     private var artworkPlaceholder: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.coverArt, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [Color(.systemGray4), Color(.systemGray5)],
+                        colors: [DS.Color.artworkPlaceholder, Color(UIColor.systemGray4)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -73,32 +68,56 @@ struct PlayerView: View {
                 .aspectRatio(1, contentMode: .fit)
             Image(systemName: "headphones")
                 .font(.system(size: 60))
-                .foregroundStyle(Color(.systemGray2))
+                .foregroundStyle(Color(UIColor.systemGray2))
         }
     }
 
     // MARK: - Title & Author
 
     private var titleSection: some View {
-        VStack(spacing: 5) {
-            Text(viewModel.audiobook?.title ?? "")
-                .font(.title2.bold())
-                .foregroundStyle(.primary)
+        VStack(spacing: DS.Spacing.xs) {
+            Text(viewModel.playerTitle)
+                .playerTitleStyle()
+                .foregroundStyle(DS.Color.primary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
 
             Text(viewModel.audiobook?.author ?? "")
-                .font(.body)
-                .foregroundStyle(.secondary)
+                .font(DS.Typography.playerAuthor)
+                .foregroundStyle(DS.Color.coral)
                 .lineLimit(1)
         }
-        .padding(.top, 28)
+        .padding(.top, DS.Spacing.lg)
+    }
+
+    // MARK: - Controls (laid directly on the glass surface)
+
+    private var controlsPanel: some View {
+        VStack(spacing: 0) {
+            // Hairline separator between title and controls
+            Rectangle()
+                .fill(DS.Color.separator.opacity(0.4))
+                .frame(height: 0.5)
+                .padding(.horizontal, DS.Spacing.xl)
+
+            scrubberSection
+                .padding(.horizontal, DS.Spacing.md)
+                .padding(.top, DS.Spacing.lg)
+
+            controlsSection
+                .padding(.top, DS.Spacing.lg + DS.Spacing.sm)
+
+            bottomRow
+                .padding(.top, DS.Spacing.lg + DS.Spacing.sm)
+                .padding(.bottom, DS.Spacing.lg)
+        }
+        .padding(.top, DS.Spacing.lg)
     }
 
     // MARK: - Scrubber
 
     private var scrubberSection: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: DS.Spacing.xs) {
             Slider(
                 value: $viewModel.scrubPosition,
                 in: 0...1,
@@ -110,21 +129,29 @@ struct PlayerView: View {
                     }
                 }
             )
-            .tint(.primary)
+            .tint(DS.Color.coral)
 
             HStack {
                 Text(viewModel.scrubDisplayCurrentTime)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .timestampStyle()
 
                 Spacer()
 
                 Text(viewModel.scrubDisplayRemainingTime)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .timestampStyle()
             }
+
+            Button {
+                viewModel.togglePlaybackDisplayMode()
+            } label: {
+                Text(viewModel.displayProgressLabel)
+                    .font(DS.Typography.caption)
+                    .foregroundStyle(DS.Color.tertiary)
+                    .contentTransition(.numericText())
+                    .animation(DS.Animation.fade, value: viewModel.displayProgressLabel)
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.top, 28)
     }
 
     // MARK: - Transport Controls
@@ -133,27 +160,25 @@ struct PlayerView: View {
         HStack(spacing: 0) {
             Spacer()
 
-            // Skip backward
             Button {
                 viewModel.skipBackward()
             } label: {
-                Image(systemName: "gobackward.15")
+                Image(systemName: "gobackward.\(viewModel.skipBackwardIntervalSeconds)")
                     .font(.system(size: 26, weight: .medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(DS.Color.primary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DS.ButtonStyle.transport)
 
             Spacer()
 
-            // Play / Pause
             Button {
                 viewModel.togglePlayPause()
             } label: {
                 ZStack {
                     Circle()
-                        .fill(Color.accentColor)
+                        .fill(DS.Color.coral)
                         .frame(width: 72, height: 72)
-                        .shadow(color: Color.accentColor.opacity(0.38), radius: 14, y: 5)
+                        .applyShadows(DS.Shadow.playButton)
 
                     if viewModel.playbackState == .loading {
                         ProgressView()
@@ -167,36 +192,36 @@ struct PlayerView: View {
                     }
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DS.ButtonStyle.playerControl)
 
             Spacer()
 
-            // Skip forward
             Button {
                 viewModel.skipForward()
             } label: {
-                Image(systemName: "goforward.15")
+                Image(systemName: "goforward.\(viewModel.skipForwardIntervalSeconds)")
                     .font(.system(size: 26, weight: .medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(DS.Color.primary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DS.ButtonStyle.transport)
 
             Spacer()
         }
-        .padding(.top, 36)
     }
 
-    // MARK: - Bottom Row (speed + chapters)
+    // MARK: - Bottom Row (speed | chapters | bookmarks | sleep timer)
 
     private var bottomRow: some View {
-        HStack(spacing: 16) {
-            Spacer()
+        HStack(spacing: DS.Spacing.sm) {
             speedMenu
             chaptersButton
-            Spacer()
+            bookmarksButton
+            sleepTimerMenu
         }
-        .padding(.top, 30)
+        .padding(.horizontal, DS.Spacing.md)
     }
+
+    // MARK: - Speed Menu
 
     private var speedMenu: some View {
         Menu {
@@ -207,7 +232,6 @@ struct PlayerView: View {
                     let label = speed.truncatingRemainder(dividingBy: 1) == 0
                         ? "\(Int(speed))×"
                         : String(format: "%.2g×", speed)
-
                     if speed == viewModel.playbackSpeed {
                         Label(label, systemImage: "checkmark")
                     } else {
@@ -217,26 +241,67 @@ struct PlayerView: View {
             }
         } label: {
             Text(viewModel.speedLabel)
-                .font(.system(.callout, design: .rounded, weight: .semibold))
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 9)
-                .background(Capsule().fill(Color(.secondarySystemBackground)))
+                .pillAppearance()
         }
     }
+
+    // MARK: - Chapters Button
 
     private var chaptersButton: some View {
         Button {
             viewModel.isChaptersPresented = true
         } label: {
             Image(systemName: "list.bullet")
-                .font(.system(.callout, weight: .semibold))
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 9)
-                .background(Capsule().fill(Color(.secondarySystemBackground)))
+                .pillAppearance()
         }
         .buttonStyle(.plain)
         .disabled(viewModel.chapters.isEmpty)
+    }
+
+    // MARK: - Bookmarks Button
+
+    private var bookmarksButton: some View {
+        Button {
+            viewModel.isBookmarksPresented = true
+        } label: {
+            Image(systemName: "bookmark")
+                .pillAppearance()
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Sleep Timer Menu
+
+    private var sleepTimerMenu: some View {
+        Menu {
+            Button { viewModel.setSleepTimer(.off) } label: {
+                if viewModel.sleepTimerOption == .off {
+                    Label("Off", systemImage: "checkmark")
+                } else { Text("Off") }
+            }
+            Divider()
+            ForEach([5, 10, 15, 30, 45, 60], id: \.self) { minutes in
+                Button { viewModel.setSleepTimer(.minutes(minutes)) } label: {
+                    if viewModel.sleepTimerOption == .minutes(minutes) {
+                        Label("\(minutes) min", systemImage: "checkmark")
+                    } else { Text("\(minutes) min") }
+                }
+            }
+            Divider()
+            Button { viewModel.setSleepTimer(.endOfChapter) } label: {
+                if viewModel.sleepTimerOption == .endOfChapter {
+                    Label("End of Chapter", systemImage: "checkmark")
+                } else { Text("End of Chapter") }
+            }
+        } label: {
+            Group {
+                if viewModel.sleepTimerOption == .off {
+                    Image(systemName: "moon.zzz")
+                } else {
+                    Text(viewModel.sleepTimerLabel)
+                }
+            }
+            .pillAppearance(isActive: viewModel.sleepTimerOption != .off)
+        }
     }
 }

@@ -8,8 +8,8 @@ import UniformTypeIdentifiers
 
 struct LibraryView: View {
     @State private var viewModel: LibraryViewModel
+    @FocusState private var isSearchFocused: Bool
 
-    // Allowed audio file types for the file importer.
     private static let allowedTypes: [UTType] = {
         var types: [UTType] = [.mp3, .mpeg4Audio]
         if let m4b = UTType(filenameExtension: "m4b") { types.append(m4b) }
@@ -21,23 +21,7 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                if viewModel.audiobooks.isEmpty && !viewModel.isImporting {
-                    emptyState
-                } else {
-                    bookList
-                }
-            }
-            .navigationTitle("Library")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar { toolbarItems }
-            .safeAreaInset(edge: .bottom) { mergeBar }
-            // Import loading overlay
-            .overlay { importOverlay }
-            // Merge title sheet
-            .sheet(isPresented: $viewModel.isMergeSheetPresented) { mergeSheet }
-            // File importer
+        navigationContent
             .fileImporter(
                 isPresented: $viewModel.isFileImporterPresented,
                 allowedContentTypes: Self.allowedTypes,
@@ -47,13 +31,42 @@ struct LibraryView: View {
                 case .success(let urls):
                     Task { await viewModel.importFiles(urls) }
                 case .failure(let error):
-                    // Only surface user-facing errors (cancelled = no-op).
                     if (error as NSError).code != NSUserCancelledError {
-                        Task { await viewModel.importFiles([]) }  // triggers no-op; error shown inline
+                        Task { await viewModel.importFiles([]) }
                     }
                 }
             }
-            // Error alert
+            .fileImporter(
+                isPresented: $viewModel.isFolderImporterPresented,
+                allowedContentTypes: [.folder],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    if let url = urls.first {
+                        Task { await viewModel.importFolder(url) }
+                    }
+                case .failure(let error):
+                    if (error as NSError).code != NSUserCancelledError {
+                        viewModel.reportError("Could not open the selected folder.")
+                    }
+                }
+            }
+            .alert("Delete Audiobook?", isPresented: $viewModel.isSwipeDeleteConfirmationPresented) {
+                Button("Delete", role: .destructive) { viewModel.confirmSwipeDelete() }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("This will permanently remove the audiobook and its file.")
+            }
+            .alert(
+                "Delete \(viewModel.selectedCount) \(viewModel.selectedCount == 1 ? "Book" : "Books")?",
+                isPresented: $viewModel.isBulkDeleteConfirmationPresented
+            ) {
+                Button("Delete", role: .destructive) { viewModel.confirmBulkDelete() }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("This will permanently remove the selected audiobooks and their files.")
+            }
             .alert(
                 "Something went wrong",
                 isPresented: Binding(
@@ -65,6 +78,52 @@ struct LibraryView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
+    }
+
+    // MARK: - Navigation Content
+
+    private var navigationContent: some View {
+        NavigationStack {
+            ZStack {
+                DS.Color.canvas.ignoresSafeArea()
+
+                if viewModel.audiobooks.isEmpty && !viewModel.isImporting {
+                    emptyState
+                } else if viewModel.filteredAudiobooks.isEmpty && !viewModel.searchText.isEmpty {
+                    noSearchResultsState
+                } else {
+                    bookList
+                }
+            }
+            .navigationTitle("Library")
+            .navigationBarTitleDisplayMode(.large)
+            .coralNavigationBanner()
+            .toolbar { toolbarItems }
+            .safeAreaInset(edge: .top, spacing: 0) { searchBarHeader }
+            .onChange(of: viewModel.isSearchActive) { _, active in
+                if active {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        isSearchFocused = true
+                    }
+                } else {
+                    isSearchFocused = false
+                }
+            }
+            .safeAreaInset(edge: .bottom) { mergeBar }
+            .overlay { importOverlay }
+            .overlay { celebrationOverlay }
+            .sheet(isPresented: $viewModel.isMergeSheetPresented) { mergeSheet }
+        }
+    }
+
+    // MARK: - Celebration Overlay
+
+    @ViewBuilder
+    private var celebrationOverlay: some View {
+        if let book = viewModel.celebratedBook {
+            PigCelebrationView(book: book) {
+                viewModel.dismissCelebration()
+            }
         }
     }
 
@@ -72,7 +131,7 @@ struct LibraryView: View {
 
     private var bookList: some View {
         List {
-            ForEach(viewModel.audiobooks) { audiobook in
+            ForEach(viewModel.filteredAudiobooks) { audiobook in
                 AudiobookRowView(
                     audiobook: audiobook,
                     isSelectionModeActive: viewModel.isSelectionModeActive,
@@ -80,49 +139,157 @@ struct LibraryView: View {
                     onTap: { viewModel.openPlayer(for: audiobook) },
                     onToggleSelection: { viewModel.toggleSelection(audiobook) }
                 )
+                .libraryCard()
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets())
-            }
-            .onDelete { indexSet in
-                viewModel.delete(at: indexSet)
+                .listRowInsets(EdgeInsets(
+                    top: DS.Spacing.xs,
+                    leading: 0,
+                    bottom: DS.Spacing.xs,
+                    trailing: 0
+                ))
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    finishSwipeAction(for: audiobook)
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    deleteSwipeAction(for: audiobook)
+                }
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
     }
 
+    // MARK: - Swipe Actions
+
+    @ViewBuilder
+    private func finishSwipeAction(for audiobook: Audiobook) -> some View {
+        if audiobook.isFinished {
+            Button {
+                viewModel.markUnfinished(audiobook)
+            } label: {
+                Label("Unfinish", systemImage: "arrow.counterclockwise")
+            }
+            .tint(DS.Color.coral.opacity(0.6))
+        } else {
+            Button {
+                viewModel.markFinished(audiobook)
+            } label: {
+                Label("Finished", systemImage: "checkmark.circle.fill")
+            }
+            .tint(DS.Color.coral)
+        }
+    }
+
+    @ViewBuilder
+    private func deleteSwipeAction(for audiobook: Audiobook) -> some View {
+        Button(role: .destructive) {
+            viewModel.requestDelete(audiobook)
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+    }
+
+    // MARK: - Search Bar
+
+    @ViewBuilder
+    private var searchBarHeader: some View {
+        if viewModel.isSearchActive {
+            HStack(spacing: DS.Spacing.sm) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(DS.Color.secondary)
+                    .font(.body)
+
+                TextField("Title, author, or file name", text: $viewModel.searchText)
+                    .focused($isSearchFocused)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .font(.body)
+                    .submitLabel(.search)
+
+                if !viewModel.searchText.isEmpty {
+                    Button {
+                        viewModel.searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(DS.Color.secondary)
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+
+                Button("Cancel") {
+                    withAnimation(DS.Animation.standard) {
+                        viewModel.clearSearch()
+                    }
+                }
+                .foregroundStyle(DS.Color.coral)
+                .font(.callout.weight(.medium))
+            }
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.vertical, DS.Spacing.sm + DS.Spacing.xs)
+            .background {
+                Capsule()
+                    .fill(DS.Color.secondarySurface)
+                    .applyShadows(DS.Shadow.card)
+            }
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.vertical, DS.Spacing.xs)
+            .transition(
+                .scale(scale: 0.01, anchor: UnitPoint(x: 0.05, y: 0.5))
+                .combined(with: .opacity)
+            )
+        }
+    }
+
+    // MARK: - No Search Results
+
+    private var noSearchResultsState: some View {
+        VStack(spacing: DS.Spacing.md) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 48))
+                .foregroundStyle(Color(UIColor.systemGray3))
+
+            Text("No Results")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(DS.Color.primary)
+
+            Text("No audiobooks match \"\(viewModel.searchText)\".")
+                .font(.subheadline)
+                .foregroundStyle(DS.Color.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, DS.Spacing.xl)
+    }
+
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DS.Spacing.md) {
             Image(systemName: "headphones")
                 .font(.system(size: 52))
-                .foregroundStyle(Color(.systemGray3))
+                .foregroundStyle(Color(UIColor.systemGray3))
 
             Text("Your Library is Empty")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(DS.Color.primary)
 
             Text("Tap + to add M4B or MP3 audiobooks.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondary)
                 .multilineTextAlignment(.center)
 
             Button {
                 viewModel.isFileImporterPresented = true
             } label: {
                 Label("Add Audiobooks", systemImage: "plus")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 11)
-                    .background(Color.accentColor, in: Capsule())
-                    .foregroundStyle(.white)
             }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
+            .buttonStyle(DS.ButtonStyle.primary())
+            .frame(maxWidth: 220)
+            .padding(.top, DS.Spacing.xs)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, DS.Spacing.xl)
     }
 
     // MARK: - Import Overlay
@@ -134,7 +301,7 @@ struct LibraryView: View {
                 Color.black.opacity(0.32)
                     .ignoresSafeArea()
 
-                VStack(spacing: 16) {
+                VStack(spacing: DS.Spacing.md) {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .tint(.white)
@@ -143,9 +310,12 @@ struct LibraryView: View {
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.white)
                 }
-                .padding(.horizontal, 36)
-                .padding(.vertical, 28)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .padding(.horizontal, DS.Spacing.xl)
+                .padding(.vertical, DS.Spacing.lg + DS.Spacing.sm)
+                .background(
+                    .regularMaterial,
+                    in: RoundedRectangle(cornerRadius: DS.Radius.sheet, style: .continuous)
+                )
             }
             .transition(.opacity)
         }
@@ -155,11 +325,39 @@ struct LibraryView: View {
 
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
-        // "+" — only when not in selection mode
+        ToolbarItem(placement: .navigationBarLeading) {
+            if viewModel.isSelectionModeActive && viewModel.canDeleteSelected {
+                Button(role: .destructive) {
+                    viewModel.requestBulkDelete()
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .transition(.opacity)
+            } else if !viewModel.isSelectionModeActive && !viewModel.isSearchActive {
+                Button {
+                    withAnimation(DS.Animation.standard) {
+                        viewModel.isSearchActive = true
+                    }
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                .transition(.opacity)
+            }
+        }
+
         ToolbarItem(placement: .navigationBarTrailing) {
             if !viewModel.isSelectionModeActive {
-                Button {
-                    viewModel.isFileImporterPresented = true
+                Menu {
+                    Button {
+                        viewModel.isFileImporterPresented = true
+                    } label: {
+                        Label("Add Files", systemImage: "doc.badge.plus")
+                    }
+                    Button {
+                        viewModel.isFolderImporterPresented = true
+                    } label: {
+                        Label("Add Folder", systemImage: "folder.badge.plus")
+                    }
                 } label: {
                     Image(systemName: "plus")
                         .fontWeight(.semibold)
@@ -168,11 +366,10 @@ struct LibraryView: View {
             }
         }
 
-        // Select / Done
         ToolbarItem(placement: .navigationBarTrailing) {
             if !viewModel.audiobooks.isEmpty {
                 Button(viewModel.isSelectionModeActive ? "Done" : "Select") {
-                    withAnimation(.easeInOut(duration: 0.22)) {
+                    withAnimation(DS.Animation.standard) {
                         viewModel.toggleSelectionMode()
                     }
                 }
@@ -194,16 +391,10 @@ struct LibraryView: View {
                     "Merge \(viewModel.selectedCount) Books",
                     systemImage: "rectangle.stack.badge.plus"
                 )
-                .font(.system(.body, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 8)
             }
-            .buttonStyle(.plain)
-            .shadow(color: Color.accentColor.opacity(0.35), radius: 12, y: 4)
+            .buttonStyle(DS.ButtonStyle.primary())
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.bottom, DS.Spacing.sm)
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
@@ -212,45 +403,49 @@ struct LibraryView: View {
 
     private var mergeSheet: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DS.Spacing.lg) {
+                VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                     Text("New Audiobook Title")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .textCase(.uppercase).tracking(0.5)
+                        .font(DS.Typography.caption)
+                        .foregroundStyle(DS.Color.secondary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
 
                     TextField("Enter title…", text: $viewModel.pendingMergeTitle)
                         .font(.body)
-                        .padding(12)
+                        .padding(DS.Spacing.sm + DS.Spacing.xs)
                         .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color(.secondarySystemBackground))
+                            RoundedRectangle(cornerRadius: DS.Radius.input, style: .continuous)
+                                .fill(DS.Color.secondarySurface)
                         )
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                     Text("Books to merge (\(viewModel.selectedCount))")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .textCase(.uppercase).tracking(0.5)
+                        .font(DS.Typography.caption)
+                        .foregroundStyle(DS.Color.secondary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
 
                     let selectedBooks = viewModel.audiobooks.filter { viewModel.isSelected($0) }
                     VStack(spacing: 0) {
                         ForEach(selectedBooks) { book in
                             HStack {
                                 Image(systemName: "line.3.horizontal")
-                                    .foregroundStyle(Color(.systemGray3))
+                                    .foregroundStyle(Color(UIColor.systemGray3))
                                 Text(book.title).font(.callout)
                                 Spacer()
                             }
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 14)
+                            .padding(.vertical, DS.Spacing.sm + DS.Spacing.xs)
+                            .padding(.horizontal, DS.Spacing.sm + DS.Spacing.xs)
                             if book.id != selectedBooks.last?.id {
-                                Divider().padding(.leading, 14)
+                                Divider().padding(.leading, DS.Spacing.sm + DS.Spacing.xs)
                             }
                         }
                     }
                     .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color(.secondarySystemBackground))
+                        RoundedRectangle(cornerRadius: DS.Radius.input, style: .continuous)
+                            .fill(DS.Color.secondarySurface)
                     )
                 }
 
@@ -264,27 +459,19 @@ struct LibraryView: View {
                             ProgressView().tint(.white)
                         } else {
                             Text("Merge into One Book")
-                                .font(.system(.body, weight: .semibold))
                         }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        viewModel.pendingMergeTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            ? Color(.systemGray4)
-                            : Color.accentColor,
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    )
-                    .foregroundStyle(.white)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(DS.ButtonStyle.primary(
+                    isDisabled: viewModel.pendingMergeTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ))
                 .disabled(
                     viewModel.pendingMergeTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     || viewModel.isMerging
                 )
-                .animation(.easeInOut(duration: 0.15), value: viewModel.pendingMergeTitle.isEmpty)
+                .animation(DS.Animation.fade, value: viewModel.pendingMergeTitle.isEmpty)
             }
-            .padding(20)
+            .padding(DS.Spacing.md)
             .navigationTitle("Merge Books")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -20,6 +20,21 @@ import UIKit
 @Observable
 final class PlayerViewModel {
 
+    // MARK: - Playback Display Mode
+
+    enum PlaybackDisplayMode {
+        case entireBook
+        case currentChapter
+    }
+
+    // MARK: - Sleep Timer
+
+    enum SleepTimerOption: Equatable {
+        case off
+        case minutes(Int)
+        case endOfChapter
+    }
+
     // MARK: - Displayed State
 
     private(set) var playbackState: PlaybackState = .idle
@@ -30,6 +45,9 @@ final class PlayerViewModel {
 
     /// Remaining time string, e.g. "-2:11:05". Updated from engine every 0.5 s.
     private(set) var displayRemainingTime: String = "-0:00"
+
+    /// Whether the slider and time labels are scoped to the whole book or the active chapter.
+    private(set) var playbackDisplayMode: PlaybackDisplayMode = .entireBook
 
     // MARK: - Scrubbing
 
@@ -43,19 +61,57 @@ final class PlayerViewModel {
 
     private(set) var audiobook: Audiobook?
 
+    /// Decoded cover image, cached at book-load time via CoverArtCache.
+    private(set) var coverImage: UIImage?
+
     // MARK: - Chapters
 
     /// Controls the chapters sheet presented from PlayerView.
     var isChaptersPresented: Bool = false
 
-    /// Chapters of the current audiobook sorted by play order.
-    var chapters: [Chapter] {
-        audiobook?.chapters.sorted { $0.orderIndex < $1.orderIndex } ?? []
-    }
+    /// Chapters of the current audiobook sorted by play order. Cached at load time.
+    private(set) var chapters: [Chapter] = []
 
     /// Index into `chapters` for the chapter that contains the current playback position.
-    /// Kept as a stored property so @Observable tracks it and the sheet updates reactively.
     private(set) var currentChapterIndex: Int = 0
+
+    /// Title shown in the player header.
+    /// When the book is a single undivided file, the audiobook name is used.
+    /// When the book has multiple chapters, the current chapter's title is shown.
+    var playerTitle: String {
+        guard chapters.count > 1 else {
+            return audiobook?.title ?? ""
+        }
+        return chapters[currentChapterIndex].title
+    }
+
+    // MARK: - Bookmarks
+
+    /// Controls the bookmarks sheet presented from PlayerView.
+    var isBookmarksPresented: Bool = false
+
+    /// Bookmarks for the current audiobook sorted by timestamp. Cached and invalidated on mutation.
+    private(set) var bookmarks: [Bookmark] = []
+
+    // MARK: - Sleep Timer
+
+    private(set) var sleepTimerOption: SleepTimerOption = .off
+    private(set) var sleepTimerRemaining: TimeInterval = 0
+
+    @ObservationIgnored private var sleepTimerCancellable: AnyCancellable?
+
+    /// Display label shown on the sleep timer button when the timer is active.
+    var sleepTimerLabel: String {
+        switch sleepTimerOption {
+        case .off:
+            return ""
+        case .minutes:
+            let total = Int(max(0, sleepTimerRemaining))
+            return String(format: "%d:%02d", total / 60, total % 60)
+        case .endOfChapter:
+            return "Chapter"
+        }
+    }
 
     // MARK: - Speed Options
 
@@ -68,8 +124,13 @@ final class PlayerViewModel {
             : String(format: "%.2g×", f)
     }
 
+    /// The current skip-forward interval as an integer, used to pick the matching SF Symbol.
+    var skipForwardIntervalSeconds: Int { Int(settings.skipForwardInterval) }
+
+    /// The current skip-backward interval as an integer, used to pick the matching SF Symbol.
+    var skipBackwardIntervalSeconds: Int { Int(settings.skipBackwardInterval) }
+
     /// True whenever an audiobook is loaded into the engine (even while loading/paused).
-    /// Drives MiniPlayer visibility.
     var isActive: Bool { audiobook != nil }
 
     var playPauseImage: String {
@@ -77,24 +138,66 @@ final class PlayerViewModel {
         return "play.fill"
     }
 
-    // MARK: - Computed display during scrub
+    // MARK: - Display Mode Toggle
 
-    /// Elapsed time accounting for active scrub position.
-    var scrubDisplayCurrentTime: String {
-        isScrubbing ? Self.formatTime(scrubPosition * audioEngine.duration) : displayCurrentTime
+    func togglePlaybackDisplayMode() {
+        playbackDisplayMode = playbackDisplayMode == .entireBook ? .currentChapter : .entireBook
+        guard !isScrubbing else { return }
+        applyEngineTime(audioEngine.currentTime)
     }
 
-    /// Remaining time accounting for active scrub position.
+    /// Summary label shown below the time row; acts as the toggle tap target.
+    var displayProgressLabel: String {
+        switch playbackDisplayMode {
+        case .entireBook:
+            let duration = audioEngine.duration
+            guard duration > 0 else { return "0% completed" }
+            let time = isScrubbing ? scrubPosition * duration : audioEngine.currentTime
+            let pct = Int((time / duration * 100).rounded())
+            return "\(pct)% completed"
+        case .currentChapter:
+            let chaps = chapters
+            guard !chaps.isEmpty else { return "" }
+            return "Chapter \(currentChapterIndex + 1) of \(chaps.count)"
+        }
+    }
+
+    // MARK: - Computed display during scrub
+
+    var scrubDisplayCurrentTime: String {
+        guard isScrubbing else { return displayCurrentTime }
+        switch playbackDisplayMode {
+        case .entireBook:
+            return Self.formatTime(scrubPosition * audioEngine.duration)
+        case .currentChapter:
+            let chaps = chapters
+            guard !chaps.isEmpty else { return Self.formatTime(scrubPosition * audioEngine.duration) }
+            return Self.formatTime(scrubPosition * chaps[currentChapterIndex].duration)
+        }
+    }
+
     var scrubDisplayRemainingTime: String {
         guard isScrubbing else { return displayRemainingTime }
-        let t = scrubPosition * audioEngine.duration
-        return "-\(Self.formatTime(max(0, audioEngine.duration - t)))"
+        switch playbackDisplayMode {
+        case .entireBook:
+            let t = scrubPosition * audioEngine.duration
+            return "-\(Self.formatTime(max(0, audioEngine.duration - t)))"
+        case .currentChapter:
+            let chaps = chapters
+            guard !chaps.isEmpty else {
+                let t = scrubPosition * audioEngine.duration
+                return "-\(Self.formatTime(max(0, audioEngine.duration - t)))"
+            }
+            let chapterDuration = chaps[currentChapterIndex].duration
+            return "-\(Self.formatTime(max(0, chapterDuration - scrubPosition * chapterDuration)))"
+        }
     }
 
     // MARK: - Private
 
     private let audioEngine: any AudioEngineProtocol
     private let modelContext: ModelContext
+    private let settings: AppSettings
 
     @ObservationIgnored
     private var cancellables = Set<AnyCancellable>()
@@ -104,20 +207,26 @@ final class PlayerViewModel {
 
     // MARK: - Init
 
-    init(audioEngine: any AudioEngineProtocol, modelContext: ModelContext) {
+    init(audioEngine: any AudioEngineProtocol, modelContext: ModelContext, appSettings: AppSettings) {
         self.audioEngine = audioEngine
         self.modelContext = modelContext
+        self.settings = appSettings
         observeEngine()
-        startPositionSaveTimer()
         installBackgroundObserver()
+        observeSkipIntervalSettings()
     }
 
     // MARK: - Lifecycle
 
     func loadAudiobook(_ audiobook: Audiobook, autoPlay: Bool = false) async {
         self.audiobook = audiobook
+        self.chapters = audiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
+        self.bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
+        self.coverImage = CoverArtCache.shared.image(for: audiobook)
         do {
             try await audioEngine.load(audiobook: audiobook)
+            try? audioEngine.setPlaybackSpeed(settings.defaultSpeed)
+            playbackSpeed = audioEngine.playbackSpeed
             if autoPlay { try? audioEngine.play() }
         } catch {
             playbackState = .failed(message: "Could not load \"\(audiobook.title)\".")
@@ -138,11 +247,11 @@ final class PlayerViewModel {
     }
 
     func skipForward() {
-        Task { try? await audioEngine.skipForward(by: 15) }
+        Task { try? await audioEngine.skipForward(by: settings.skipForwardInterval) }
     }
 
     func skipBackward() {
-        Task { try? await audioEngine.skipBackward(by: 15) }
+        Task { try? await audioEngine.skipBackward(by: settings.skipBackwardInterval) }
     }
 
     func setSpeed(_ speed: Float) {
@@ -155,6 +264,57 @@ final class PlayerViewModel {
         Task { try? await audioEngine.seek(to: chapter.startTime) }
     }
 
+    // MARK: - Bookmarks
+
+    func addBookmark() {
+        guard let audiobook else { return }
+        let title = Self.formatTime(audioEngine.currentTime)
+        let bookmark = Bookmark(title: title, timestamp: audioEngine.currentTime, audiobook: audiobook)
+        audiobook.bookmarks.append(bookmark)
+        bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
+        try? modelContext.save()
+    }
+
+    func deleteBookmark(_ bookmark: Bookmark) {
+        audiobook?.bookmarks.removeAll { $0.id == bookmark.id }
+        modelContext.delete(bookmark)
+        bookmarks = audiobook?.bookmarks.sorted { $0.timestamp < $1.timestamp } ?? []
+        try? modelContext.save()
+    }
+
+    func seekToBookmark(_ bookmark: Bookmark) {
+        isBookmarksPresented = false
+        Task { try? await audioEngine.seek(to: bookmark.timestamp) }
+    }
+
+    // MARK: - Sleep Timer
+
+    func setSleepTimer(_ option: SleepTimerOption) {
+        sleepTimerCancellable?.cancel()
+        sleepTimerCancellable = nil
+        sleepTimerOption = option
+        sleepTimerRemaining = 0
+
+        guard case .minutes(let n) = option else { return }
+
+        sleepTimerRemaining = TimeInterval(n * 60)
+        sleepTimerCancellable = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if self.sleepTimerRemaining > 1 {
+                    self.sleepTimerRemaining -= 1
+                } else {
+                    self.sleepTimerRemaining = 0
+                    self.audioEngine.pause()
+                    self.savePlaybackPosition()
+                    self.sleepTimerOption = .off
+                    self.sleepTimerCancellable?.cancel()
+                    self.sleepTimerCancellable = nil
+                }
+            }
+    }
+
     // MARK: - Scrubbing
 
     func beginScrubbing() {
@@ -162,7 +322,19 @@ final class PlayerViewModel {
     }
 
     func commitScrub() async {
-        let targetTime = scrubPosition * audioEngine.duration
+        let targetTime: TimeInterval
+        switch playbackDisplayMode {
+        case .entireBook:
+            targetTime = scrubPosition * audioEngine.duration
+        case .currentChapter:
+            let chaps = chapters
+            if chaps.isEmpty {
+                targetTime = scrubPosition * audioEngine.duration
+            } else {
+                let chapter = chaps[currentChapterIndex]
+                targetTime = chapter.startTime + scrubPosition * chapter.duration
+            }
+        }
         isScrubbing = false
         try? await audioEngine.seek(to: targetTime)
     }
@@ -174,7 +346,15 @@ final class PlayerViewModel {
             .receive(on: RunLoop.main)
             .sink { [weak self] time in
                 guard let self, !self.isScrubbing else { return }
+                let prevChapterIndex = self.currentChapterIndex
                 self.applyEngineTime(time)
+                // Sleep-timer: endOfChapter — pause as soon as the chapter advances.
+                if self.sleepTimerOption == .endOfChapter
+                    && self.currentChapterIndex > prevChapterIndex {
+                    self.audioEngine.pause()
+                    self.savePlaybackPosition()
+                    self.sleepTimerOption = .off
+                }
             }
             .store(in: &cancellables)
 
@@ -185,12 +365,14 @@ final class PlayerViewModel {
                 self.playbackState = state
                 self.playbackSpeed = self.audioEngine.playbackSpeed
 
-                // Persist position any time playback stops naturally or by user action.
                 switch state {
+                case .playing:
+                    self.startPositionSaveTimer()
                 case .paused, .finished:
+                    self.stopPositionSaveTimer()
                     self.savePlaybackPosition()
                 default:
-                    break
+                    self.stopPositionSaveTimer()
                 }
             }
             .store(in: &cancellables)
@@ -198,46 +380,103 @@ final class PlayerViewModel {
 
     private func applyEngineTime(_ time: TimeInterval) {
         let duration = audioEngine.duration
-        scrubPosition = duration > 0 ? min(1, time / duration) : 0
-        displayCurrentTime = Self.formatTime(time)
-        displayRemainingTime = "-\(Self.formatTime(max(0, duration - time)))"
-        currentChapterIndex = resolveChapterIndex(for: time)
+        let newIndex = resolveChapterIndex(for: time)
+        if newIndex != currentChapterIndex { currentChapterIndex = newIndex }
+
+        let newScrub: Double
+        let newCurrent: String
+        let newRemaining: String
+
+        switch playbackDisplayMode {
+        case .entireBook:
+            newScrub    = duration > 0 ? min(1, time / duration) : 0
+            newCurrent  = Self.formatTime(time)
+            newRemaining = "-\(Self.formatTime(max(0, duration - time)))"
+
+        case .currentChapter:
+            if chapters.isEmpty {
+                newScrub    = duration > 0 ? min(1, time / duration) : 0
+                newCurrent  = Self.formatTime(time)
+                newRemaining = "-\(Self.formatTime(max(0, duration - time)))"
+            } else {
+                let chapter = chapters[newIndex]
+                let elapsed = max(0, time - chapter.startTime)
+                let dur     = chapter.duration
+                newScrub    = dur > 0 ? min(1, elapsed / dur) : 0
+                newCurrent  = Self.formatTime(elapsed)
+                newRemaining = "-\(Self.formatTime(max(0, dur - elapsed)))"
+            }
+        }
+
+        // scrubPosition drives the slider and must update every tick for smooth motion.
+        // The string labels only change once per second — skip the write when unchanged
+        // to avoid invalidating views that only read those labels.
+        scrubPosition = newScrub
+        if displayCurrentTime  != newCurrent   { displayCurrentTime  = newCurrent }
+        if displayRemainingTime != newRemaining { displayRemainingTime = newRemaining }
     }
 
     private func resolveChapterIndex(for time: TimeInterval) -> Int {
-        let chaps = chapters
-        for (i, chapter) in chaps.enumerated() {
+        guard !chapters.isEmpty else { return 0 }
+        var low = 0, high = chapters.count - 1
+        while low <= high {
+            let mid = (low + high) / 2
+            let chapter = chapters[mid]
             if time >= chapter.startTime && time < chapter.startTime + chapter.duration {
-                return i
+                return mid
+            } else if time < chapter.startTime {
+                high = mid - 1
+            } else {
+                low = mid + 1
             }
         }
-        return max(0, chaps.count - 1)
+        return max(0, chapters.count - 1)
     }
 
     // MARK: - Private — Persistence
 
-    /// Writes the current engine position back to the SwiftData model and saves.
     private func savePlaybackPosition() {
         guard let audiobook else { return }
         audiobook.currentPlaybackTime = audioEngine.currentTime
         try? modelContext.save()
     }
 
-    /// Fires every 5 seconds; saves only during active playback to minimise writes.
     private func startPositionSaveTimer() {
+        guard positionSaveTimer == nil else { return }
         positionSaveTimer = Timer.publish(every: 5, on: .main, in: .common)
             .autoconnect()
-            .sink { [weak self] _ in
-                guard let self, case .playing = self.playbackState else { return }
-                self.savePlaybackPosition()
-            }
+            .sink { [weak self] _ in self?.savePlaybackPosition() }
     }
 
-    /// Saves when the app moves to the background (home button, phone call screen, etc.).
+    private func stopPositionSaveTimer() {
+        positionSaveTimer?.cancel()
+        positionSaveTimer = nil
+    }
+
     private func installBackgroundObserver() {
         NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
             .sink { [weak self] _ in self?.savePlaybackPosition() }
             .store(in: &cancellables)
+    }
+
+    private func observeSkipIntervalSettings() {
+        pushSkipIntervalsToEngine()
+        withObservationTracking {
+            _ = settings.skipForwardInterval
+            _ = settings.skipBackwardInterval
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.pushSkipIntervalsToEngine()
+                self?.observeSkipIntervalSettings()
+            }
+        }
+    }
+
+    private func pushSkipIntervalsToEngine() {
+        audioEngine.updateRemoteSkipIntervals(
+            forward: settings.skipForwardInterval,
+            backward: settings.skipBackwardInterval
+        )
     }
 
     // MARK: - Private — Formatting

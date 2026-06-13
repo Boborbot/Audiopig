@@ -13,12 +13,15 @@ struct MiniPlayerView: View {
     let viewModel: PlayerViewModel
     let onTap: () -> Void
 
+    /// Average colour of the current cover art — recomputed only when the image changes.
+    private var artworkTint: Color? { viewModel.coverImage?.miniPlayerTint }
+
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: DS.Spacing.sm + DS.Spacing.xs) {
 
             // Left: art + title — tapping opens the full player
             Button(action: onTap) {
-                HStack(spacing: 12) {
+                HStack(spacing: DS.Spacing.sm) {
                     coverArt
                     titleStack
                     Spacer(minLength: 0)
@@ -27,17 +30,17 @@ struct MiniPlayerView: View {
             }
             .buttonStyle(.plain)
 
-            // Skip backward 15 s
+            // Skip backward
             Button {
                 viewModel.skipBackward()
             } label: {
-                Image(systemName: "gobackward.15")
+                Image(systemName: "gobackward.\(viewModel.skipBackwardIntervalSeconds)")
                     .font(.system(size: 21, weight: .medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(DS.Color.primary)
                     .frame(width: 36, height: 36)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DS.ButtonStyle.transport)
 
             // Play / Pause
             Button {
@@ -46,29 +49,38 @@ struct MiniPlayerView: View {
                 ZStack {
                     if viewModel.playbackState == .loading {
                         ProgressView()
-                            .tint(.primary)
+                            .tint(DS.Color.primary)
                     } else {
                         Image(systemName: viewModel.playPauseImage)
                             .font(.system(size: 23, weight: .semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(DS.Color.primary)
                             .contentTransition(.symbolEffect(.replace))
                     }
                 }
                 .frame(width: 36, height: 36)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(DS.ButtonStyle.transport)
+
+            // Skip forward
+            Button {
+                viewModel.skipForward()
+            } label: {
+                Image(systemName: "goforward.\(viewModel.skipForwardIntervalSeconds)")
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(DS.Color.primary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(DS.ButtonStyle.transport)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, DS.Spacing.md)
         .padding(.vertical, 11)
         .background {
-            Rectangle()
-                .fill(.thinMaterial)
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color(.separator).opacity(0.5))
-                        .frame(height: 0.5)
-                }
+            MiniPlayerPillBackground(
+                progress: viewModel.scrubPosition,
+                tintColor: artworkTint
+            )
         }
     }
 
@@ -76,34 +88,33 @@ struct MiniPlayerView: View {
 
     private var coverArt: some View {
         Group {
-            if let data = viewModel.audiobook?.coverArtwork,
-               let uiImage = UIImage(data: data) {
+            if let uiImage = viewModel.coverImage {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } else {
                 ZStack {
-                    Color(.systemGray5)
+                    DS.Color.artworkPlaceholder
                     Image(systemName: "headphones")
                         .font(.system(size: 16))
-                        .foregroundStyle(Color(.systemGray2))
+                        .foregroundStyle(Color(UIColor.systemGray2))
                 }
             }
         }
         .frame(width: 40, height: 40)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.chip, style: .continuous))
     }
 
     private var titleStack: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(viewModel.audiobook?.title ?? "")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+            Text(viewModel.playerTitle)
+                .font(DS.Typography.listTitle)
+                .foregroundStyle(DS.Color.primary)
                 .lineLimit(1)
 
             Text(viewModel.audiobook?.author ?? "")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(DS.Typography.caption)
+                .foregroundStyle(DS.Color.secondary)
                 .lineLimit(1)
         }
     }

@@ -20,7 +20,7 @@ struct AudiobookRowView: View {
                 onTap()
             }
         } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: DS.Spacing.sm + DS.Spacing.xs) {
                 selectionIndicator
                 coverArtwork
                 bookInfo
@@ -28,12 +28,12 @@ struct AudiobookRowView: View {
                 progressIndicator
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.vertical, DS.Spacing.sm + DS.Spacing.xs)
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.2), value: isSelectionModeActive)
-        .animation(.easeInOut(duration: 0.15), value: isSelected)
+        .animation(DS.Animation.standard, value: isSelectionModeActive)
+        .animation(DS.Animation.snappy, value: isSelected)
     }
 
     // MARK: - Sub-views
@@ -43,12 +43,15 @@ struct AudiobookRowView: View {
         if isSelectionModeActive {
             ZStack {
                 Circle()
-                    .stroke(isSelected ? Color.accentColor : Color(.systemGray3), lineWidth: 1.5)
+                    .stroke(
+                        isSelected ? DS.Color.coral : Color(UIColor.systemGray3),
+                        lineWidth: 1.5
+                    )
                     .frame(width: 24, height: 24)
 
                 if isSelected {
                     Circle()
-                        .fill(Color.accentColor)
+                        .fill(DS.Color.coral)
                         .frame(width: 24, height: 24)
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .bold))
@@ -60,43 +63,59 @@ struct AudiobookRowView: View {
     }
 
     private var coverArtwork: some View {
-        Group {
-            if let data = audiobook.coverArtwork,
-               let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                ZStack {
-                    Color(.systemGray5)
-                    Image(systemName: "headphones")
-                        .font(.title3)
-                        .foregroundStyle(Color(.systemGray2))
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let uiImage = CoverArtCache.shared.image(for: audiobook) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    ZStack {
+                        DS.Color.artworkPlaceholder
+                        Image(systemName: "headphones")
+                            .font(.title3)
+                            .foregroundStyle(Color(UIColor.systemGray2))
+                    }
                 }
             }
+            .frame(width: 60, height: 60)
+            .listCoverArtClip()
+
+            if audiobook.isFinished {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(DS.Color.coral)
+                    .background(
+                        Circle()
+                            .fill(Color(UIColor.systemBackground))
+                            .padding(-2)
+                    )
+                    .offset(x: 4, y: -4)
+                    .transition(.scale.combined(with: .opacity))
+            }
         }
-        .frame(width: 60, height: 60)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .animation(DS.Animation.snappy, value: audiobook.isFinished)
     }
 
     private var bookInfo: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(audiobook.title)
-                .font(.system(.callout, design: .default, weight: .semibold))
-                .foregroundStyle(.primary)
+                .font(DS.Typography.listTitle)
+                .foregroundStyle(DS.Color.primary)
                 .lineLimit(1)
 
             Text(audiobook.author)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondary)
                 .lineLimit(1)
 
             Text(AudiobookProgressFormatter.progressText(
                 currentTime: audiobook.currentPlaybackTime,
-                duration: audiobook.duration
+                duration: audiobook.duration,
+                isManuallyFinished: audiobook.isManuallyFinished
             ))
-            .font(.caption)
-            .foregroundStyle(Color(.tertiaryLabel))
+            .font(DS.Typography.caption)
+            .foregroundStyle(DS.Color.tertiary)
             .lineLimit(1)
             .padding(.top, 2)
         }

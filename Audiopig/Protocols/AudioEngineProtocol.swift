@@ -52,4 +52,7 @@ protocol AudioEngineProtocol: AnyObject {
 
     /// Sets the playback rate. Clamped to [0.5, 3.0].
     func setPlaybackSpeed(_ speed: Float) throws
+
+    /// Updates the lock-screen skip-forward and skip-backward intervals for the remote command center.
+    func updateRemoteSkipIntervals(forward: TimeInterval, backward: TimeInterval)
 }

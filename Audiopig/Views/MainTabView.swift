@@ -23,15 +23,18 @@ struct MainTabView: View {
 
     @State private var viewModel: LibraryViewModel
     @State private var isPlayerPresented: Bool = false
+    private let appSettings: AppSettings
 
     /// Standard iOS tab-bar height (does not vary by device type or screen size).
     private static let tabBarHeight: CGFloat = 49
 
-    /// Intrinsic height of MiniPlayerView (vertical padding 11 × 2 + 40 pt art row = 62 pt).
-    private static let miniPlayerHeight: CGFloat = 62
+    /// Intrinsic height of MiniPlayerView (vertical padding 11 × 2 + 40 pt art row = 62 pt)
+    /// plus the 6 pt floating gap between the pill's bottom edge and the tab bar.
+    private static let miniPlayerHeight: CGFloat = 68
 
-    init(libraryViewModel: LibraryViewModel) {
+    init(libraryViewModel: LibraryViewModel, appSettings: AppSettings) {
         _viewModel = State(initialValue: libraryViewModel)
+        self.appSettings = appSettings
     }
 
     var body: some View {
@@ -41,19 +44,22 @@ struct MainTabView: View {
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }
                     .tabItem { Label("Library", systemImage: "books.vertical") }
 
-                SettingsView()
+                SettingsView(settings: appSettings)
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }
                     .tabItem { Label("Settings", systemImage: "gearshape") }
             }
 
             // MiniPlayer sits between tab-bar items and scroll content.
-            // .padding(.bottom, tabBarHeight) lifts it above the 49 pt tab bar.
+            // Horizontal padding floats the pill away from screen edges;
+            // the extra 6 pt bottom gap gives the shadow room to breathe
+            // above the tab bar.
             if viewModel.playerViewModel.isActive {
                 MiniPlayerView(
                     viewModel: viewModel.playerViewModel,
                     onTap: { isPlayerPresented = true }
                 )
-                .padding(.bottom, Self.tabBarHeight)
+                .padding(.horizontal, DS.Spacing.sm)
+                .padding(.bottom, Self.tabBarHeight + 6)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }

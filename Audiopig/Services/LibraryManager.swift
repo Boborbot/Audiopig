@@ -179,6 +179,11 @@ final class LibraryManager: LibraryManagerProtocol {
         let masterAudiobook = audiobooks[0]
         masterAudiobook.title = title
 
+        // Snapshot absorbed audiobooks' book-level file URLs before any mutation.
+        // After chapters are re-parented these records are deleted; any URL that isn't
+        // covered by a surviving chapter in the master is an orphan and should be removed.
+        let absorbedFileURLs = audiobooks.dropFirst().map(\.fileURL)
+
         var timelineOffset = masterAudiobook.duration
         var nextOrderIndex = (masterAudiobook.chapters.map(\.orderIndex).max() ?? -1) + 1
 
@@ -207,6 +212,15 @@ final class LibraryManager: LibraryManagerProtocol {
             try context.save()
         } catch {
             throw LibraryManagerError.mergeFailed
+        }
+
+        // Delete any absorbed book-level files that are no longer referenced by a chapter
+        // in the merged result. In the typical single-file-per-book case every absorbed
+        // fileURL is reused as a chapter URL so nothing is deleted; this guard handles
+        // future edge cases where the book-level URL diverges from its chapter URLs.
+        let masterChapterURLs = Set(masterAudiobook.chapters.map(\.fileURL))
+        for fileURL in absorbedFileURLs where !masterChapterURLs.contains(fileURL) {
+            try? deleteAudiobookFile(at: fileURL)
         }
 
         return masterAudiobook

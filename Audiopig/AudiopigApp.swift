@@ -12,6 +12,7 @@ import SwiftData
 struct AudiopigApp: App {
 
     private let container: DependencyContainer
+    private let libraryViewModel: LibraryViewModel
 
     init() {
         do {
@@ -26,6 +27,12 @@ struct AudiopigApp: App {
             )
             DependencyContainer.shared = dc
             self.container = dc
+            self.libraryViewModel = LibraryViewModel(
+                modelContext: dc.modelContainer.mainContext,
+                libraryManager: dc.libraryManager,
+                audioEngine: dc.audioEngine,
+                appSettings: dc.appSettings
+            )
         } catch {
             fatalError("Audiopig failed to initialise core services: \(error.localizedDescription)")
         }
@@ -34,13 +41,11 @@ struct AudiopigApp: App {
     var body: some Scene {
         WindowGroup {
             MainTabView(
-                libraryViewModel: LibraryViewModel(
-                    modelContext: container.modelContainer.mainContext,
-                    libraryManager: container.libraryManager,
-                    audioEngine: container.audioEngine
-                )
+                libraryViewModel: libraryViewModel,
+                appSettings: container.appSettings
             )
             .modelContainer(container.modelContainer)
+            .preferredColorScheme(container.appSettings.appearance.colorScheme)
         }
     }
 }

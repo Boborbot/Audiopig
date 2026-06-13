@@ -22,9 +22,10 @@ struct ChaptersListView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .coralActiveIndicator(isActive: index == viewModel.currentChapterIndex)
                     .listRowBackground(
                         index == viewModel.currentChapterIndex
-                            ? Color.accentColor.opacity(0.08)
+                            ? DS.Color.coralSubtle.opacity(0.6)
                             : Color.clear
                     )
                 }
@@ -36,9 +37,11 @@ struct ChaptersListView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
+                        .foregroundStyle(DS.Color.coral)
                 }
             }
         }
+        .sheetGlass()
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
@@ -51,16 +54,16 @@ private struct ChapterRow: View {
     let isActive: Bool
 
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: DS.Spacing.sm + DS.Spacing.xs) {
+            VStack(alignment: .leading, spacing: DS.Spacing.xs) {
                 Text(chapter.title)
-                    .font(isActive ? .body.weight(.semibold) : .body)
-                    .foregroundStyle(isActive ? Color.accentColor : .primary)
+                    .font(isActive ? DS.Typography.listBody.bold() : DS.Typography.listBody)
+                    .foregroundStyle(isActive ? DS.Color.coral : DS.Color.primary)
                     .lineLimit(2)
 
                 Text(PlayerViewModel.formatTime(chapter.duration))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(DS.Typography.timestamp)
+                    .foregroundStyle(DS.Color.secondary)
             }
 
             Spacer(minLength: 0)
@@ -69,10 +72,10 @@ private struct ChapterRow: View {
                 Image(systemName: "waveform")
                     .symbolEffect(.variableColor.iterative, isActive: true)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(DS.Color.coral)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, DS.Spacing.xs)
         .contentShape(Rectangle())
     }
 }
