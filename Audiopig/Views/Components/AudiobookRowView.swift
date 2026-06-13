@@ -71,10 +71,10 @@ struct AudiobookRowView: View {
                         .aspectRatio(contentMode: .fill)
                 } else {
                     ZStack {
-                        DS.Color.artworkPlaceholder
+                        audiobook.placeholderColor.opacity(0.75)
                         Image(systemName: "headphones")
                             .font(.title3)
-                            .foregroundStyle(Color(UIColor.systemGray2))
+                            .foregroundStyle(.white.opacity(0.7))
                     }
                 }
             }

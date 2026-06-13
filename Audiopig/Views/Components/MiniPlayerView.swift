@@ -94,10 +94,10 @@ struct MiniPlayerView: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 ZStack {
-                    DS.Color.artworkPlaceholder
+                    viewModel.audiobook?.placeholderColor.opacity(0.75) ?? DS.Color.artworkPlaceholder
                     Image(systemName: "headphones")
                         .font(.system(size: 16))
-                        .foregroundStyle(Color(UIColor.systemGray2))
+                        .foregroundStyle(.white.opacity(0.7))
                 }
             }
         }
