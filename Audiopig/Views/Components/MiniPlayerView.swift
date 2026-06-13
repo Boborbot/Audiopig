@@ -29,6 +29,7 @@ struct MiniPlayerView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Open player for \(viewModel.audiobook?.title ?? "current audiobook")")
 
             // Skip backward
             Button {
@@ -41,6 +42,7 @@ struct MiniPlayerView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(DS.ButtonStyle.transport)
+            .accessibilityLabel("Skip back \(viewModel.skipBackwardIntervalSeconds) seconds")
 
             // Play / Pause
             Button {
@@ -61,6 +63,7 @@ struct MiniPlayerView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(DS.ButtonStyle.transport)
+            .accessibilityLabel(viewModel.playbackState == .playing ? "Pause" : "Play")
 
             // Skip forward
             Button {
@@ -73,6 +76,7 @@ struct MiniPlayerView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(DS.ButtonStyle.transport)
+            .accessibilityLabel("Skip forward \(viewModel.skipForwardIntervalSeconds) seconds")
         }
         .padding(.horizontal, DS.Spacing.md)
         .padding(.vertical, 11)

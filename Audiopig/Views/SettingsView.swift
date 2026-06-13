@@ -84,7 +84,9 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Label("Version 1.0", systemImage: "info.circle")
+                    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+                    let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+                    Label("Version \(version) (\(build))", systemImage: "info.circle")
                         .foregroundStyle(DS.Color.secondary)
                 } header: {
                     Text("About")

@@ -56,6 +56,8 @@ final class AppSettings {
         static let appearance           = "settings.appearance"
         static let autoDeleteOnFinish   = "settings.autoDeleteOnFinish"
         static let trackReadingStats    = "settings.trackReadingStats"
+        static let sleepTimerOption     = "settings.sleepTimerOption"
+        static let sleepTimerExpiry     = "settings.sleepTimerExpiry"
     }
 
     // MARK: - Backing Stores (not observed individually)
@@ -184,5 +186,50 @@ final class AppSettings {
                 UserDefaults.standard.set(newValue.rawValue, forKey: Keys.appearance)
             }
         }
+    }
+
+    // MARK: - Sleep Timer Session Persistence
+
+    /// Persists the active sleep timer so it survives an app kill.
+    ///
+    /// - For `.minutes` timers the absolute expiry date is stored so that time elapsed
+    ///   while the app was killed is correctly subtracted on restore.
+    /// - For `.endOfChapter` the option name is stored without a time component.
+    /// - For `.off` any previous persisted state is cleared.
+    func saveSleepTimer(option: String, expiryDate: Date?) {
+        UserDefaults.standard.set(option, forKey: Keys.sleepTimerOption)
+        if let expiry = expiryDate {
+            UserDefaults.standard.set(expiry, forKey: Keys.sleepTimerExpiry)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Keys.sleepTimerExpiry)
+        }
+    }
+
+    /// Returns the persisted sleep timer state, or `nil` if none is saved or it has expired.
+    ///
+    /// Returns a tuple of `(optionRawString, remainingSeconds)`.
+    /// For `.endOfChapter` remaining is always 0.
+    /// Returns `nil` when the persisted timer has already elapsed.
+    func loadSleepTimer() -> (option: String, remaining: TimeInterval)? {
+        guard let raw = UserDefaults.standard.string(forKey: Keys.sleepTimerOption) else { return nil }
+        if raw == "endOfChapter" {
+            return ("endOfChapter", 0)
+        }
+        if raw.hasPrefix("minutes") {
+            guard let expiry = UserDefaults.standard.object(forKey: Keys.sleepTimerExpiry) as? Date else { return nil }
+            let remaining = expiry.timeIntervalSinceNow
+            guard remaining > 0 else {
+                clearSleepTimer()
+                return nil
+            }
+            return (raw, remaining)
+        }
+        return nil
+    }
+
+    /// Clears any persisted sleep timer state.
+    func clearSleepTimer() {
+        UserDefaults.standard.removeObject(forKey: Keys.sleepTimerOption)
+        UserDefaults.standard.removeObject(forKey: Keys.sleepTimerExpiry)
     }
 }

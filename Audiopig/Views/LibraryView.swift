@@ -60,7 +60,7 @@ struct LibraryView: View {
                         Task { await viewModel.importFiles(urls) }
                     case .failure(let error):
                         if (error as NSError).code != NSUserCancelledError {
-                            Task { await viewModel.importFiles([]) }
+                            viewModel.reportError("Could not open the selected files. Please try again.")
                         }
                     }
                 }
@@ -355,6 +355,7 @@ struct LibraryView: View {
                     Image(systemName: "trash")
                 }
                 .transition(.opacity)
+                .accessibilityLabel("Delete selected")
             } else if !viewModel.isSelectionModeActive && !viewModel.isSearchActive {
                 Button {
                     withAnimation(DS.Animation.standard) {
@@ -364,6 +365,7 @@ struct LibraryView: View {
                     Image(systemName: "magnifyingglass")
                 }
                 .transition(.opacity)
+                .accessibilityLabel("Search library")
             }
         }
 
@@ -385,6 +387,7 @@ struct LibraryView: View {
                         .fontWeight(.semibold)
                 }
                 .transition(.opacity)
+                .accessibilityLabel("Add audiobook")
             }
         }
 

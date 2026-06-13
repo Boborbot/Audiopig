@@ -239,6 +239,7 @@ final class PlayerViewModel {
         observeEngine()
         installBackgroundObserver()
         observeSkipIntervalSettings()
+        restoreSleepTimer()
     }
 
     // MARK: - Lifecycle
@@ -353,9 +354,22 @@ final class PlayerViewModel {
         sleepTimerOption = option
         sleepTimerRemaining = 0
 
-        guard case .minutes(let n) = option else { return }
+        switch option {
+        case .off:
+            settings.clearSleepTimer()
 
-        sleepTimerRemaining = TimeInterval(n * 60)
+        case .endOfChapter:
+            settings.saveSleepTimer(option: "endOfChapter", expiryDate: nil)
+
+        case .minutes(let n):
+            sleepTimerRemaining = TimeInterval(n * 60)
+            let expiryDate = Date().addingTimeInterval(sleepTimerRemaining)
+            settings.saveSleepTimer(option: "minutes(\(n))", expiryDate: expiryDate)
+            startMinutesTimer()
+        }
+    }
+
+    private func startMinutesTimer() {
         sleepTimerCancellable = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
@@ -369,8 +383,27 @@ final class PlayerViewModel {
                     self.sleepTimerOption = .off
                     self.sleepTimerCancellable?.cancel()
                     self.sleepTimerCancellable = nil
+                    self.settings.clearSleepTimer()
                 }
             }
+    }
+
+    /// Restores a persisted sleep timer after an app kill. Called once from `init`.
+    private func restoreSleepTimer() {
+        guard let saved = settings.loadSleepTimer() else { return }
+
+        if saved.option == "endOfChapter" {
+            sleepTimerOption = .endOfChapter
+            return
+        }
+
+        // Parse "minutes(N)" format
+        if saved.option.hasPrefix("minutes("), saved.option.hasSuffix(")"),
+           let n = Int(saved.option.dropFirst(8).dropLast()) {
+            sleepTimerOption = .minutes(n)
+            sleepTimerRemaining = saved.remaining
+            startMinutesTimer()
+        }
     }
 
     // MARK: - Scrubbing

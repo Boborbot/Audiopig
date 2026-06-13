@@ -115,20 +115,55 @@ struct PlayerView: View {
 
             scrubberSection
                 .padding(.horizontal, DS.Spacing.md)
-                .padding(.top, DS.Spacing.sm)          // was lg (24) → sm (8)
+                .padding(.top, DS.Spacing.sm)
+
+            if case .failed(let message) = viewModel.playbackState {
+                failedStateBanner(message: message)
+                    .padding(.horizontal, DS.Spacing.md)
+                    .padding(.top, DS.Spacing.md)
+            }
 
             controlsSection
-                .padding(.top, DS.Spacing.md + DS.Spacing.sm) // was lg+sm (32) → md+sm (24)
+                .padding(.top, DS.Spacing.md + DS.Spacing.sm)
 
             bottomRow
-                .padding(.top, DS.Spacing.md + DS.Spacing.sm) // was lg+sm (32) → md+sm (24)
+                .padding(.top, DS.Spacing.md + DS.Spacing.sm)
 
             lullAnalysisSection
                 .padding(.top, DS.Spacing.sm)
                 .padding(.horizontal, DS.Spacing.md)
-                .padding(.bottom, DS.Spacing.md)       // was lg (24) → md (16)
+                .padding(.bottom, DS.Spacing.md)
         }
-        .padding(.top, DS.Spacing.md)                  // was lg (24) → md (16)
+        .padding(.top, DS.Spacing.md)
+    }
+
+    // MARK: - Failed State Banner
+
+    private func failedStateBanner(message: String) -> some View {
+        HStack(spacing: DS.Spacing.sm) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.white)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Playback Error")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Spacing.md)
+        .padding(.vertical, DS.Spacing.sm + DS.Spacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: DS.Radius.chip, style: .continuous)
+                .fill(Color.red.opacity(0.80))
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Playback error: \(message)")
     }
 
     // MARK: - Scrubber
@@ -147,6 +182,8 @@ struct PlayerView: View {
                 }
             )
             .tint(DS.Color.coral)
+            .accessibilityLabel("Playback position")
+            .accessibilityValue(viewModel.scrubDisplayCurrentTime)
 
             HStack {
                 Text(viewModel.scrubDisplayCurrentTime)
@@ -185,6 +222,7 @@ struct PlayerView: View {
                     .foregroundStyle(DS.Color.primary)
             }
             .buttonStyle(DS.ButtonStyle.transport)
+            .accessibilityLabel("Skip back \(viewModel.skipBackwardIntervalSeconds) seconds")
 
             Spacer()
 
@@ -210,6 +248,7 @@ struct PlayerView: View {
                 }
             }
             .buttonStyle(DS.ButtonStyle.playerControl)
+            .accessibilityLabel(viewModel.playbackState == .playing ? "Pause" : "Play")
 
             Spacer()
 
@@ -221,6 +260,7 @@ struct PlayerView: View {
                     .foregroundStyle(DS.Color.primary)
             }
             .buttonStyle(DS.ButtonStyle.transport)
+            .accessibilityLabel("Skip forward \(viewModel.skipForwardIntervalSeconds) seconds")
 
             Spacer()
         }
@@ -260,6 +300,7 @@ struct PlayerView: View {
             Text(viewModel.speedLabel)
                 .pillAppearance()
         }
+        .accessibilityLabel("Playback speed, \(viewModel.speedLabel)")
     }
 
     // MARK: - Chapters Button
@@ -273,6 +314,7 @@ struct PlayerView: View {
         }
         .buttonStyle(.plain)
         .disabled(viewModel.chapters.isEmpty)
+        .accessibilityLabel("Chapters")
     }
 
     // MARK: - Bookmarks Button
@@ -285,6 +327,7 @@ struct PlayerView: View {
                 .pillAppearance()
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Bookmarks")
     }
 
     // MARK: - Sleep Timer Menu
@@ -320,6 +363,10 @@ struct PlayerView: View {
             }
             .pillAppearance(isActive: viewModel.sleepTimerOption != .off)
         }
+        .accessibilityLabel(viewModel.sleepTimerOption == .off
+            ? "Sleep timer, off"
+            : "Sleep timer, \(viewModel.sleepTimerLabel)"
+        )
     }
 
     // MARK: - Lull Analysis Section

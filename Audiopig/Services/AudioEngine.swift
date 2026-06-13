@@ -278,8 +278,6 @@ final class AudioEngine: AudioEngineProtocol {
         let globalSeekTime = chapter.startTime + localOffset
         let fst = fileSeekTime(forGlobalTime: globalSeekTime, inChapterAt: index)
 
-        print("[AudioEngine] Loading: \(chapter.fileURL.lastPathComponent) — fileSeek \(String(format: "%.1f", fst))s (global \(String(format: "%.1f", globalSeekTime))s)")
-        print("[AudioEngine] File exists: \(FileManager.default.fileExists(atPath: chapter.fileURL.path))")
 
         currentChapterIndex = index
         removeTimeObserver()
@@ -327,7 +325,6 @@ final class AudioEngine: AudioEngineProtocol {
             itemReadinessResumed = true
             playerItemStatusObservation?.invalidate()
             playerItemStatusObservation = nil
-            print("[AudioEngine] Item ready.")
 
             guard fst > 0 else { return }
 
@@ -345,7 +342,6 @@ final class AudioEngine: AudioEngineProtocol {
             playerItemStatusObservation?.invalidate()
             playerItemStatusObservation = nil
             let desc = item.error?.localizedDescription ?? "Unknown AVPlayer error"
-            print("[AudioEngine] Item FAILED: \(desc)")
             _playbackState.send(.failed(message: desc))
 
         default:
