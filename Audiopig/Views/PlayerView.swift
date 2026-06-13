@@ -56,19 +56,32 @@ struct PlayerView: View {
     }
 
     private var artworkPlaceholder: some View {
-        ZStack {
+        let accent = viewModel.audiobook?.placeholderColor ?? DS.Color.artworkPlaceholder
+        return ZStack {
             RoundedRectangle(cornerRadius: DS.Radius.coverArt, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [DS.Color.artworkPlaceholder, Color(UIColor.systemGray4)],
+                        colors: [accent.opacity(0.85), accent.opacity(0.55)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .aspectRatio(1, contentMode: .fit)
-            Image(systemName: "headphones")
-                .font(.system(size: 60))
-                .foregroundStyle(Color(UIColor.systemGray2))
+
+            VStack(spacing: DS.Spacing.md) {
+                Image(systemName: "headphones")
+                    .font(.system(size: 36, weight: .light))
+                    .foregroundStyle(.white.opacity(0.5))
+
+                if let title = viewModel.audiobook?.title {
+                    Text(title)
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(4)
+                        .padding(.horizontal, DS.Spacing.lg)
+                }
+            }
         }
     }
 

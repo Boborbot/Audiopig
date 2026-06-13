@@ -5,6 +5,7 @@
 
 import Foundation
 import SwiftData
+import SwiftUI
 
 @Model
 final class Audiobook {
@@ -21,6 +22,23 @@ final class Audiobook {
     /// playback has reached the end naturally.
     var isFinished: Bool {
         isManuallyFinished || (duration > 0 && currentPlaybackTime >= duration)
+    }
+
+    /// A stable accent color derived from the book's UUID.
+    /// The same book always gets the same color; no storage required.
+    var placeholderColor: Color {
+        let palette: [Color] = [
+            Color(red: 0.35, green: 0.40, blue: 0.75), // indigo
+            Color(red: 0.22, green: 0.57, blue: 0.60), // teal
+            Color(red: 0.75, green: 0.38, blue: 0.20), // burnt orange
+            Color(red: 0.52, green: 0.28, blue: 0.70), // purple
+            Color(red: 0.72, green: 0.25, blue: 0.48), // rose
+            Color(red: 0.18, green: 0.55, blue: 0.68), // cyan
+            Color(red: 0.22, green: 0.60, blue: 0.45), // mint
+            Color(red: 0.50, green: 0.35, blue: 0.25), // brown
+        ]
+        let index = abs(id.hashValue) % palette.count
+        return palette[index]
     }
 
     @Relationship(deleteRule: .cascade, inverse: \Chapter.audiobook)
