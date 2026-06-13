@@ -313,7 +313,7 @@ final class PlayerViewModel {
 
     private func startLullAnalysis() {
         lullAnalysisState = .analyzing
-        let to = audioEngine.currentTime
+        let to = max(0, audioEngine.currentTime - 30)  // exclude last 30 s
         let from = max(0, to - 300)
         let chapters = audioEngine.resolvedChapters
         Task {
