@@ -115,20 +115,20 @@ struct PlayerView: View {
 
             scrubberSection
                 .padding(.horizontal, DS.Spacing.md)
-                .padding(.top, DS.Spacing.lg)
+                .padding(.top, DS.Spacing.sm)          // was lg (24) → sm (8)
 
             controlsSection
-                .padding(.top, DS.Spacing.lg + DS.Spacing.sm)
+                .padding(.top, DS.Spacing.md + DS.Spacing.sm) // was lg+sm (32) → md+sm (24)
 
             bottomRow
-                .padding(.top, DS.Spacing.lg + DS.Spacing.sm)
+                .padding(.top, DS.Spacing.md + DS.Spacing.sm) // was lg+sm (32) → md+sm (24)
 
             lullAnalysisSection
                 .padding(.top, DS.Spacing.sm)
                 .padding(.horizontal, DS.Spacing.md)
-                .padding(.bottom, DS.Spacing.lg)
+                .padding(.bottom, DS.Spacing.md)       // was lg (24) → md (16)
         }
-        .padding(.top, DS.Spacing.lg)
+        .padding(.top, DS.Spacing.md)                  // was lg (24) → md (16)
     }
 
     // MARK: - Scrubber
