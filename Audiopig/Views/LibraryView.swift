@@ -5,7 +5,6 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
-import AudioToolbox
 
 struct LibraryView: View {
     @State private var viewModel: LibraryViewModel
@@ -123,15 +122,6 @@ struct LibraryView: View {
                 }
             }
             .overlay { importOverlay }
-            .overlay { celebrationOverlay }
-            .overlay { iconUnlockOverlay }
-            .onChange(of: viewModel.celebratedBook?.id) { _, bookID in
-                guard bookID != nil else { return }
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                // System sound 1073 ("mail sent" ascending chime) — plays over existing
-                // audio via its own ambient session; silently ignored if unavailable.
-                AudioServicesPlaySystemSound(SystemSoundID(1073))
-            }
             .sheet(isPresented: $viewModel.isMergeSheetPresented) { mergeSheet }
             .sheet(isPresented: $viewModel.isFolderSheetPresented) { folderSheet }
             .sheet(item: $viewModel.bookPendingEdit) { audiobook in
@@ -142,32 +132,6 @@ struct LibraryView: View {
             .navigationDestination(for: Folder.self) { folder in
                 FolderContentView(folder: folder, viewModel: viewModel)
             }
-        }
-    }
-
-    // MARK: - Celebration Overlay
-
-    @ViewBuilder
-    private var celebrationOverlay: some View {
-        if viewModel.celebratedBook != nil {
-            ConfettiBurstView {
-                viewModel.dismissCelebration()
-            }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-        }
-    }
-
-    // MARK: - Icon Unlock Overlay
-
-    @ViewBuilder
-    private var iconUnlockOverlay: some View {
-        if let tier = viewModel.newlyUnlockedIconTier {
-            IconUnlockOverlay(tier: tier) {
-                viewModel.dismissIconUnlock()
-            }
-            .ignoresSafeArea()
-            .transition(.opacity)
         }
     }
 

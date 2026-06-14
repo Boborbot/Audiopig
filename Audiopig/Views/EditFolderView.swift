@@ -23,9 +23,26 @@ struct EditFolderView: View {
     }
 
     var body: some View {
+        @Bindable var vm = vm
+
         NavigationStack {
             Form {
-                artworkSection
+                ArtworkPickerSection(
+                    draftArtwork: $vm.draftArtwork,
+                    isPhotoPickerPresented: $vm.isPhotoPickerPresented,
+                    isCameraPresented: $vm.isCameraPresented,
+                    isFileImporterPresented: $vm.isFileImporterPresented,
+                    hasClipboardImage: vm.hasClipboardImage,
+                    onPasteFromClipboard: { vm.pasteFromClipboard() }
+                ) {
+                    ZStack {
+                        DS.Color.coral.opacity(0.15)
+                        Image(systemName: "folder.fill")
+                            .font(.largeTitle)
+                            .foregroundStyle(DS.Color.coral)
+                    }
+                }
+
                 metadataSection
             }
             .navigationTitle("Edit Folder")
@@ -58,6 +75,7 @@ struct EditFolderView: View {
                        let image = UIImage(data: data) {
                         vm.draftArtwork = image
                     }
+                    photoPickerItem = nil
                 }
             }
             .sheet(isPresented: $vm.isCameraPresented) {
@@ -76,23 +94,6 @@ struct EditFolderView: View {
         }
     }
 
-    // MARK: - Sections
-
-    private var artworkSection: some View {
-        Section {
-            HStack(spacing: DS.Spacing.md) {
-                artworkPreview
-                    .frame(width: 100, height: 100)
-                    .listCoverArtClip()
-
-                changeArtworkMenu
-            }
-            .padding(.vertical, DS.Spacing.xs)
-        } header: {
-            Text("Artwork")
-        }
-    }
-
     private var metadataSection: some View {
         Section {
             LabeledContent("Title") {
@@ -101,58 +102,6 @@ struct EditFolderView: View {
             }
         } header: {
             Text("Details")
-        }
-    }
-
-    // MARK: - Artwork Components
-
-    @ViewBuilder
-    private var artworkPreview: some View {
-        if let img = vm.draftArtwork {
-            Image(uiImage: img)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-        } else {
-            ZStack {
-                DS.Color.coral.opacity(0.15)
-                Image(systemName: "folder.fill")
-                    .font(.largeTitle)
-                    .foregroundStyle(DS.Color.coral)
-            }
-        }
-    }
-
-    private var changeArtworkMenu: some View {
-        Menu {
-            Button {
-                vm.isPhotoPickerPresented = true
-            } label: {
-                Label("Photo Library", systemImage: "photo.on.rectangle")
-            }
-
-            Button {
-                vm.isCameraPresented = true
-            } label: {
-                Label("Camera", systemImage: "camera")
-            }
-
-            Button {
-                vm.isFileImporterPresented = true
-            } label: {
-                Label("Choose File", systemImage: "doc")
-            }
-
-            if vm.hasClipboardImage {
-                Button {
-                    vm.pasteFromClipboard()
-                } label: {
-                    Label("Paste from Clipboard", systemImage: "doc.on.clipboard")
-                }
-            }
-        } label: {
-            Text("Change Artwork")
-                .font(.callout)
-                .foregroundStyle(DS.Color.coral)
         }
     }
 }

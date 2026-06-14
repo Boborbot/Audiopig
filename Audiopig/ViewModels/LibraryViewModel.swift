@@ -102,8 +102,15 @@ final class LibraryViewModel {
     var newlyUnlockedIconTier: AppIconTier?
 
     /// When `autoDeleteOnFinish` is on, the book is held here until the celebration
-    /// completes so the overlay can still reference its title during the animation.
+    /// completes, then the user is asked whether to delete it.
     private var pendingAutoDeleteBook: Audiobook?
+
+    /// Shown after the finish celebration when auto-delete is enabled.
+    var isAutoDeleteConfirmationPresented: Bool = false
+
+    var pendingAutoDeleteBookTitle: String {
+        pendingAutoDeleteBook?.title ?? "this audiobook"
+    }
 
     // MARK: - Pending Edit
 
@@ -236,19 +243,40 @@ final class LibraryViewModel {
         newlyUnlockedIconTier = nil
     }
 
-    /// Unmarks a book so it is no longer manually finished.
+    /// Unmarks a book so it is no longer manually finished and removes its finished records.
     func markUnfinished(_ audiobook: Audiobook) {
         audiobook.isManuallyFinished = false
+        removeFinishedRecords(for: audiobook.id)
         saveContext(errorContext: "mark unfinished")
     }
 
-    /// Clears the celebration overlay; if auto-delete is pending, deletes the book now.
+    /// Clears the celebration overlay; prompts to delete when auto-delete is pending.
     func dismissCelebration() {
         celebratedBook = nil
-        if let book = pendingAutoDeleteBook {
-            pendingAutoDeleteBook = nil
-            delete(book)
+        if pendingAutoDeleteBook != nil {
+            isAutoDeleteConfirmationPresented = true
         }
+    }
+
+    func confirmAutoDelete() {
+        guard let book = pendingAutoDeleteBook else { return }
+        pendingAutoDeleteBook = nil
+        isAutoDeleteConfirmationPresented = false
+        delete(book)
+    }
+
+    func cancelAutoDelete() {
+        pendingAutoDeleteBook = nil
+        isAutoDeleteConfirmationPresented = false
+    }
+
+    private func removeFinishedRecords(for audiobookID: UUID) {
+        let id = audiobookID
+        let descriptor = FetchDescriptor<FinishedRecord>(
+            predicate: #Predicate { $0.audiobookID == id }
+        )
+        let records = (try? modelContext.fetch(descriptor)) ?? []
+        records.forEach { modelContext.delete($0) }
     }
 
     // MARK: - Delete

@@ -76,6 +76,7 @@ struct MainTabView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .finishCelebrationOverlay(viewModel: viewModel)
         .animation(
             .spring(response: 0.38, dampingFraction: 0.80),
             value: viewModel.playerViewModel.isActive
