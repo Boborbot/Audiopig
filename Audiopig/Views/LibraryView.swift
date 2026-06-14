@@ -122,7 +122,6 @@ struct LibraryView: View {
                     isSearchFocused = false
                 }
             }
-            .safeAreaInset(edge: .bottom) { mergeBar }
             .overlay { importOverlay }
             .overlay { celebrationOverlay }
             .overlay { iconUnlockOverlay }
@@ -362,15 +361,26 @@ struct LibraryView: View {
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .navigationBarLeading) {
-            if viewModel.isSelectionModeActive && viewModel.canDeleteSelected {
-                Button(role: .destructive) {
-                    viewModel.requestBulkDelete()
+            if viewModel.isSelectionModeActive {
+                Menu {
+                    Button(role: .destructive) {
+                        viewModel.requestBulkDelete()
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .disabled(!viewModel.canDeleteSelected)
+
+                    Button {
+                        viewModel.presentMergeSheet()
+                    } label: {
+                        Label("Combine into Volume", systemImage: "rectangle.stack.badge.plus")
+                    }
+                    .disabled(!viewModel.canMergeSelected)
                 } label: {
-                    Image(systemName: "trash")
+                    Image(systemName: "ellipsis.circle")
                 }
                 .transition(.opacity)
-                .accessibilityLabel("Delete selected")
-            } else if !viewModel.isSelectionModeActive && !viewModel.isSearchActive {
+            } else if !viewModel.isSearchActive {
                 Button {
                     withAnimation(DS.Animation.standard) {
                         viewModel.isSearchActive = true
@@ -418,33 +428,13 @@ struct LibraryView: View {
         }
     }
 
-    // MARK: - Floating Merge Bar
-
-    @ViewBuilder
-    private var mergeBar: some View {
-        if viewModel.isSelectionModeActive && viewModel.canMergeSelected {
-            Button {
-                viewModel.isMergeSheetPresented = true
-            } label: {
-                Label(
-                    "Merge \(viewModel.selectedCount) Books",
-                    systemImage: "rectangle.stack.badge.plus"
-                )
-            }
-            .buttonStyle(DS.ButtonStyle.primary())
-            .padding(.horizontal, DS.Spacing.md)
-            .padding(.bottom, DS.Spacing.sm)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
-    }
-
-    // MARK: - Merge Sheet
+    // MARK: - Combine Sheet
 
     private var mergeSheet: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: DS.Spacing.lg) {
                 VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-                    Text("New Audiobook Title")
+                    Text("Volume Title")
                         .font(DS.Typography.caption)
                         .foregroundStyle(DS.Color.secondary)
                         .textCase(.uppercase)
@@ -460,32 +450,32 @@ struct LibraryView: View {
                 }
 
                 VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-                    Text("Books to merge (\(viewModel.selectedCount))")
+                    Text("Books to combine (\(viewModel.mergeOrder.count))")
                         .font(DS.Typography.caption)
                         .foregroundStyle(DS.Color.secondary)
                         .textCase(.uppercase)
                         .tracking(0.5)
 
-                    let selectedBooks = viewModel.audiobooks.filter { viewModel.isSelected($0) }
-                    VStack(spacing: 0) {
-                        ForEach(selectedBooks) { book in
+                    List {
+                        ForEach(viewModel.mergeOrder) { book in
                             HStack {
                                 Image(systemName: "line.3.horizontal")
                                     .foregroundStyle(Color(UIColor.systemGray3))
                                 Text(book.title).font(.callout)
                                 Spacer()
                             }
-                            .padding(.vertical, DS.Spacing.sm + DS.Spacing.xs)
-                            .padding(.horizontal, DS.Spacing.sm + DS.Spacing.xs)
-                            if book.id != selectedBooks.last?.id {
-                                Divider().padding(.leading, DS.Spacing.sm + DS.Spacing.xs)
-                            }
+                            .padding(.vertical, DS.Spacing.xs)
                         }
+                        .onMove { viewModel.moveMergeBook(from: $0, to: $1) }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                     .background(
                         RoundedRectangle(cornerRadius: DS.Radius.input, style: .continuous)
                             .fill(DS.Color.secondarySurface)
                     )
+                    .environment(\.editMode, .constant(.active))
+                    .frame(minHeight: 44 * CGFloat(viewModel.mergeOrder.count))
                 }
 
                 Spacer()
@@ -497,7 +487,7 @@ struct LibraryView: View {
                         if viewModel.isMerging {
                             ProgressView().tint(.white)
                         } else {
-                            Text("Merge into One Book")
+                            Text("Combine into Volume")
                         }
                     }
                 }
@@ -511,7 +501,7 @@ struct LibraryView: View {
                 .animation(DS.Animation.fade, value: viewModel.pendingMergeTitle.isEmpty)
             }
             .padding(DS.Spacing.md)
-            .navigationTitle("Merge Books")
+            .navigationTitle("Combine into Volume")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

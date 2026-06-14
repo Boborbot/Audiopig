@@ -46,6 +46,10 @@ final class LibraryViewModel {
     var isBulkDeleteConfirmationPresented: Bool = false
     var isSwipeDeleteConfirmationPresented: Bool = false
 
+    /// Ordered list of audiobooks to combine, populated when the sheet opens.
+    /// The user can reorder these before confirming; the order is respected by merge().
+    private(set) var mergeOrder: [Audiobook] = []
+
     // MARK: - Player Sub-ViewModel
 
     let playerViewModel: PlayerViewModel
@@ -323,6 +327,20 @@ final class LibraryViewModel {
 
     // MARK: - Merge
 
+    /// Opens the combine sheet, snapshotting the current selection into mergeOrder
+    /// so the user can drag to set the desired playback order before confirming.
+    func presentMergeSheet() {
+        mergeOrder = selectedAudiobooks
+        isMergeSheetPresented = true
+    }
+
+    func moveMergeBook(from source: IndexSet, to destination: Int) {
+        guard let sourceIndex = source.first else { return }
+        let item = mergeOrder.remove(at: sourceIndex)
+        let insertAt = destination > sourceIndex ? destination - 1 : destination
+        mergeOrder.insert(item, at: min(insertAt, mergeOrder.count))
+    }
+
     func mergeSelected() async {
         let title = pendingMergeTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canMergeSelected, !title.isEmpty else { return }
@@ -332,11 +350,12 @@ final class LibraryViewModel {
             isMerging = false
             isMergeSheetPresented = false
             pendingMergeTitle = ""
+            mergeOrder = []
         }
 
         do {
             _ = try libraryManager.merge(
-                audiobooks: selectedAudiobooks,
+                audiobooks: mergeOrder,
                 intoTitle: title,
                 in: modelContext
             )

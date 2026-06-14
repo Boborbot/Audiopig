@@ -177,6 +177,7 @@ final class LibraryManager: LibraryManagerProtocol {
         }
 
         let masterAudiobook = audiobooks[0]
+        let masterOriginalTitle = masterAudiobook.title
         masterAudiobook.title = title
 
         // Snapshot absorbed audiobooks' book-level file URLs before any mutation.
@@ -187,10 +188,22 @@ final class LibraryManager: LibraryManagerProtocol {
         var timelineOffset = masterAudiobook.duration
         var nextOrderIndex = (masterAudiobook.chapters.map(\.orderIndex).max() ?? -1) + 1
 
+        // For single-file master books, name the chapter after the original book title
+        // so chapter navigation in the merged result is meaningful.
+        let masterChapters = masterAudiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
+        if masterChapters.count == 1 {
+            masterChapters[0].title = masterOriginalTitle
+        }
+
         for absorbedAudiobook in audiobooks.dropFirst() {
             let chaptersToAbsorb = absorbedAudiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
 
             for chapter in chaptersToAbsorb {
+                // For single-file books (one chapter), name the chapter after the book
+                // so the merged result's chapter list is navigable by original book title.
+                if chaptersToAbsorb.count == 1 {
+                    chapter.title = absorbedAudiobook.title
+                }
                 chapter.startTime = timelineOffset + chapter.startTime
                 chapter.orderIndex = nextOrderIndex
                 chapter.audiobook = masterAudiobook
