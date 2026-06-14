@@ -32,6 +32,9 @@ struct PlayerView: View {
         .sheet(isPresented: $viewModel.isBookmarksPresented) {
             BookmarksListView(viewModel: viewModel)
         }
+        .sheet(item: $viewModel.pendingNewBookmark) { bookmark in
+            BookmarkEditView(viewModel: viewModel, bookmark: bookmark)
+        }
     }
 
     // MARK: - Artwork
@@ -320,17 +323,21 @@ struct PlayerView: View {
     // MARK: - Bookmarks Button
 
     private var bookmarksButton: some View {
-        Image(systemName: "bookmark")
-            .pillAppearance()
-            .contentShape(Rectangle())
-            .onTapGesture {
-                viewModel.addBookmark()
-            }
-            .onLongPressGesture {
-                viewModel.isBookmarksPresented = true
-            }
-            .accessibilityLabel("Bookmarks")
-            .accessibilityHint("Tap to bookmark current position. Hold to view all bookmarks.")
+        Button {
+            viewModel.addBookmarkForEditing()
+        } label: {
+            Image(systemName: "bookmark")
+                .pillAppearance()
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.5)
+                .onEnded { _ in
+                    viewModel.isBookmarksPresented = true
+                }
+        )
+        .accessibilityLabel("Bookmarks")
+        .accessibilityHint("Tap to add a bookmark. Hold to view all bookmarks.")
     }
 
     // MARK: - Sleep Timer Menu

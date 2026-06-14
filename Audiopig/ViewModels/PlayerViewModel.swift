@@ -96,6 +96,10 @@ final class PlayerViewModel {
     /// Set to the bookmark being edited to present BookmarkEditView from BookmarksListView.
     var editingBookmark: Bookmark? = nil
 
+    /// Set when a new bookmark is created via the player button tap, driving the quick-edit
+    /// sheet directly from PlayerView (separate from the list-edit flow).
+    var pendingNewBookmark: Bookmark? = nil
+
     // MARK: - Sleep Timer
 
     private(set) var sleepTimerOption: SleepTimerOption = .off
@@ -334,6 +338,16 @@ final class PlayerViewModel {
         audiobook.bookmarks.append(bookmark)
         bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
         try? modelContext.save()
+    }
+
+    /// Creates a bookmark at the current position and surfaces the edit sheet from PlayerView.
+    func addBookmarkForEditing() {
+        guard let audiobook else { return }
+        let bookmark = Bookmark(title: "", note: "", timestamp: audioEngine.currentTime, audiobook: audiobook)
+        audiobook.bookmarks.append(bookmark)
+        bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
+        try? modelContext.save()
+        pendingNewBookmark = bookmark
     }
 
     func deleteBookmark(_ bookmark: Bookmark) {
