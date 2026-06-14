@@ -19,15 +19,22 @@ final class CoverArtCache {
     }
 
     func image(for audiobook: Audiobook) -> UIImage? {
-        let key = audiobook.id as NSUUID
-        if let cached = cache.object(forKey: key) { return cached }
-        guard let data = audiobook.coverArtwork,
-              let image = UIImage(data: data) else { return nil }
-        cache.setObject(image, forKey: key)
-        return image
+        decode(id: audiobook.id, data: audiobook.coverArtwork)
+    }
+
+    func image(for folder: Folder) -> UIImage? {
+        decode(id: folder.id, data: folder.coverArtwork)
     }
 
     func invalidate(for id: UUID) {
         cache.removeObject(forKey: id as NSUUID)
+    }
+
+    private func decode(id: UUID, data: Data?) -> UIImage? {
+        let key = id as NSUUID
+        if let cached = cache.object(forKey: key) { return cached }
+        guard let data, let image = UIImage(data: data) else { return nil }
+        cache.setObject(image, forKey: key)
+        return image
     }
 }

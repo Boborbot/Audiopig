@@ -105,6 +105,10 @@ final class LibraryViewModel {
     /// completes so the overlay can still reference its title during the animation.
     private var pendingAutoDeleteBook: Audiobook?
 
+    // MARK: - Pending Edit
+
+    var bookPendingEdit: Audiobook?
+
     // MARK: - Pending Delete
 
     private var pendingSwipeDeleteIndexSet: IndexSet?
@@ -260,6 +264,17 @@ final class LibraryViewModel {
         selectedAudiobooks.forEach { delete($0) }
         isSelectionModeActive = false
         selectedIDs.removeAll()
+    }
+
+    // MARK: - Edit
+
+    func requestEdit(_ audiobook: Audiobook) {
+        bookPendingEdit = audiobook
+    }
+
+    func finishEdit() {
+        bookPendingEdit = nil
+        fetchAudiobooks()
     }
 
     /// Stores the swipe-delete index set and requests confirmation before executing.

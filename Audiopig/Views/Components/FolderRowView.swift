@@ -25,13 +25,19 @@ struct FolderRowView: View {
 
     @ViewBuilder
     private var coverArtwork: some View {
-        let books = folder.sortedAudiobooks
-        if books.count >= 4 {
-            fourGrid(Array(books.prefix(4)))
-        } else if let first = books.first {
-            singleCover(first)
+        if let img = CoverArtCache.shared.image(for: folder) {
+            Image(uiImage: img)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
         } else {
-            defaultIcon
+            let books = folder.sortedAudiobooks
+            if books.count >= 4 {
+                fourGrid(Array(books.prefix(4)))
+            } else if let first = books.first {
+                singleCover(first)
+            } else {
+                defaultIcon
+            }
         }
     }
 

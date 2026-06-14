@@ -134,6 +134,11 @@ struct LibraryView: View {
             }
             .sheet(isPresented: $viewModel.isMergeSheetPresented) { mergeSheet }
             .sheet(isPresented: $viewModel.isFolderSheetPresented) { folderSheet }
+            .sheet(item: $viewModel.bookPendingEdit) { audiobook in
+                EditAudiobookView(audiobook: audiobook) {
+                    viewModel.finishEdit()
+                }
+            }
             .navigationDestination(for: Folder.self) { folder in
                 FolderContentView(folder: folder, viewModel: viewModel)
             }
@@ -194,6 +199,7 @@ struct LibraryView: View {
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         deleteSwipeAction(for: audiobook)
+                        editSwipeAction(for: audiobook)
                     }
 
                 case .folder(let folder):
@@ -262,6 +268,16 @@ struct LibraryView: View {
         } label: {
             Label("Delete", systemImage: "trash")
         }
+    }
+
+    @ViewBuilder
+    private func editSwipeAction(for audiobook: Audiobook) -> some View {
+        Button {
+            viewModel.requestEdit(audiobook)
+        } label: {
+            Label("Edit", systemImage: "pencil")
+        }
+        .tint(.blue)
     }
 
     // MARK: - Search Bar
@@ -621,6 +637,8 @@ private struct FolderListRow: View {
     let folder: Folder
     let viewModel: LibraryViewModel
 
+    @State private var showEditSheet = false
+
     var body: some View {
         NavigationLink(value: folder) {
             FolderRowView(folder: folder)
@@ -641,6 +659,15 @@ private struct FolderListRow: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
+            Button {
+                showEditSheet = true
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(.blue)
+        }
+        .sheet(isPresented: $showEditSheet) {
+            EditFolderView(folder: folder) {}
         }
     }
 }
