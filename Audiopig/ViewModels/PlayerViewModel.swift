@@ -93,6 +93,9 @@ final class PlayerViewModel {
     /// Bookmarks for the current audiobook sorted by timestamp. Cached and invalidated on mutation.
     private(set) var bookmarks: [Bookmark] = []
 
+    /// Set to the bookmark being edited to present BookmarkEditView from BookmarksListView.
+    var editingBookmark: Bookmark? = nil
+
     // MARK: - Sleep Timer
 
     private(set) var sleepTimerOption: SleepTimerOption = .off
@@ -327,8 +330,7 @@ final class PlayerViewModel {
 
     func addBookmark() {
         guard let audiobook else { return }
-        let title = Self.formatTime(audioEngine.currentTime)
-        let bookmark = Bookmark(title: title, timestamp: audioEngine.currentTime, audiobook: audiobook)
+        let bookmark = Bookmark(title: "", note: "", timestamp: audioEngine.currentTime, audiobook: audiobook)
         audiobook.bookmarks.append(bookmark)
         bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
         try? modelContext.save()
@@ -341,9 +343,117 @@ final class PlayerViewModel {
         try? modelContext.save()
     }
 
+    func updateBookmark(_ bookmark: Bookmark, title: String, note: String, timestamp: TimeInterval) {
+        bookmark.title = title
+        bookmark.note = note
+        bookmark.timestamp = timestamp
+        bookmarks = audiobook?.bookmarks.sorted { $0.timestamp < $1.timestamp } ?? []
+        try? modelContext.save()
+    }
+
     func seekToBookmark(_ bookmark: Bookmark) {
         isBookmarksPresented = false
         Task { try? await audioEngine.seek(to: bookmark.timestamp) }
+    }
+
+    // MARK: - Bookmark Export
+
+    func exportText() -> String {
+        guard let audiobook else { return "" }
+        var lines: [String] = []
+
+        let header = exportHeader(for: audiobook)
+        lines.append(header)
+        lines.append("")
+
+        let col1 = 4, col2 = 10, col3 = 26
+        let divider = String(repeating: "─", count: col1) + "  "
+                    + String(repeating: "─", count: col2) + "  "
+                    + String(repeating: "─", count: col3) + "  "
+                    + String(repeating: "─", count: 40)
+        let heading = pad("#", col1) + "  " + pad("Timestamp", col2) + "  "
+                    + pad("Name", col3) + "  " + "Note"
+        lines.append(heading)
+        lines.append(divider)
+
+        for (i, bm) in bookmarks.enumerated() {
+            let idx   = pad(String(i + 1), col1)
+            let ts    = pad(Self.formatTime(bm.timestamp), col2)
+            let name  = pad(bm.title.isEmpty ? "—" : bm.title, col3)
+            let note  = bm.note.isEmpty ? "" : bm.note
+            lines.append("\(idx)  \(ts)  \(name)  \(note)")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    func exportCSV() -> String {
+        guard let audiobook else { return "" }
+        var rows: [String] = []
+        rows.append("# Audiobook Bookmarks")
+        rows.append("# Book: \(audiobook.title)")
+        rows.append("# Author: \(audiobook.author)")
+        rows.append("# Duration: \(Self.formatTime(audiobook.duration))")
+        rows.append("")
+        rows.append("#,Timestamp,Name,Note")
+
+        for (i, bm) in bookmarks.enumerated() {
+            let name = csvEscape(bm.title)
+            let note = csvEscape(bm.note)
+            rows.append("\(i + 1),\(Self.formatTime(bm.timestamp)),\(name),\(note)")
+        }
+
+        return rows.joined(separator: "\n")
+    }
+
+    func exportMarkdown() -> String {
+        guard let audiobook else { return "" }
+        var lines: [String] = []
+
+        lines.append("# Audiobook Bookmarks — \(audiobook.title)")
+        lines.append("")
+        lines.append("**Author:** \(audiobook.author)  ")
+        lines.append("**Duration:** \(Self.formatTime(audiobook.duration))  ")
+        let dateStr = DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none)
+        lines.append("**Exported:** \(dateStr)  ")
+        lines.append("")
+        lines.append("| # | Timestamp | Name | Note |")
+        lines.append("|---|-----------|------|------|")
+
+        for (i, bm) in bookmarks.enumerated() {
+            let name = mdEscape(bm.title.isEmpty ? "" : bm.title)
+            let note = mdEscape(bm.note)
+            lines.append("| \(i + 1) | \(Self.formatTime(bm.timestamp)) | \(name) | \(note) |")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func exportHeader(for audiobook: Audiobook) -> String {
+        let dateStr = DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none)
+        let separator = String(repeating: "═", count: 52)
+        return """
+        AUDIOBOOK BOOKMARKS
+        \(separator)
+        Book:     \(audiobook.title)
+        Author:   \(audiobook.author)
+        Duration: \(Self.formatTime(audiobook.duration))
+        Exported: \(dateStr)
+        \(separator)
+        """
+    }
+
+    private func pad(_ s: String, _ width: Int) -> String {
+        s.count >= width ? s : s + String(repeating: " ", count: width - s.count)
+    }
+
+    private func csvEscape(_ s: String) -> String {
+        guard s.contains(",") || s.contains("\"") || s.contains("\n") else { return s }
+        return "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+    }
+
+    private func mdEscape(_ s: String) -> String {
+        s.replacingOccurrences(of: "|", with: "\\|")
     }
 
     // MARK: - Sleep Timer

@@ -320,14 +320,17 @@ struct PlayerView: View {
     // MARK: - Bookmarks Button
 
     private var bookmarksButton: some View {
-        Button {
-            viewModel.isBookmarksPresented = true
-        } label: {
-            Image(systemName: "bookmark")
-                .pillAppearance()
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Bookmarks")
+        Image(systemName: "bookmark")
+            .pillAppearance()
+            .contentShape(Rectangle())
+            .onTapGesture {
+                viewModel.addBookmark()
+            }
+            .onLongPressGesture {
+                viewModel.isBookmarksPresented = true
+            }
+            .accessibilityLabel("Bookmarks")
+            .accessibilityHint("Tap to bookmark current position. Hold to view all bookmarks.")
     }
 
     // MARK: - Sleep Timer Menu
