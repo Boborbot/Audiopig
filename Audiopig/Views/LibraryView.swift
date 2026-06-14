@@ -15,8 +15,6 @@ struct LibraryView: View {
     @State private var isImporterPresented: Bool = false
     /// When true the importer shows folders; when false it shows audio files.
     @State private var isImportingFolder: Bool = false
-    /// Set when the user initiates a swipe-delete on a folder; drives the confirmation dialog.
-    @State private var folderPendingDelete: Folder? = nil
 
     private static let allowedAudioTypes: [UTType] = {
         var types: [UTType] = [.mp3, .mpeg4Audio]
@@ -92,26 +90,6 @@ struct LibraryView: View {
                 Button("OK") { viewModel.clearError() }
             } message: {
                 Text(viewModel.errorMessage ?? "")
-            }
-            .confirmationDialog(
-                "Delete \"\(folderPendingDelete?.title ?? "Folder")\"?",
-                isPresented: Binding(
-                    get: { folderPendingDelete != nil },
-                    set: { if !$0 { folderPendingDelete = nil } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("Delete Folder and All Books", role: .destructive) {
-                    if let folder = folderPendingDelete { viewModel.deleteFolderAndBooks(folder) }
-                    folderPendingDelete = nil
-                }
-                Button("Delete Folder Only") {
-                    if let folder = folderPendingDelete { viewModel.deleteFolder(folder) }
-                    folderPendingDelete = nil
-                }
-                Button("Cancel", role: .cancel) { folderPendingDelete = nil }
-            } message: {
-                Text("\"Delete Folder Only\" returns books to your library.")
             }
     }
 
@@ -219,23 +197,8 @@ struct LibraryView: View {
                     }
 
                 case .folder(let folder):
-                    NavigationLink(value: folder) {
-                        FolderRowView(folder: folder)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(viewModel.isSelectionModeActive)
-                    .libraryCard()
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(
-                        top: DS.Spacing.xs,
-                        leading: 0,
-                        bottom: DS.Spacing.xs,
-                        trailing: 0
-                    ))
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        deleteFolderSwipeAction(for: folder)
-                    }
+                    FolderListRow(folder: folder, viewModel: viewModel)
+                        .disabled(viewModel.isSelectionModeActive)
                 }
             }
         }
@@ -268,14 +231,6 @@ struct LibraryView: View {
     private func deleteSwipeAction(for audiobook: Audiobook) -> some View {
         Button(role: .destructive) {
             viewModel.requestDelete(audiobook)
-        } label: {
-            Label("Delete", systemImage: "trash")
-        }
-    }
-
-    private func deleteFolderSwipeAction(for folder: Folder) -> some View {
-        Button(role: .destructive) {
-            folderPendingDelete = folder
         } label: {
             Label("Delete", systemImage: "trash")
         }
@@ -629,5 +584,54 @@ struct LibraryView: View {
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+    }
+}
+
+// MARK: - FolderListRow
+
+/// Self-contained list row for a folder. Owns its own delete-confirmation state so
+/// the confirmationDialog is anchored to this row rather than the whole screen.
+private struct FolderListRow: View {
+    let folder: Folder
+    let viewModel: LibraryViewModel
+
+    @State private var showDeleteDialog = false
+
+    var body: some View {
+        NavigationLink(value: folder) {
+            FolderRowView(folder: folder)
+        }
+        .buttonStyle(.plain)
+        .libraryCard()
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(
+            top: DS.Spacing.xs,
+            leading: 0,
+            bottom: DS.Spacing.xs,
+            trailing: 0
+        ))
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                showDeleteDialog = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .confirmationDialog(
+            "Delete \"\(folder.title)\"?",
+            isPresented: $showDeleteDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Folder and All Books", role: .destructive) {
+                viewModel.deleteFolderAndBooks(folder)
+            }
+            Button("Delete Folder Only") {
+                viewModel.deleteFolder(folder)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("\"Delete Folder Only\" returns books to your library.")
+        }
     }
 }
