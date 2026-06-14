@@ -20,11 +20,13 @@ struct AudiopigApp: App {
             let modelContainer  = try AudiopigModelContainer.make()
             let libraryManager  = try LibraryManager()
             let audioEngine     = try AudioEngine()
+            let appIconManager  = AppIconManager()
 
             let dc = DependencyContainer(
                 libraryManager: libraryManager,
                 audioEngine: audioEngine,
-                modelContainer: modelContainer
+                modelContainer: modelContainer,
+                appIconManager: appIconManager
             )
             DependencyContainer.shared = dc
             self.container = dc
@@ -32,7 +34,8 @@ struct AudiopigApp: App {
                 modelContext: dc.modelContainer.mainContext,
                 libraryManager: dc.libraryManager,
                 audioEngine: dc.audioEngine,
-                appSettings: dc.appSettings
+                appSettings: dc.appSettings,
+                appIconManager: dc.appIconManager
             )
             self.statsViewModel = StatsViewModel(
                 modelContext: dc.modelContainer.mainContext
@@ -47,7 +50,8 @@ struct AudiopigApp: App {
             MainTabView(
                 libraryViewModel: libraryViewModel,
                 appSettings: container.appSettings,
-                statsViewModel: statsViewModel
+                statsViewModel: statsViewModel,
+                appIconManager: container.appIconManager
             )
             .modelContainer(container.modelContainer)
             .preferredColorScheme(container.appSettings.appearance.colorScheme)

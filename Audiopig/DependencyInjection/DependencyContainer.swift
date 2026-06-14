@@ -15,17 +15,20 @@ final class DependencyContainer {
     let audioEngine: any AudioEngineProtocol
     let modelContainer: ModelContainer
     let appSettings: AppSettings
+    let appIconManager: AppIconManager
 
     init(
         libraryManager: any LibraryManagerProtocol,
         audioEngine: any AudioEngineProtocol,
         modelContainer: ModelContainer,
-        appSettings: AppSettings = AppSettings()
+        appSettings: AppSettings = AppSettings(),
+        appIconManager: AppIconManager
     ) {
         self.libraryManager = libraryManager
         self.audioEngine = audioEngine
         self.modelContainer = modelContainer
         self.appSettings = appSettings
+        self.appIconManager = appIconManager
     }
 
     /// Registers the global container. Call once during app launch after concrete services are wired.
@@ -33,13 +36,15 @@ final class DependencyContainer {
         libraryManager: any LibraryManagerProtocol,
         audioEngine: any AudioEngineProtocol,
         modelContainer: ModelContainer,
-        appSettings: AppSettings = AppSettings()
+        appSettings: AppSettings = AppSettings(),
+        appIconManager: AppIconManager
     ) {
         shared = DependencyContainer(
             libraryManager: libraryManager,
             audioEngine: audioEngine,
             modelContainer: modelContainer,
-            appSettings: appSettings
+            appSettings: appSettings,
+            appIconManager: appIconManager
         )
     }
 

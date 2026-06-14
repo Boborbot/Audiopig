@@ -125,6 +125,7 @@ struct LibraryView: View {
             .safeAreaInset(edge: .bottom) { mergeBar }
             .overlay { importOverlay }
             .overlay { celebrationOverlay }
+            .overlay { iconUnlockOverlay }
             .onChange(of: viewModel.celebratedBook?.id) { _, bookID in
                 guard bookID != nil else { return }
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -146,6 +147,19 @@ struct LibraryView: View {
             }
             .ignoresSafeArea()
             .allowsHitTesting(false)
+        }
+    }
+
+    // MARK: - Icon Unlock Overlay
+
+    @ViewBuilder
+    private var iconUnlockOverlay: some View {
+        if let tier = viewModel.newlyUnlockedIconTier {
+            IconUnlockOverlay(tier: tier) {
+                viewModel.dismissIconUnlock()
+            }
+            .ignoresSafeArea()
+            .transition(.opacity)
         }
     }
 

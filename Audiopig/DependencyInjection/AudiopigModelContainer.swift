@@ -33,7 +33,7 @@ enum AudiopigModelContainer {
     static func make(isStoredInMemoryOnly: Bool = false) throws -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: isStoredInMemoryOnly)
         return try ModelContainer(
-            for: AudiopigSchemaV1.schema,
+            for: Schema(AudiopigSchemaV1.models),
             migrationPlan: AudiopigMigrationPlan.self,
             configurations: configuration
         )

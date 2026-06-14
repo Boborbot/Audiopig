@@ -69,6 +69,10 @@ final class LibraryViewModel {
     /// Set when the user marks a book finished — drives the confetti overlay.
     var celebratedBook: Audiobook?
 
+    /// Set when finishing a book pushes total hours over a new icon tier threshold.
+    /// Drives the `IconUnlockOverlay` in `LibraryView`.
+    var newlyUnlockedIconTier: AppIconTier?
+
     /// When `autoDeleteOnFinish` is on, the book is held here until the celebration
     /// completes so the overlay can still reference its title during the animation.
     private var pendingAutoDeleteBook: Audiobook?
@@ -83,6 +87,7 @@ final class LibraryViewModel {
     private let modelContext: ModelContext
     private let libraryManager: any LibraryManagerProtocol
     private let appSettings: AppSettings
+    let appIconManager: AppIconManager
 
     // MARK: - Init
 
@@ -90,11 +95,13 @@ final class LibraryViewModel {
         modelContext: ModelContext,
         libraryManager: any LibraryManagerProtocol,
         audioEngine: any AudioEngineProtocol,
-        appSettings: AppSettings
+        appSettings: AppSettings,
+        appIconManager: AppIconManager
     ) {
         self.modelContext = modelContext
         self.libraryManager = libraryManager
         self.appSettings = appSettings
+        self.appIconManager = appIconManager
         self.playerViewModel = PlayerViewModel(
             audioEngine: audioEngine,
             modelContext: modelContext,
@@ -160,12 +167,36 @@ final class LibraryViewModel {
         }
 
         saveContext(errorContext: "mark finished")
+        checkIconUnlock()
 
         if appSettings.autoDeleteOnFinish {
             pendingAutoDeleteBook = audiobook
         }
 
         celebratedBook = audiobook
+    }
+
+    /// Computes total finished-book listening time and asks `AppIconManager`
+    /// whether any new tier is now unlocked. Sets `newlyUnlockedIconTier` if so.
+    private func checkIconUnlock() {
+        let records    = (try? modelContext.fetch(FetchDescriptor<FinishedRecord>())) ?? []
+        let allBooks   = (try? modelContext.fetch(FetchDescriptor<Audiobook>()))      ?? []
+        let libraryIDs = Set(allBooks.map(\.id))
+
+        let finishedLibraryTime = allBooks
+            .filter(\.isFinished)
+            .reduce(0.0) { $0 + $1.currentPlaybackTime }
+        let finishedDeletedTime = records
+            .filter { !libraryIDs.contains($0.audiobookID) }
+            .reduce(0.0) { $0 + $1.listenedSeconds }
+
+        let total = finishedLibraryTime + finishedDeletedTime
+        newlyUnlockedIconTier = appIconManager.checkForNewUnlocks(totalFinishedSeconds: total)
+    }
+
+    /// Clears the icon-unlock overlay.
+    func dismissIconUnlock() {
+        newlyUnlockedIconTier = nil
     }
 
     /// Unmarks a book so it is no longer manually finished.

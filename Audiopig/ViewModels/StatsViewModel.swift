@@ -23,6 +23,10 @@ final class StatsViewModel {
     private(set) var totalListenedSeconds: TimeInterval = 0
     private(set) var finishedBooksCount: Int = 0
 
+    /// Total seconds listened across **finished** books only.
+    /// Used by the icon gallery progress bars (mirrors AppIconManager's unlock logic).
+    private(set) var finishedListenedSeconds: TimeInterval = 0
+
     // MARK: - Formatted helpers
 
     /// Human-readable total listening time, e.g. "42 h 17 m" or "38 min".
@@ -60,14 +64,21 @@ final class StatsViewModel {
             .reduce(0.0) { $0 + $1.listenedSeconds }
         totalListenedSeconds = libraryTime + deletedTime
 
-        // Finished books count
+        // Finished books count + finished-only listened time (for icon unlock progress)
         // • Books currently in the library that are finished.
         // • Books that were finished then deleted (present in FinishedRecord but
         //   absent from the live library). Union avoids double-counting books that
         //   are finished and still in the library with a FinishedRecord.
-        let finishedLibraryIDs = Set(audiobooks.filter(\.isFinished).map(\.id))
+        let finishedBooks      = audiobooks.filter(\.isFinished)
+        let finishedLibraryIDs = Set(finishedBooks.map(\.id))
         let finishedDeletedIDs = Set(records.map(\.audiobookID)).subtracting(libraryIDs)
         finishedBooksCount = finishedLibraryIDs.union(finishedDeletedIDs).count
+
+        let finishedLibraryTime = finishedBooks.reduce(0.0) { $0 + $1.currentPlaybackTime }
+        let finishedDeletedTime = records
+            .filter { !libraryIDs.contains($0.audiobookID) }
+            .reduce(0.0) { $0 + $1.listenedSeconds }
+        finishedListenedSeconds = finishedLibraryTime + finishedDeletedTime
     }
 
     // MARK: - Private helpers
