@@ -18,7 +18,7 @@ import SwiftUI
 
 struct IconUnlockOverlay: View {
 
-    let tier: AppIconTier
+    let unlock: AppIconUnlock
     let onDismiss: () -> Void
 
     // MARK: - Animation state
@@ -132,15 +132,15 @@ struct IconUnlockOverlay: View {
 
     private var textBlock: some View {
         VStack(spacing: DS.Spacing.sm) {
-            Text("Icon Unlocked!")
+            Text(unlock.overlayTitle)
                 .font(.custom("ClashDisplay-Bold", size: 24))
                 .foregroundStyle(DS.Color.primary)
 
-            Text(tier.label)
+            Text(unlock.label)
                 .font(.custom("ClashDisplay-Semibold", size: 20))
                 .foregroundStyle(DS.Color.coral)
 
-            Text(tier.unlockDescription)
+            Text(unlock.unlockDescription)
                 .font(.subheadline)
                 .foregroundStyle(DS.Color.secondary)
                 .multilineTextAlignment(.center)

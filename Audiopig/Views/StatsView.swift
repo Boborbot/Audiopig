@@ -28,7 +28,8 @@ struct StatsView: View {
             ScrollView {
                 VStack(spacing: DS.Spacing.xl) {
                     summaryCards
-                    iconGallery
+                    hourClubGallery
+                    secretIconGallery
                 }
                 .padding(.vertical, DS.Spacing.sm)
                 .padding(.bottom, DS.Spacing.xl)
@@ -60,11 +61,11 @@ struct StatsView: View {
         .padding(.top, DS.Spacing.sm)
     }
 
-    // MARK: - Icon Gallery
+    // MARK: - Hour Club Gallery
 
-    private var iconGallery: some View {
+    private var hourClubGallery: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.md) {
-            Text("Icons")
+            Text("Hour Club")
                 .sectionTitle()
                 .padding(.horizontal, DS.Spacing.md)
 
@@ -82,6 +83,34 @@ struct StatsView: View {
                 }
                 .padding(.horizontal, DS.Spacing.md)
                 .padding(.vertical, DS.Spacing.xs)
+            }
+        }
+    }
+
+    // MARK: - Secret Icon Gallery
+
+    @ViewBuilder
+    private var secretIconGallery: some View {
+        let unlockedSecrets = appIconManager.unlockedSecrets
+        if !unlockedSecrets.isEmpty {
+            VStack(alignment: .leading, spacing: DS.Spacing.md) {
+                Text("Secret Icons")
+                    .sectionTitle()
+                    .padding(.horizontal, DS.Spacing.md)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DS.Spacing.md) {
+                        ForEach(unlockedSecrets) { achievement in
+                            SecretIconCard(
+                                achievement: achievement,
+                                isActive: appIconManager.isActive(achievement),
+                                onApply: { appIconManager.applyIcon(achievement) }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, DS.Spacing.md)
+                    .padding(.vertical, DS.Spacing.xs)
+                }
             }
         }
     }
@@ -190,5 +219,65 @@ private struct IconTierCard: View {
         .padding(DS.Spacing.md)
         .floatingPanel()
         .opacity(isUnlocked ? 1 : 0.7)
+    }
+}
+
+// MARK: - Secret Icon Card
+
+private struct SecretIconCard: View {
+    let achievement: SecretAchievement
+    let isActive: Bool
+    let onApply: () -> Void
+
+    var body: some View {
+        VStack(spacing: DS.Spacing.sm) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [DS.Color.coral.opacity(0.25), DS.Color.coral.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 64, height: 64)
+
+                Image(systemName: "sparkles")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(DS.Color.coral)
+            }
+
+            Text(achievement.label)
+                .font(.custom("ClashDisplay-Semibold", size: 14))
+                .foregroundStyle(DS.Color.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(minHeight: 34)
+
+            Text("Secret")
+                .font(DS.Typography.caption)
+                .foregroundStyle(DS.Color.secondary)
+
+            if isActive {
+                Text("Active")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, DS.Spacing.sm)
+                    .padding(.vertical, 3)
+                    .background(DS.Color.coral, in: Capsule())
+            } else {
+                Button("Apply") { onApply() }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DS.Color.coral)
+                    .padding(.horizontal, DS.Spacing.sm)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule().strokeBorder(DS.Color.coral.opacity(0.5), lineWidth: 1)
+                    )
+            }
+        }
+        .frame(width: 100)
+        .padding(DS.Spacing.md)
+        .floatingPanel()
     }
 }

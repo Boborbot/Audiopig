@@ -11,6 +11,9 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var isDeleteStatsConfirmationPresented = false
+    @State private var isShareAllExportedPresented = false
+    @State private var shareAllExportedItems: [Any] = []
+    @State private var exportedNoteCount = 0
 
     private static let skipIntervalOptions: [TimeInterval] = [5, 10, 15, 30, 45, 60]
 
@@ -84,6 +87,32 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle(isOn: $settings.autoExportOnFinish) {
+                        Label("Auto-export on book completion", systemImage: "bookmark")
+                    }
+                    .tint(DS.Color.coral)
+
+                    Toggle(isOn: $settings.autoExportOnDelete) {
+                        Label("Auto-export on book removal", systemImage: "bookmark")
+                    }
+                    .tint(DS.Color.coral)
+
+                    Button {
+                        shareAllExportedNotes()
+                    } label: {
+                        Label("Share All Exported Notes", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(exportedNoteCount == 0)
+                } header: {
+                    Text("Bookmark Export")
+                        .sectionTitle()
+                } footer: {
+                    Text("Notes are saved to On My iPhone › Audiopig › Exported Bookmarks and are visible in the Files app.")
+                        .font(DS.Typography.caption)
+                        .foregroundStyle(DS.Color.tertiary)
+                }
+
+                Section {
                     let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
                     let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
                     Label("Version \(version) (\(build))", systemImage: "info.circle")
@@ -104,7 +133,24 @@ struct SettingsView: View {
             } message: {
                 Text("Your entire reading history will be permanently removed. This cannot be undone.")
             }
+            .sheet(isPresented: $isShareAllExportedPresented) {
+                ShareActivityView(activityItems: shareAllExportedItems)
+            }
+            .onAppear { refreshExportedNoteCount() }
         }
+    }
+
+    // MARK: - Bookmark export
+
+    private func refreshExportedNoteCount() {
+        exportedNoteCount = BookmarkExportService.allExportedFiles().count
+    }
+
+    private func shareAllExportedNotes() {
+        let files = BookmarkExportService.allExportedFiles()
+        guard !files.isEmpty else { return }
+        shareAllExportedItems = files
+        isShareAllExportedPresented = true
     }
 
     // MARK: - Stats management

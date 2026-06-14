@@ -49,7 +49,7 @@ struct BookmarksListView: View {
         }
         .sheet(isPresented: $isShareSheetPresented) {
             if let items = shareItems {
-                ActivityView(activityItems: items)
+                ShareActivityView(activityItems: items)
             }
         }
     }
@@ -198,16 +198,4 @@ private struct BookmarkRow: View {
         .padding(.vertical, DS.Spacing.xs)
         .contentShape(Rectangle())
     }
-}
-
-// MARK: - Activity View (share sheet bridge)
-
-private struct ActivityView: UIViewControllerRepresentable {
-    let activityItems: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

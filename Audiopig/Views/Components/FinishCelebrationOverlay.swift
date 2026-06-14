@@ -48,8 +48,8 @@ struct FinishCelebrationOverlay: ViewModifier {
 
     @ViewBuilder
     private var iconUnlockOverlay: some View {
-        if let tier = viewModel.newlyUnlockedIconTier {
-            IconUnlockOverlay(tier: tier) {
+        if let unlock = viewModel.newlyUnlockedIcon {
+            IconUnlockOverlay(unlock: unlock) {
                 viewModel.dismissIconUnlock()
             }
             .ignoresSafeArea()

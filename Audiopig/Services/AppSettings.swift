@@ -56,6 +56,8 @@ final class AppSettings {
         static let appearance           = "settings.appearance"
         static let autoDeleteOnFinish   = "settings.autoDeleteOnFinish"
         static let trackReadingStats    = "settings.trackReadingStats"
+        static let autoExportOnFinish   = "settings.autoExportOnFinish"
+        static let autoExportOnDelete   = "settings.autoExportOnDelete"
         static let sleepTimerOption     = "settings.sleepTimerOption"
         static let sleepTimerExpiry     = "settings.sleepTimerExpiry"
     }
@@ -98,6 +100,18 @@ final class AppSettings {
     private var _trackReadingStats: Bool = {
         guard UserDefaults.standard.object(forKey: Keys.trackReadingStats) != nil else { return true }
         return UserDefaults.standard.bool(forKey: Keys.trackReadingStats)
+    }()
+
+    @ObservationIgnored
+    private var _autoExportOnFinish: Bool = {
+        guard UserDefaults.standard.object(forKey: Keys.autoExportOnFinish) != nil else { return true }
+        return UserDefaults.standard.bool(forKey: Keys.autoExportOnFinish)
+    }()
+
+    @ObservationIgnored
+    private var _autoExportOnDelete: Bool = {
+        guard UserDefaults.standard.object(forKey: Keys.autoExportOnDelete) != nil else { return true }
+        return UserDefaults.standard.bool(forKey: Keys.autoExportOnDelete)
     }()
 
     // MARK: - Observable Properties
@@ -170,6 +184,36 @@ final class AppSettings {
             withMutation(keyPath: \.trackReadingStats) {
                 _trackReadingStats = newValue
                 UserDefaults.standard.set(newValue, forKey: Keys.trackReadingStats)
+            }
+        }
+    }
+
+    /// When `true`, bookmarks are exported to the Files app when a book is marked finished.
+    /// Default: `true`.
+    var autoExportOnFinish: Bool {
+        get {
+            access(keyPath: \.autoExportOnFinish)
+            return _autoExportOnFinish
+        }
+        set {
+            withMutation(keyPath: \.autoExportOnFinish) {
+                _autoExportOnFinish = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.autoExportOnFinish)
+            }
+        }
+    }
+
+    /// When `true`, bookmarks are exported to the Files app when a book is removed from the library.
+    /// Default: `true`.
+    var autoExportOnDelete: Bool {
+        get {
+            access(keyPath: \.autoExportOnDelete)
+            return _autoExportOnDelete
+        }
+        set {
+            withMutation(keyPath: \.autoExportOnDelete) {
+                _autoExportOnDelete = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.autoExportOnDelete)
             }
         }
     }

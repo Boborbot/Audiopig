@@ -227,6 +227,13 @@ final class PlayerViewModel {
 
     // MARK: - Private
 
+    /// Called once when playback naturally reaches the end of the loaded book.
+    @ObservationIgnored
+    var onNaturalFinish: ((Audiobook) -> Void)?
+
+    @ObservationIgnored
+    private var didReportNaturalFinish = false
+
     private let audioEngine: any AudioEngineProtocol
     private let modelContext: ModelContext
     private let settings: AppSettings
@@ -253,6 +260,7 @@ final class PlayerViewModel {
 
     func loadAudiobook(_ audiobook: Audiobook, autoPlay: Bool = false) async {
         lullAnalysisState = .idle
+        didReportNaturalFinish = false
         self.audiobook = audiobook
         self.chapters = audiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
         self.bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
@@ -374,33 +382,7 @@ final class PlayerViewModel {
 
     func exportText() -> String {
         guard let audiobook else { return "" }
-        let dateStr = DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none)
-        let rule = String(repeating: "─", count: 60)
-
-        var lines: [String] = []
-        lines.append("AUDIOBOOK BOOKMARKS")
-        lines.append(rule)
-        lines.append("Book:     \(audiobook.title)")
-        lines.append("Author:   \(audiobook.author)")
-        lines.append("Length:   \(Self.formatTime(audiobook.duration))")
-        lines.append("Exported: \(dateStr)")
-        lines.append(rule)
-        lines.append("")
-
-        let tsWidth   = 10
-        let nameWidth = 28
-        let headingTS   = pad("Timestamp", tsWidth)
-        let headingName = pad("Name", nameWidth)
-        lines.append("\(headingTS)  \(headingName)  Note")
-        lines.append("\(pad("", tsWidth, fill: "─"))  \(pad("", nameWidth, fill: "─"))  \(String(repeating: "─", count: 36))")
-
-        for bm in bookmarks {
-            let ts   = pad(Self.formatTime(bm.timestamp), tsWidth)
-            let name = pad(bm.title, nameWidth)
-            lines.append("\(ts)  \(name)  \(bm.note)")
-        }
-
-        return lines.joined(separator: "\n")
+        return BookmarkExportService.generateText(for: audiobook, bookmarks: bookmarks)
     }
 
     func exportCSV() -> String {
@@ -447,14 +429,6 @@ final class PlayerViewModel {
         }
 
         return lines.joined(separator: "\n")
-    }
-
-    private func pad(_ s: String, _ width: Int, fill: Character = " ") -> String {
-        if fill == " " {
-            return s.count >= width ? s : s + String(repeating: fill, count: width - s.count)
-        } else {
-            return String(repeating: fill, count: width)
-        }
     }
 
     private func csvEscape(_ s: String) -> String {
@@ -582,6 +556,12 @@ final class PlayerViewModel {
                 case .paused, .finished:
                     self.stopPositionSaveTimer()
                     self.savePlaybackPosition()
+                    if case .finished = state,
+                       !self.didReportNaturalFinish,
+                       let book = self.audiobook {
+                        self.didReportNaturalFinish = true
+                        self.onNaturalFinish?(book)
+                    }
                 default:
                     self.stopPositionSaveTimer()
                 }

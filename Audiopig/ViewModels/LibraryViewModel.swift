@@ -97,9 +97,12 @@ final class LibraryViewModel {
     /// Set when the user marks a book finished — drives the confetti overlay.
     var celebratedBook: Audiobook?
 
-    /// Set when finishing a book pushes total hours over a new icon tier threshold.
+    /// Set when finishing a book unlocks a new app icon.
     /// Drives the `IconUnlockOverlay` in `LibraryView`.
-    var newlyUnlockedIconTier: AppIconTier?
+    var newlyUnlockedIcon: AppIconUnlock?
+
+    private var pendingIconUnlocks: [AppIconUnlock] = []
+    private var processedNaturalFinishIDs: Set<UUID> = []
 
     /// When `autoDeleteOnFinish` is on, the book is held here until the celebration
     /// completes, then the user is asked whether to delete it.
@@ -146,6 +149,9 @@ final class LibraryViewModel {
             modelContext: modelContext,
             appSettings: appSettings
         )
+        self.playerViewModel.onNaturalFinish = { [weak self] audiobook in
+            self?.handleNaturalFinish(audiobook)
+        }
         fetchAudiobooks()
     }
 
@@ -194,24 +200,52 @@ final class LibraryViewModel {
     /// Idempotent — calling it on an already-finished book is a no-op.
     func markFinished(_ audiobook: Audiobook) {
         guard !audiobook.isManuallyFinished else { return }
-
         audiobook.isManuallyFinished = true
+        processBookFinish(for: audiobook, wasManuallyMarked: true)
+    }
+
+    /// Called when playback reaches the natural end of a book.
+    func handleNaturalFinish(_ audiobook: Audiobook) {
+        guard !audiobook.isManuallyFinished else { return }
+        guard audiobook.isFinished else { return }
+        guard !processedNaturalFinishIDs.contains(audiobook.id) else { return }
+
+        processedNaturalFinishIDs.insert(audiobook.id)
+        processBookFinish(for: audiobook, wasManuallyMarked: false)
+    }
+
+    private func processBookFinish(for audiobook: Audiobook, wasManuallyMarked: Bool) {
+        let finishEvent = BookFinishEvent(
+            audiobookID: audiobook.id,
+            title: audiobook.title,
+            author: audiobook.author,
+            totalSeconds: audiobook.duration,
+            listenedSeconds: audiobook.currentPlaybackTime,
+            chapterCount: audiobook.chapters.count,
+            finishedAt: Date(),
+            wasManuallyMarked: wasManuallyMarked
+        )
 
         if appSettings.trackReadingStats {
             let record = FinishedRecord(
-                audiobookID:       audiobook.id,
-                title:             audiobook.title,
-                author:            audiobook.author,
-                totalSeconds:      audiobook.duration,
-                listenedSeconds:   audiobook.currentPlaybackTime,
-                chapterCount:      audiobook.chapters.count,
-                wasManuallyMarked: true
+                audiobookID: finishEvent.audiobookID,
+                title: finishEvent.title,
+                author: finishEvent.author,
+                totalSeconds: finishEvent.totalSeconds,
+                listenedSeconds: finishEvent.listenedSeconds,
+                finishedAt: finishEvent.finishedAt,
+                chapterCount: finishEvent.chapterCount,
+                wasManuallyMarked: wasManuallyMarked
             )
             modelContext.insert(record)
         }
 
         saveContext(errorContext: "mark finished")
-        checkIconUnlock()
+        enqueueIconUnlocks(finishEvent: finishEvent)
+
+        if appSettings.autoExportOnFinish {
+            try? BookmarkExportService.export(audiobook)
+        }
 
         if appSettings.autoDeleteOnFinish {
             pendingAutoDeleteBook = audiobook
@@ -221,8 +255,8 @@ final class LibraryViewModel {
     }
 
     /// Computes total finished-book listening time and asks `AppIconManager`
-    /// whether any new tier is now unlocked. Sets `newlyUnlockedIconTier` if so.
-    private func checkIconUnlock() {
+    /// whether any new icons are now unlocked.
+    private func enqueueIconUnlocks(finishEvent: BookFinishEvent) {
         let records    = (try? modelContext.fetch(FetchDescriptor<FinishedRecord>())) ?? []
         let allBooks   = (try? modelContext.fetch(FetchDescriptor<Audiobook>()))      ?? []
         let libraryIDs = Set(allBooks.map(\.id))
@@ -235,12 +269,26 @@ final class LibraryViewModel {
             .reduce(0.0) { $0 + $1.listenedSeconds }
 
         let total = finishedLibraryTime + finishedDeletedTime
-        newlyUnlockedIconTier = appIconManager.checkForNewUnlocks(totalFinishedSeconds: total)
+        let unlocks = appIconManager.checkForNewUnlocks(
+            totalFinishedSeconds: total,
+            finishEvent: finishEvent
+        )
+
+        guard !unlocks.isEmpty else { return }
+
+        pendingIconUnlocks.append(contentsOf: unlocks)
+        if newlyUnlockedIcon == nil {
+            newlyUnlockedIcon = pendingIconUnlocks.removeFirst()
+        }
     }
 
-    /// Clears the icon-unlock overlay.
+    /// Advances the icon-unlock overlay queue, or clears it when empty.
     func dismissIconUnlock() {
-        newlyUnlockedIconTier = nil
+        if pendingIconUnlocks.isEmpty {
+            newlyUnlockedIcon = nil
+        } else {
+            newlyUnlockedIcon = pendingIconUnlocks.removeFirst()
+        }
     }
 
     /// Unmarks a book so it is no longer manually finished and removes its finished records.
@@ -330,6 +378,9 @@ final class LibraryViewModel {
     }
 
     private func delete(_ audiobook: Audiobook) {
+        if appSettings.autoExportOnDelete {
+            try? BookmarkExportService.export(audiobook)
+        }
         try? libraryManager.deleteAudiobookFile(at: audiobook.fileURL)
         modelContext.delete(audiobook)
         saveContext(errorContext: "delete audiobook")
@@ -472,6 +523,9 @@ final class LibraryViewModel {
     func deleteFolderAndBooks(_ folder: Folder) {
         let booksToDelete = folder.audiobooks
         for book in booksToDelete {
+            if appSettings.autoExportOnDelete {
+                try? BookmarkExportService.export(book)
+            }
             try? libraryManager.deleteAudiobookFile(at: book.fileURL)
             modelContext.delete(book)
         }

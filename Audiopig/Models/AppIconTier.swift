@@ -16,6 +16,7 @@ enum AppIconTier: Int, CaseIterable, Identifiable {
     case h50  = 2
     case h100 = 3
     case h200 = 4
+    case h500 = 5
 
     var id: Int { rawValue }
 
@@ -27,6 +28,7 @@ enum AppIconTier: Int, CaseIterable, Identifiable {
         case .h50:  return 50
         case .h100: return 100
         case .h200: return 200
+        case .h500: return 500
         }
     }
 
