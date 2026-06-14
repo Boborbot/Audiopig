@@ -204,6 +204,34 @@ struct LibraryView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        // Attached to the List (never leaves the hierarchy) so the swipe-row
+        // collapse animation cannot dismiss the dialog mid-presentation.
+        .confirmationDialog(
+            "Delete \"\(viewModel.folderPendingDelete?.title ?? "Folder")\"?",
+            isPresented: Binding(
+                get: { viewModel.folderPendingDelete != nil },
+                set: { if !$0 { viewModel.folderPendingDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Folder and All Books", role: .destructive) {
+                if let folder = viewModel.folderPendingDelete {
+                    viewModel.deleteFolderAndBooks(folder)
+                }
+                viewModel.folderPendingDelete = nil
+            }
+            Button("Delete Folder Only") {
+                if let folder = viewModel.folderPendingDelete {
+                    viewModel.deleteFolder(folder)
+                }
+                viewModel.folderPendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.folderPendingDelete = nil
+            }
+        } message: {
+            Text("\"Delete Folder Only\" returns books to your library.")
+        }
     }
 
     // MARK: - Swipe Actions
@@ -589,8 +617,6 @@ struct LibraryView: View {
 
 // MARK: - FolderListRow
 
-/// Self-contained list row for a folder. Owns its own delete-confirmation state so
-/// the confirmationDialog is anchored to this row rather than the whole screen.
 private struct FolderListRow: View {
     let folder: Folder
     let viewModel: LibraryViewModel
@@ -615,29 +641,6 @@ private struct FolderListRow: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-        }
-        // Binding reads from the ViewModel so state survives any list re-render.
-        .confirmationDialog(
-            "Delete \"\(folder.title)\"?",
-            isPresented: Binding(
-                get: { viewModel.folderPendingDelete?.id == folder.id },
-                set: { if !$0 { viewModel.folderPendingDelete = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete Folder and All Books", role: .destructive) {
-                viewModel.deleteFolderAndBooks(folder)
-                viewModel.folderPendingDelete = nil
-            }
-            Button("Delete Folder Only") {
-                viewModel.deleteFolder(folder)
-                viewModel.folderPendingDelete = nil
-            }
-            Button("Cancel", role: .cancel) {
-                viewModel.folderPendingDelete = nil
-            }
-        } message: {
-            Text("\"Delete Folder Only\" returns books to your library.")
         }
     }
 }
