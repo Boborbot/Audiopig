@@ -595,8 +595,6 @@ private struct FolderListRow: View {
     let folder: Folder
     let viewModel: LibraryViewModel
 
-    @State private var showDeleteDialog = false
-
     var body: some View {
         NavigationLink(value: folder) {
             FolderRowView(folder: folder)
@@ -613,23 +611,31 @@ private struct FolderListRow: View {
         ))
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
-                showDeleteDialog = true
+                viewModel.folderPendingDelete = folder
             } label: {
                 Label("Delete", systemImage: "trash")
             }
         }
+        // Binding reads from the ViewModel so state survives any list re-render.
         .confirmationDialog(
             "Delete \"\(folder.title)\"?",
-            isPresented: $showDeleteDialog,
+            isPresented: Binding(
+                get: { viewModel.folderPendingDelete?.id == folder.id },
+                set: { if !$0 { viewModel.folderPendingDelete = nil } }
+            ),
             titleVisibility: .visible
         ) {
             Button("Delete Folder and All Books", role: .destructive) {
                 viewModel.deleteFolderAndBooks(folder)
+                viewModel.folderPendingDelete = nil
             }
             Button("Delete Folder Only") {
                 viewModel.deleteFolder(folder)
+                viewModel.folderPendingDelete = nil
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) {
+                viewModel.folderPendingDelete = nil
+            }
         } message: {
             Text("\"Delete Folder Only\" returns books to your library.")
         }

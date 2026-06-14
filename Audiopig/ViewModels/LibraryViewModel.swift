@@ -66,6 +66,7 @@ final class LibraryViewModel {
     var pendingMergeTitle: String = ""
     var isFolderSheetPresented: Bool = false
     var pendingFolderTitle: String = ""
+    var folderPendingDelete: Folder? = nil
     var isBulkDeleteConfirmationPresented: Bool = false
     var isSwipeDeleteConfirmationPresented: Bool = false
 
