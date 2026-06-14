@@ -374,28 +374,30 @@ final class PlayerViewModel {
 
     func exportText() -> String {
         guard let audiobook else { return "" }
-        var lines: [String] = []
+        let dateStr = DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none)
+        let rule = String(repeating: "─", count: 60)
 
-        let header = exportHeader(for: audiobook)
-        lines.append(header)
+        var lines: [String] = []
+        lines.append("AUDIOBOOK BOOKMARKS")
+        lines.append(rule)
+        lines.append("Book:     \(audiobook.title)")
+        lines.append("Author:   \(audiobook.author)")
+        lines.append("Length:   \(Self.formatTime(audiobook.duration))")
+        lines.append("Exported: \(dateStr)")
+        lines.append(rule)
         lines.append("")
 
-        let col1 = 4, col2 = 10, col3 = 26
-        let divider = String(repeating: "─", count: col1) + "  "
-                    + String(repeating: "─", count: col2) + "  "
-                    + String(repeating: "─", count: col3) + "  "
-                    + String(repeating: "─", count: 40)
-        let heading = pad("#", col1) + "  " + pad("Timestamp", col2) + "  "
-                    + pad("Name", col3) + "  " + "Note"
-        lines.append(heading)
-        lines.append(divider)
+        let tsWidth   = 10
+        let nameWidth = 28
+        let headingTS   = pad("Timestamp", tsWidth)
+        let headingName = pad("Name", nameWidth)
+        lines.append("\(headingTS)  \(headingName)  Note")
+        lines.append("\(pad("", tsWidth, fill: "─"))  \(pad("", nameWidth, fill: "─"))  \(String(repeating: "─", count: 36))")
 
-        for (i, bm) in bookmarks.enumerated() {
-            let idx   = pad(String(i + 1), col1)
-            let ts    = pad(Self.formatTime(bm.timestamp), col2)
-            let name  = pad(bm.title.isEmpty ? "—" : bm.title, col3)
-            let note  = bm.note.isEmpty ? "" : bm.note
-            lines.append("\(idx)  \(ts)  \(name)  \(note)")
+        for bm in bookmarks {
+            let ts   = pad(Self.formatTime(bm.timestamp), tsWidth)
+            let name = pad(bm.title, nameWidth)
+            lines.append("\(ts)  \(name)  \(bm.note)")
         }
 
         return lines.joined(separator: "\n")
@@ -403,18 +405,20 @@ final class PlayerViewModel {
 
     func exportCSV() -> String {
         guard let audiobook else { return "" }
+        let dateStr = DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none)
         var rows: [String] = []
-        rows.append("# Audiobook Bookmarks")
-        rows.append("# Book: \(audiobook.title)")
-        rows.append("# Author: \(audiobook.author)")
-        rows.append("# Duration: \(Self.formatTime(audiobook.duration))")
-        rows.append("")
-        rows.append("#,Timestamp,Name,Note")
+        rows.append(csvEscape(audiobook.title) + ",,")
+        rows.append(csvEscape(audiobook.author) + ",,")
+        rows.append("\(Self.formatTime(audiobook.duration)),,")
+        rows.append("\(dateStr),,")
+        rows.append(",,")
+        rows.append("Timestamp,Name,Note")
 
-        for (i, bm) in bookmarks.enumerated() {
+        for bm in bookmarks {
+            let ts   = Self.formatTime(bm.timestamp)
             let name = csvEscape(bm.title)
             let note = csvEscape(bm.note)
-            rows.append("\(i + 1),\(Self.formatTime(bm.timestamp)),\(name),\(note)")
+            rows.append("\(ts),\(name),\(note)")
         }
 
         return rows.joined(separator: "\n")
@@ -422,43 +426,35 @@ final class PlayerViewModel {
 
     func exportMarkdown() -> String {
         guard let audiobook else { return "" }
+        let dateStr = DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none)
         var lines: [String] = []
 
-        lines.append("# Audiobook Bookmarks — \(audiobook.title)")
+        lines.append("# \(audiobook.title) — Bookmarks")
         lines.append("")
-        lines.append("**Author:** \(audiobook.author)  ")
-        lines.append("**Duration:** \(Self.formatTime(audiobook.duration))  ")
-        let dateStr = DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none)
-        lines.append("**Exported:** \(dateStr)  ")
+        lines.append("| | |")
+        lines.append("|---|---|")
+        lines.append("| **Author** | \(mdEscape(audiobook.author)) |")
+        lines.append("| **Length** | \(Self.formatTime(audiobook.duration)) |")
+        lines.append("| **Exported** | \(dateStr) |")
         lines.append("")
-        lines.append("| # | Timestamp | Name | Note |")
-        lines.append("|---|-----------|------|------|")
+        lines.append("| Timestamp | Name | Note |")
+        lines.append("|-----------|------|------|")
 
-        for (i, bm) in bookmarks.enumerated() {
-            let name = mdEscape(bm.title.isEmpty ? "" : bm.title)
+        for bm in bookmarks {
+            let name = mdEscape(bm.title)
             let note = mdEscape(bm.note)
-            lines.append("| \(i + 1) | \(Self.formatTime(bm.timestamp)) | \(name) | \(note) |")
+            lines.append("| \(Self.formatTime(bm.timestamp)) | \(name) | \(note) |")
         }
 
         return lines.joined(separator: "\n")
     }
 
-    private func exportHeader(for audiobook: Audiobook) -> String {
-        let dateStr = DateFormatter.localizedString(from: .now, dateStyle: .long, timeStyle: .none)
-        let separator = String(repeating: "═", count: 52)
-        return """
-        AUDIOBOOK BOOKMARKS
-        \(separator)
-        Book:     \(audiobook.title)
-        Author:   \(audiobook.author)
-        Duration: \(Self.formatTime(audiobook.duration))
-        Exported: \(dateStr)
-        \(separator)
-        """
-    }
-
-    private func pad(_ s: String, _ width: Int) -> String {
-        s.count >= width ? s : s + String(repeating: " ", count: width - s.count)
+    private func pad(_ s: String, _ width: Int, fill: Character = " ") -> String {
+        if fill == " " {
+            return s.count >= width ? s : s + String(repeating: fill, count: width - s.count)
+        } else {
+            return String(repeating: fill, count: width)
+        }
     }
 
     private func csvEscape(_ s: String) -> String {
