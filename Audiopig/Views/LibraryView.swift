@@ -15,6 +15,8 @@ struct LibraryView: View {
     @State private var isImporterPresented: Bool = false
     /// When true the importer shows folders; when false it shows audio files.
     @State private var isImportingFolder: Bool = false
+    /// Set when the user initiates a swipe-delete on a folder; drives the confirmation dialog.
+    @State private var folderPendingDelete: Folder? = nil
 
     private static let allowedAudioTypes: [UTType] = {
         var types: [UTType] = [.mp3, .mpeg4Audio]
@@ -90,6 +92,26 @@ struct LibraryView: View {
                 Button("OK") { viewModel.clearError() }
             } message: {
                 Text(viewModel.errorMessage ?? "")
+            }
+            .confirmationDialog(
+                "Delete \"\(folderPendingDelete?.title ?? "Folder")\"?",
+                isPresented: Binding(
+                    get: { folderPendingDelete != nil },
+                    set: { if !$0 { folderPendingDelete = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete Folder and All Books", role: .destructive) {
+                    if let folder = folderPendingDelete { viewModel.deleteFolderAndBooks(folder) }
+                    folderPendingDelete = nil
+                }
+                Button("Delete Folder Only") {
+                    if let folder = folderPendingDelete { viewModel.deleteFolder(folder) }
+                    folderPendingDelete = nil
+                }
+                Button("Cancel", role: .cancel) { folderPendingDelete = nil }
+            } message: {
+                Text("\"Delete Folder Only\" returns books to your library.")
             }
     }
 
@@ -253,7 +275,7 @@ struct LibraryView: View {
 
     private func deleteFolderSwipeAction(for folder: Folder) -> some View {
         Button(role: .destructive) {
-            viewModel.deleteFolder(folder)
+            folderPendingDelete = folder
         } label: {
             Label("Delete", systemImage: "trash")
         }

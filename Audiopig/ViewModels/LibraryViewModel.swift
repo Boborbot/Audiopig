@@ -425,6 +425,17 @@ final class LibraryViewModel {
         fetchAudiobooks()
     }
 
+    func deleteFolderAndBooks(_ folder: Folder) {
+        let booksToDelete = folder.audiobooks
+        for book in booksToDelete {
+            try? libraryManager.deleteAudiobookFile(at: book.fileURL)
+            modelContext.delete(book)
+        }
+        modelContext.delete(folder)
+        saveContext(errorContext: "delete folder and books")
+        fetchAudiobooks()
+    }
+
     func removeFromFolder(_ audiobook: Audiobook) {
         audiobook.folder = nil
         saveContext(errorContext: "remove from folder")
