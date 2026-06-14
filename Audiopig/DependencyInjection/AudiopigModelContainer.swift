@@ -10,18 +10,10 @@ private let log = Logger(subsystem: "com.audiopig", category: "ModelContainer")
 
 // MARK: - Schema versioning
 
-/// The v1.0 schema. Add a new VersionedSchema enum for every shipping schema change,
+/// The current schema. Add a new VersionedSchema enum for every shipping schema change,
 /// then add a MigrationStage to AudiopigMigrationPlan.
 enum AudiopigSchemaV1: VersionedSchema {
     static var versionIdentifier = Schema.Version(1, 0, 0)
-    static var models: [any PersistentModel.Type] {
-        [Audiobook.self, Chapter.self, Bookmark.self, FinishedRecord.self]
-    }
-}
-
-/// v2.0 — adds Folder model and the Audiobook.folder optional relationship.
-enum AudiopigSchemaV2: VersionedSchema {
-    static var versionIdentifier = Schema.Version(2, 0, 0)
     static var models: [any PersistentModel.Type] {
         [Audiobook.self, Chapter.self, Bookmark.self, FinishedRecord.self, Folder.self]
     }
@@ -30,15 +22,8 @@ enum AudiopigSchemaV2: VersionedSchema {
 /// Migration plan wired into ModelContainer. Currently a single-version plan; extend
 /// with new VersionedSchema types and MigrationStage entries as the schema evolves.
 enum AudiopigMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [AudiopigSchemaV1.self, AudiopigSchemaV2.self] }
-    static var stages: [MigrationStage] { [v1ToV2] }
-
-    /// Lightweight migration: adds the Folder model and the nullable Audiobook.folder
-    /// attribute — both additive changes that SwiftData can handle without a custom block.
-    static let v1ToV2 = MigrationStage.lightweight(
-        fromVersion: AudiopigSchemaV1.self,
-        toVersion: AudiopigSchemaV2.self
-    )
+    static var schemas: [any VersionedSchema.Type] { [AudiopigSchemaV1.self] }
+    static var stages: [MigrationStage] { [] }
 }
 
 // MARK: - Container factory
@@ -48,7 +33,7 @@ enum AudiopigModelContainer {
     static func make(isStoredInMemoryOnly: Bool = false) throws -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: isStoredInMemoryOnly)
         return try ModelContainer(
-            for: Schema(AudiopigSchemaV2.models),
+            for: Schema(AudiopigSchemaV1.models),
             migrationPlan: AudiopigMigrationPlan.self,
             configurations: configuration
         )
