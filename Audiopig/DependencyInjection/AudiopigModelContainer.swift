@@ -19,11 +19,26 @@ enum AudiopigSchemaV1: VersionedSchema {
     }
 }
 
+/// v2.0 — adds Folder model and the Audiobook.folder optional relationship.
+enum AudiopigSchemaV2: VersionedSchema {
+    static var versionIdentifier = Schema.Version(2, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        [Audiobook.self, Chapter.self, Bookmark.self, FinishedRecord.self, Folder.self]
+    }
+}
+
 /// Migration plan wired into ModelContainer. Currently a single-version plan; extend
 /// with new VersionedSchema types and MigrationStage entries as the schema evolves.
 enum AudiopigMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [AudiopigSchemaV1.self] }
-    static var stages: [MigrationStage] { [] }
+    static var schemas: [any VersionedSchema.Type] { [AudiopigSchemaV1.self, AudiopigSchemaV2.self] }
+    static var stages: [MigrationStage] { [v1ToV2] }
+
+    /// Lightweight migration: adds the Folder model and the nullable Audiobook.folder
+    /// attribute — both additive changes that SwiftData can handle without a custom block.
+    static let v1ToV2 = MigrationStage.lightweight(
+        fromVersion: AudiopigSchemaV1.self,
+        toVersion: AudiopigSchemaV2.self
+    )
 }
 
 // MARK: - Container factory
@@ -33,7 +48,7 @@ enum AudiopigModelContainer {
     static func make(isStoredInMemoryOnly: Bool = false) throws -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: isStoredInMemoryOnly)
         return try ModelContainer(
-            for: Schema(AudiopigSchemaV1.models),
+            for: Schema(AudiopigSchemaV2.models),
             migrationPlan: AudiopigMigrationPlan.self,
             configurations: configuration
         )

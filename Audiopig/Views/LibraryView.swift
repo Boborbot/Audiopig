@@ -100,9 +100,9 @@ struct LibraryView: View {
             ZStack {
                 DS.Color.canvas.ignoresSafeArea()
 
-                if viewModel.audiobooks.isEmpty && !viewModel.isImporting {
+                if viewModel.audiobooks.isEmpty && viewModel.folders.isEmpty && !viewModel.isImporting {
                     emptyState
-                } else if viewModel.filteredAudiobooks.isEmpty && !viewModel.searchText.isEmpty {
+                } else if viewModel.libraryItems.isEmpty && !viewModel.searchText.isEmpty {
                     noSearchResultsState
                 } else {
                     bookList
@@ -133,6 +133,10 @@ struct LibraryView: View {
                 AudioServicesPlaySystemSound(SystemSoundID(1073))
             }
             .sheet(isPresented: $viewModel.isMergeSheetPresented) { mergeSheet }
+            .sheet(isPresented: $viewModel.isFolderSheetPresented) { folderSheet }
+            .navigationDestination(for: Folder.self) { folder in
+                FolderContentView(folder: folder, viewModel: viewModel)
+            }
         }
     }
 
@@ -166,28 +170,50 @@ struct LibraryView: View {
 
     private var bookList: some View {
         List {
-            ForEach(viewModel.filteredAudiobooks) { audiobook in
-                AudiobookRowView(
-                    audiobook: audiobook,
-                    isSelectionModeActive: viewModel.isSelectionModeActive,
-                    isSelected: viewModel.isSelected(audiobook),
-                    onTap: { viewModel.openPlayer(for: audiobook) },
-                    onToggleSelection: { viewModel.toggleSelection(audiobook) }
-                )
-                .libraryCard()
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(
-                    top: DS.Spacing.xs,
-                    leading: 0,
-                    bottom: DS.Spacing.xs,
-                    trailing: 0
-                ))
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    finishSwipeAction(for: audiobook)
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    deleteSwipeAction(for: audiobook)
+            ForEach(viewModel.libraryItems) { item in
+                switch item {
+                case .audiobook(let audiobook):
+                    AudiobookRowView(
+                        audiobook: audiobook,
+                        isSelectionModeActive: viewModel.isSelectionModeActive,
+                        isSelected: viewModel.isSelected(audiobook),
+                        onTap: { viewModel.openPlayer(for: audiobook) },
+                        onToggleSelection: { viewModel.toggleSelection(audiobook) }
+                    )
+                    .libraryCard()
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(
+                        top: DS.Spacing.xs,
+                        leading: 0,
+                        bottom: DS.Spacing.xs,
+                        trailing: 0
+                    ))
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        finishSwipeAction(for: audiobook)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        deleteSwipeAction(for: audiobook)
+                    }
+
+                case .folder(let folder):
+                    NavigationLink(value: folder) {
+                        FolderRowView(folder: folder)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(viewModel.isSelectionModeActive)
+                    .libraryCard()
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(
+                        top: DS.Spacing.xs,
+                        leading: 0,
+                        bottom: DS.Spacing.xs,
+                        trailing: 0
+                    ))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        deleteFolderSwipeAction(for: folder)
+                    }
                 }
             }
         }
@@ -220,6 +246,14 @@ struct LibraryView: View {
     private func deleteSwipeAction(for audiobook: Audiobook) -> some View {
         Button(role: .destructive) {
             viewModel.requestDelete(audiobook)
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+    }
+
+    private func deleteFolderSwipeAction(for folder: Folder) -> some View {
+        Button(role: .destructive) {
+            viewModel.deleteFolder(folder)
         } label: {
             Label("Delete", systemImage: "trash")
         }
@@ -376,6 +410,13 @@ struct LibraryView: View {
                         Label("Combine into Volume", systemImage: "rectangle.stack.badge.plus")
                     }
                     .disabled(!viewModel.canMergeSelected)
+
+                    Button {
+                        viewModel.presentFolderSheet()
+                    } label: {
+                        Label("Combine into Folder", systemImage: "folder.badge.plus")
+                    }
+                    .disabled(!viewModel.canDeleteSelected)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -513,6 +554,58 @@ struct LibraryView: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    // MARK: - Folder Sheet
+
+    private var folderSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: DS.Spacing.lg) {
+                VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+                    Text("Folder Name")
+                        .font(DS.Typography.caption)
+                        .foregroundStyle(DS.Color.secondary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+
+                    TextField("Enter name…", text: $viewModel.pendingFolderTitle)
+                        .font(.body)
+                        .padding(DS.Spacing.sm + DS.Spacing.xs)
+                        .background(
+                            RoundedRectangle(cornerRadius: DS.Radius.input, style: .continuous)
+                                .fill(DS.Color.secondarySurface)
+                        )
+                }
+
+                Spacer()
+
+                Button {
+                    viewModel.createFolder()
+                } label: {
+                    Text("Create Folder")
+                }
+                .buttonStyle(DS.ButtonStyle.primary(
+                    isDisabled: viewModel.pendingFolderTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ))
+                .disabled(
+                    viewModel.pendingFolderTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
+                .animation(DS.Animation.fade, value: viewModel.pendingFolderTitle.isEmpty)
+            }
+            .padding(DS.Spacing.md)
+            .navigationTitle("Combine into Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        viewModel.isFolderSheetPresented = false
+                        viewModel.pendingFolderTitle = ""
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
     }
 }

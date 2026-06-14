@@ -14,6 +14,7 @@ final class LibraryViewModel {
     // MARK: - Library State
 
     private(set) var audiobooks: [Audiobook] = []
+    private(set) var folders: [Folder] = []
     private(set) var isMerging: Bool = false
     private(set) var isImporting: Bool = false
     private(set) var errorMessage: String?
@@ -34,6 +35,26 @@ final class LibraryViewModel {
         }
     }
 
+    /// Items shown in the root library list.
+    /// Normal mode: folders + root-level books (no folder) interleaved by title.
+    /// Search mode: all matching books regardless of folder, no folder rows.
+    var libraryItems: [LibraryItem] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isSearchActive && !trimmed.isEmpty {
+            let query = trimmed.lowercased()
+            return audiobooks.filter { book in
+                book.title.lowercased().contains(query)
+                    || book.author.lowercased().contains(query)
+                    || book.fileURL.deletingPathExtension().lastPathComponent.lowercased().contains(query)
+            }.map { .audiobook($0) }
+        }
+        let bookItems = audiobooks.filter { $0.folder == nil }.map { LibraryItem.audiobook($0) }
+        let folderItems = folders.map { LibraryItem.folder($0) }
+        return (bookItems + folderItems).sorted {
+            $0.sortTitle.localizedCaseInsensitiveCompare($1.sortTitle) == .orderedAscending
+        }
+    }
+
     // MARK: - Selection State
 
     private(set) var isSelectionModeActive: Bool = false
@@ -43,6 +64,8 @@ final class LibraryViewModel {
 
     var isMergeSheetPresented: Bool = false
     var pendingMergeTitle: String = ""
+    var isFolderSheetPresented: Bool = false
+    var pendingFolderTitle: String = ""
     var isBulkDeleteConfirmationPresented: Bool = false
     var isSwipeDeleteConfirmationPresented: Bool = false
 
@@ -121,6 +144,11 @@ final class LibraryViewModel {
             sortBy: [SortDescriptor(\.title, comparator: .localizedStandard)]
         )
         audiobooks = (try? modelContext.fetch(descriptor)) ?? []
+
+        let folderDescriptor = FetchDescriptor<Folder>(
+            sortBy: [SortDescriptor(\.title, comparator: .localizedStandard)]
+        )
+        folders = (try? modelContext.fetch(folderDescriptor)) ?? []
     }
 
     // MARK: - Player Navigation
@@ -365,6 +393,42 @@ final class LibraryViewModel {
         } catch {
             errorMessage = "Merge failed. Please try again."
         }
+    }
+
+    // MARK: - Folder
+
+    func presentFolderSheet() {
+        isFolderSheetPresented = true
+    }
+
+    func createFolder() {
+        let title = pendingFolderTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, canDeleteSelected else { return }
+
+        let folder = Folder(title: title)
+        modelContext.insert(folder)
+        for book in selectedAudiobooks {
+            book.folder = folder
+        }
+        saveContext(errorContext: "create folder")
+
+        isFolderSheetPresented = false
+        pendingFolderTitle = ""
+        isSelectionModeActive = false
+        selectedIDs.removeAll()
+        fetchAudiobooks()
+    }
+
+    func deleteFolder(_ folder: Folder) {
+        modelContext.delete(folder)
+        saveContext(errorContext: "delete folder")
+        fetchAudiobooks()
+    }
+
+    func removeFromFolder(_ audiobook: Audiobook) {
+        audiobook.folder = nil
+        saveContext(errorContext: "remove from folder")
+        fetchAudiobooks()
     }
 
     // MARK: - Search

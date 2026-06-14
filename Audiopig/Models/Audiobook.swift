@@ -47,6 +47,8 @@ final class Audiobook {
     @Relationship(deleteRule: .cascade, inverse: \Bookmark.audiobook)
     var bookmarks: [Bookmark]
 
+    var folder: Folder?
+
     init(
         id: UUID = UUID(),
         title: String,
