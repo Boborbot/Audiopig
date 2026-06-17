@@ -7,6 +7,12 @@ import SwiftData
 import XCTest
 @testable import Audiopig
 
+/// Keeps `@MainActor` view models alive through XCTest teardown to avoid Swift 6 deinit crashes in the host app.
+@MainActor
+private enum StatsViewModelTestRetention {
+    static var viewModels: [StatsViewModel] = []
+}
+
 @MainActor
 final class StatsViewModelTests: XCTestCase {
 
@@ -38,6 +44,7 @@ final class StatsViewModelTests: XCTestCase {
         try context.save()
 
         let viewModel = StatsViewModel(modelContext: context)
+        StatsViewModelTestRetention.viewModels.append(viewModel)
         XCTAssertEqual(viewModel.finishedBooksCount, 1)
 
         viewModel.deleteAllStats()
@@ -65,6 +72,7 @@ final class StatsViewModelTests: XCTestCase {
         try context.save()
 
         let viewModel = StatsViewModel(modelContext: context)
+        StatsViewModelTestRetention.viewModels.append(viewModel)
         XCTAssertEqual(viewModel.totalListenedSeconds, 5400, accuracy: 0.01)
 
         viewModel.deleteAllStats()

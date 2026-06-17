@@ -545,6 +545,13 @@ final class WatchTransferService: WatchTransferServiceProtocol {
         }) {}
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
+
+    deinit {
+        ackTimeoutTasks.values.forEach { $0.cancel() }
+        outboundTimeoutTasks.values.forEach { $0.cancel() }
+        confirmationPollTasks.values.forEach { $0.cancel() }
+        progressWatchdogTasks.values.forEach { $0.cancel() }
+    }
 }
 
 enum WatchTransferError: LocalizedError {

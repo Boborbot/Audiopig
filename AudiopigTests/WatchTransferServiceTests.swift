@@ -6,12 +6,26 @@
 import XCTest
 @testable import Audiopig
 
+/// Keeps `@MainActor` services alive through XCTest teardown to avoid Swift 6 deinit crashes in the host app.
+@MainActor
+private enum WatchTransferServiceTestRetention {
+    static var services: [WatchTransferService] = []
+    static var bridges: [MockWatchBridge] = []
+}
+
 @MainActor
 final class WatchTransferServiceTests: XCTestCase {
 
-    func test_acknowledgementCompletesPendingTransfer() {
+    private func makeService() -> (MockWatchBridge, WatchTransferService) {
         let bridge = MockWatchBridge()
         let service = WatchTransferService(watchBridge: bridge)
+        WatchTransferServiceTestRetention.bridges.append(bridge)
+        WatchTransferServiceTestRetention.services.append(service)
+        return (bridge, service)
+    }
+
+    func test_acknowledgementCompletesPendingTransfer() {
+        let (bridge, service) = makeService()
         let bookID = UUID()
         let manifest = sampleManifest(bookID: bookID)
 
@@ -40,8 +54,7 @@ final class WatchTransferServiceTests: XCTestCase {
     }
 
     func test_ingestFailureMarksTransferFailed() {
-        let bridge = MockWatchBridge()
-        let service = WatchTransferService(watchBridge: bridge)
+        let (_, service) = makeService()
         let bookID = UUID()
 
         service.testing_setPendingTransfer(bookID: bookID, manifest: sampleManifest(bookID: bookID))
@@ -52,8 +65,7 @@ final class WatchTransferServiceTests: XCTestCase {
     }
 
     func test_fileDeliveredWithoutPendingTransferIsIgnored() {
-        let bridge = MockWatchBridge()
-        let service = WatchTransferService(watchBridge: bridge)
+        let (_, service) = makeService()
 
         service.handleFileDelivered(bookID: UUID())
 
@@ -61,8 +73,7 @@ final class WatchTransferServiceTests: XCTestCase {
     }
 
     func test_reconcileClearsStuckProgressWhenBookAlreadyOnWatch() {
-        let bridge = MockWatchBridge()
-        let service = WatchTransferService(watchBridge: bridge)
+        let (bridge, service) = makeService()
         let bookID = UUID()
         let manifest = sampleManifest(bookID: bookID)
 
@@ -88,8 +99,7 @@ final class WatchTransferServiceTests: XCTestCase {
     }
 
     func test_stateRevisionBumpsOnProgressChanges() {
-        let bridge = MockWatchBridge()
-        let service = WatchTransferService(watchBridge: bridge)
+        let (_, service) = makeService()
         let bookID = UUID()
         var callbackCount = 0
         service.onStateChanged = { callbackCount += 1 }
@@ -142,10 +152,6 @@ private final class MockWatchBridge: WatchConnectivityBridgeProtocol {
     }
 
     func publishSettings(_ settings: WatchSettingsSnapshot) {}
-
-    func publishLocalBooks(_ payload: WatchLocalBooksPayload) {
-        latestLocalBooks = payload
-    }
 
     func restoreLocalBooksCache(_ payload: WatchLocalBooksPayload) {
         latestLocalBooks = payload

@@ -77,12 +77,54 @@ Simulator: `Cmd+S` after `Window → Physical Size` for clean frames.
 
 ---
 
+## In-App Purchases (App Store Connect)
+
+Create IAP products **before** TestFlight Sandbox testing or App Review. Local `Audiopig.storekit` only works for Xcode Run; uploaded builds load products from Connect.
+
+### Subscription group
+
+1. App Store Connect → your app → **Subscriptions** → **+** Subscription Group
+2. Reference name: `audiopig_plus` (internal label; display name can be "Audiopig Plus")
+
+### Products (IDs must match code exactly)
+
+Source of truth: `AudiopigShared/ProductIdentifiers.swift`
+
+| Type | Product ID | Suggested price | Notes |
+|---|---|---|---|
+| Auto-renewable subscription | `com.nitay.Audiopig.plus.monthly` | $3.99/month | Add **7-day free trial** introductory offer |
+| Consumable | `com.nitay.Audiopig.tip.coffee` | $1.99 | Display name: Coffee Tip |
+| Consumable | `com.nitay.Audiopig.tip.lunch` | $4.99 | Display name: Lunch Tip |
+| Consumable | `com.nitay.Audiopig.tip.sponsor` | $9.99 | Display name: Sponsor Tip |
+
+Copy for display names and descriptions is in `Audiopig/Audiopig.storekit` localizations.
+
+### Subscription metadata
+
+- **Subscription display name:** Audiopig Plus
+- **Description:** Unlocks Find Paragraph Breaks (smart silence analysis)
+- **Review screenshot:** capture the paywall from Simulator or device (required for subscription review)
+
+### Sandbox testing (physical device)
+
+1. Connect → **Users and Access** → **Sandbox** → create a Sandbox Apple ID
+2. On iPhone: **Settings → App Store → Sandbox Account** → sign in with sandbox tester
+3. Install via **TestFlight** (or Xcode Run with StoreKit config for local-only QA)
+4. Verify per `qa-checklist.md` § StoreKit / Monetization:
+   - Plus trial subscribe, restore, manage subscription link
+   - All three tip tiers purchase and show thank-you UI
+5. Do **not** use your real Apple ID for sandbox purchases
+
+---
+
 ## TestFlight (recommended before public release)
 
 1. After upload processes, enable **Internal Testing** for your team
 2. Install via TestFlight on your phone
-3. Smoke-test import + playback + background audio
-4. Fix issues, increment build number, re-archive, re-upload
+3. Complete IAP setup (see **In-App Purchases** above) before Sandbox testing on TestFlight builds
+4. Smoke-test: import → playback → background audio → Watch remote playback
+5. Sandbox IAP: Plus trial, restore, and tip purchase on the TestFlight build
+6. Fix issues, increment build number, re-archive, re-upload
 
 ---
 
