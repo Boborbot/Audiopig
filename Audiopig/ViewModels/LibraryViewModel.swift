@@ -25,16 +25,23 @@ final class LibraryViewModel {
     var searchText: String = ""
     var isSearchActive: Bool = false
     var librarySortOrder: LibrarySortOrder
+    var libraryBookFilter: LibraryBookFilter
+    var librarySortDirection: LibrarySortDirection
 
     var filteredAudiobooks: [Audiobook] {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return audiobooks }
-        let query = trimmed.lowercased()
-        return audiobooks.filter { book in
-            book.title.lowercased().contains(query)
-                || book.author.lowercased().contains(query)
-                || book.fileURL.deletingPathExtension().lastPathComponent.lowercased().contains(query)
+        let matching: [Audiobook]
+        if trimmed.isEmpty {
+            matching = audiobooks
+        } else {
+            let query = trimmed.lowercased()
+            matching = audiobooks.filter { book in
+                book.title.lowercased().contains(query)
+                    || book.author.lowercased().contains(query)
+                    || book.fileURL.deletingPathExtension().lastPathComponent.lowercased().contains(query)
+            }
         }
+        return sortedAudiobooks(matching)
     }
 
     /// Items shown in the root library list.
@@ -43,17 +50,16 @@ final class LibraryViewModel {
     var libraryItems: [LibraryItem] {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if isSearchActive && !trimmed.isEmpty {
-            let query = trimmed.lowercased()
-            let matching = audiobooks.filter { book in
-                book.title.lowercased().contains(query)
-                    || book.author.lowercased().contains(query)
-                    || book.fileURL.deletingPathExtension().lastPathComponent.lowercased().contains(query)
-            }
-            return sortedAudiobooks(matching).map { .audiobook($0) }
+            return filteredAudiobooks.map { .audiobook($0) }
         }
 
         let rootBooks = sortedAudiobooks(audiobooks.filter { $0.folder == nil })
         let bookItems = rootBooks.map { LibraryItem.audiobook($0) }
+
+        guard libraryBookFilter == .all else {
+            return bookItems
+        }
+
         let sortedFolders = folders.sorted {
             $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
         }
@@ -61,18 +67,24 @@ final class LibraryViewModel {
 
         switch librarySortOrder {
         case .title:
-            return (bookItems + folderItems).sorted {
+            let combined = (bookItems + folderItems).sorted {
                 $0.sortTitle.localizedCaseInsensitiveCompare($1.sortTitle) == .orderedAscending
             }
+            return librarySortDirection == .descending ? combined.reversed() : combined
         default:
             return bookItems + folderItems
         }
     }
 
     func sortedAudiobooks(_ books: [Audiobook]) -> [Audiobook] {
-        let candidates = books.map { $0.librarySortCandidate() }
-        let sortedIDs = LibrarySorter.sorted(candidates, by: librarySortOrder).map(\.id)
-        let bookByID = Dictionary(uniqueKeysWithValues: books.map { ($0.id, $0) })
+        let filtered = books.filter { libraryBookFilter.includes(lastPlayedAt: $0.lastPlayedAt) }
+        let candidates = filtered.map { $0.librarySortCandidate() }
+        let sortedIDs = LibrarySorter.sorted(
+            candidates,
+            by: librarySortOrder,
+            direction: librarySortDirection
+        ).map(\.id)
+        let bookByID = Dictionary(uniqueKeysWithValues: filtered.map { ($0.id, $0) })
         return sortedIDs.compactMap { bookByID[$0] }
     }
 
@@ -83,6 +95,16 @@ final class LibraryViewModel {
     func setLibrarySortOrder(_ order: LibrarySortOrder) {
         librarySortOrder = order
         appSettings.librarySortOrder = order
+    }
+
+    func cycleLibraryBookFilter() {
+        libraryBookFilter = libraryBookFilter.next
+        appSettings.libraryBookFilter = libraryBookFilter
+    }
+
+    func toggleLibrarySortDirection() {
+        librarySortDirection = librarySortDirection.toggled
+        appSettings.librarySortDirection = librarySortDirection
     }
 
     // MARK: - Selection State
@@ -187,6 +209,8 @@ final class LibraryViewModel {
         self.volumeController = volumeController
         self.monetization = monetization
         self.librarySortOrder = appSettings.librarySortOrder
+        self.libraryBookFilter = appSettings.libraryBookFilter
+        self.librarySortDirection = appSettings.librarySortDirection
         self.playerViewModel = PlayerViewModel(
             audioEngine: audioEngine,
             modelContext: modelContext,
@@ -321,6 +345,23 @@ final class LibraryViewModel {
             appSettings.watchArtworkSkipGesturesEnabled = enabled
             syncWatchSettings()
             return .ok()
+
+        case .analyzeLulls:
+            guard monetization.hasAccess(to: .paragraphBreaks) else {
+                return .failure("Audiopig Plus required on iPhone.")
+            }
+            guard playerViewModel.audiobook != nil else {
+                return .failure("No book loaded on iPhone.")
+            }
+            let lull = await playerViewModel.analyzeLullsForWatch()
+            return .ok(
+                snapshot: playerViewModel.watchSnapshotForReply(),
+                lullResult: lull
+            )
+
+        case .seekToLull(let endTime):
+            playerViewModel.seekToLullEndTime(endTime)
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
 
         case .syncLocalPlaybackPosition(let bookID, let time):
             if let audiobook = audiobook(withID: bookID) {

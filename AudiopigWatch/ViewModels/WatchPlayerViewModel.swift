@@ -7,6 +7,14 @@ import Foundation
 import UIKit
 import Combine
 
+enum WatchLullState: Equatable {
+    case idle
+    case analyzing
+    case result(WatchLullResult)
+    case empty
+    case unavailable(String)
+}
+
 @MainActor
 final class WatchPlayerViewModel: ObservableObject {
     @Published private(set) var snapshot: WatchPlaybackSnapshot = .idle
@@ -23,6 +31,7 @@ final class WatchPlayerViewModel: ObservableObject {
     @Published var speedDraft: Float = 1.0
     @Published var volumeDraft: Float = 0.5
     @Published var showVolumeOverlay = false
+    @Published private(set) var lullState: WatchLullState = .idle
 
     private let coordinator: any WatchPlaybackCoordinating
     private let client: WatchConnectivityClient
@@ -76,6 +85,44 @@ final class WatchPlayerViewModel: ObservableObject {
         case .idle, .finished, .failed:
             return false
         }
+    }
+
+    var showsRemoteLullDetection: Bool {
+        snapshot.bookID != nil && snapshot.source == .remote
+    }
+
+    func lullLabel(for lull: WatchLullResult) -> String {
+        let delta = max(0, interpolatedGlobalTime - lull.endTime)
+        let secs = Int(delta)
+        return String(format: "-%d:%02d", secs / 60, secs % 60)
+    }
+
+    func analyzeLulls() {
+        guard showsRemoteLullDetection, isActive else { return }
+        guard case .idle = lullState else { return }
+        lullState = .analyzing
+        Task {
+            let result = await coordinator.send(.analyzeLulls)
+            await handleLullCommandResult(result)
+        }
+    }
+
+    func seekToLull(_ lull: WatchLullResult) {
+        lullState = .idle
+        WatchHaptics.directionUp()
+        Task {
+            let result = await coordinator.send(.seekToLull(endTime: lull.endTime))
+            await handleCommandResult(result)
+        }
+    }
+
+    func cancelLullAnalysis() {
+        lullState = .idle
+    }
+
+    func retryLullAnalysis() {
+        lullState = .idle
+        analyzeLulls()
     }
 
     var displayState: WatchPlaybackState {
@@ -248,12 +295,11 @@ final class WatchPlayerViewModel: ObservableObject {
     }
 
     private func applyAuthoritativeSnapshot(_ incoming: WatchPlaybackSnapshot) {
-        if incoming.revision < lastAuthoritativeSnapshot.revision,
-           optimisticState != nil {
-            // Stale snapshot while optimistic — wait for newer revision.
+        if incoming.revision < lastAuthoritativeSnapshot.revision {
             return
         }
 
+        let bookChanged = incoming.bookID != lastAuthoritativeSnapshot.bookID
         lastAuthoritativeSnapshot = incoming
         snapshot = incoming
         optimisticState = nil
@@ -262,14 +308,46 @@ final class WatchPlayerViewModel: ObservableObject {
         interpolatedGlobalTime = incoming.globalCurrentTime
         isReachable = coordinator.isReachable
 
-        let phoneSpeed = incoming.playbackSpeed
-        if lastSentSpeed == nil || abs(speedDraft - phoneSpeed) > WatchSpeedRange.step {
-            speedDraft = phoneSpeed
-            lastSentSpeed = phoneSpeed
+        if bookChanged {
+            lullState = .idle
         }
+
+        reconcileSpeed(from: incoming.playbackSpeed)
 
         volumeDraft = incoming.systemVolume
         restartInterpolationIfNeeded()
+    }
+
+    private func reconcileSpeed(from phoneSpeed: Float) {
+        let tolerance = WatchSpeedRange.step / 2
+        if let pending = lastSentSpeed {
+            if abs(phoneSpeed - pending) <= tolerance {
+                speedDraft = phoneSpeed
+                lastSentSpeed = nil
+            }
+        } else if abs(speedDraft - phoneSpeed) > tolerance {
+            speedDraft = phoneSpeed
+        }
+    }
+
+    private func handleLullCommandResult(_ result: WatchCommandResult) async {
+        isReachable = coordinator.isReachable
+        if let snap = result.snapshot {
+            applyAuthoritativeSnapshot(snap)
+        }
+
+        if !result.success {
+            lullState = .unavailable(result.errorMessage ?? "Unavailable on iPhone")
+            WatchHaptics.error()
+            return
+        }
+
+        if let lull = result.lullResult {
+            lullState = .result(lull)
+            WatchHaptics.click()
+        } else {
+            lullState = .empty
+        }
     }
 
     private func applyChapters(_ payload: WatchChaptersPayload) {
@@ -296,6 +374,8 @@ final class WatchPlayerViewModel: ObservableObject {
             applyAuthoritativeSnapshot(snap)
         } else if !result.success {
             optimisticState = nil
+            lastSentSpeed = nil
+            reconcileSpeed(from: snapshot.playbackSpeed)
             connectionMessage = result.errorMessage ?? client.connectionErrorMessage
             WatchHaptics.error()
         }

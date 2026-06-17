@@ -63,7 +63,9 @@ final class WatchTransferManifestTests: XCTestCase {
             .loadLocalBook(bookID: bookID, autoPlay: true),
             .deleteLocalBook(bookID: bookID),
             .syncLocalPlaybackPosition(bookID: bookID, time: 99.5),
-            .acknowledgeLocalBooks(WatchLocalBooksPayload(books: [], usedBytes: 0, budgetBytes: 100))
+            .acknowledgeLocalBooks(WatchLocalBooksPayload(books: [], usedBytes: 0, budgetBytes: 100)),
+            .analyzeLulls,
+            .seekToLull(endTime: 123.5)
         ]
 
         for command in commands {

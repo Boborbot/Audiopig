@@ -21,6 +21,8 @@ public enum WatchCommand: Codable, Sendable, Equatable {
     case seekToChapterIndex(Int)
     case seekToChapter(id: UUID)
     case setArtworkSkipGesturesEnabled(Bool)
+    case analyzeLulls
+    case seekToLull(endTime: TimeInterval)
     case deleteLocalBook(bookID: UUID)
     case syncLocalPlaybackPosition(bookID: UUID, time: TimeInterval)
     case acknowledgeLocalBooks(WatchLocalBooksPayload)
@@ -54,6 +56,8 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case seekToChapterIndex
         case seekToChapter
         case setArtworkSkipGesturesEnabled
+        case analyzeLulls
+        case seekToLull
         case deleteLocalBook
         case syncLocalPlaybackPosition
         case acknowledgeLocalBooks
@@ -89,6 +93,10 @@ public enum WatchCommand: Codable, Sendable, Equatable {
             self = .seekToChapter(id: try container.decode(UUID.self, forKey: .chapterID))
         case .setArtworkSkipGesturesEnabled:
             self = .setArtworkSkipGesturesEnabled(try container.decode(Bool.self, forKey: .enabled))
+        case .analyzeLulls:
+            self = .analyzeLulls
+        case .seekToLull:
+            self = .seekToLull(endTime: try container.decode(TimeInterval.self, forKey: .time))
         case .deleteLocalBook:
             self = .deleteLocalBook(bookID: try container.decode(UUID.self, forKey: .bookID))
         case .syncLocalPlaybackPosition:
@@ -142,6 +150,11 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case .setArtworkSkipGesturesEnabled(let enabled):
             try container.encode(Kind.setArtworkSkipGesturesEnabled, forKey: .kind)
             try container.encode(enabled, forKey: .enabled)
+        case .analyzeLulls:
+            try container.encode(Kind.analyzeLulls, forKey: .kind)
+        case .seekToLull(let endTime):
+            try container.encode(Kind.seekToLull, forKey: .kind)
+            try container.encode(endTime, forKey: .time)
         case .deleteLocalBook(let bookID):
             try container.encode(Kind.deleteLocalBook, forKey: .kind)
             try container.encode(bookID, forKey: .bookID)
@@ -160,15 +173,25 @@ public struct WatchCommandResult: Codable, Sendable, Equatable {
     public let success: Bool
     public let errorMessage: String?
     public let snapshot: WatchPlaybackSnapshot?
+    public let lullResult: WatchLullResult?
 
-    public init(success: Bool, errorMessage: String? = nil, snapshot: WatchPlaybackSnapshot? = nil) {
+    public init(
+        success: Bool,
+        errorMessage: String? = nil,
+        snapshot: WatchPlaybackSnapshot? = nil,
+        lullResult: WatchLullResult? = nil
+    ) {
         self.success = success
         self.errorMessage = errorMessage
         self.snapshot = snapshot
+        self.lullResult = lullResult
     }
 
-    public static func ok(snapshot: WatchPlaybackSnapshot? = nil) -> WatchCommandResult {
-        WatchCommandResult(success: true, snapshot: snapshot)
+    public static func ok(
+        snapshot: WatchPlaybackSnapshot? = nil,
+        lullResult: WatchLullResult? = nil
+    ) -> WatchCommandResult {
+        WatchCommandResult(success: true, snapshot: snapshot, lullResult: lullResult)
     }
 
     public static func failure(_ message: String) -> WatchCommandResult {

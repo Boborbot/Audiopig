@@ -23,7 +23,7 @@ final class LibrarySorterTests: XCTestCase {
 
         let sorted = LibrarySorter.sorted(books, by: .recentlyListened).map(\.title)
 
-        XCTAssertEqual(sorted, ["New Play", "Old Play", "Never", "Also Never"])
+        XCTAssertEqual(sorted, ["New Play", "Old Play", "Also Never", "Never"])
     }
 
     func test_dateAdded_sortsNewestFirst() {
@@ -69,15 +69,26 @@ final class LibrarySorterTests: XCTestCase {
         XCTAssertEqual(sorted, ["13:00 day3", "09:00 day3", "09:00 day2"])
     }
 
-    func test_title_sortsAlphabetically() {
+    func test_title_sortsAlphabeticallyAscending() {
         let books = [
             candidate(title: "Zebra"),
             candidate(title: "alpha"),
             candidate(title: "Beta"),
         ]
 
-        let sorted = LibrarySorter.sorted(books, by: .title).map(\.title)
+        let sorted = LibrarySorter.sorted(books, by: .title, direction: .ascending).map(\.title)
         XCTAssertEqual(sorted, ["alpha", "Beta", "Zebra"])
+    }
+
+    func test_title_sortsReverseAlphabeticallyDescending() {
+        let books = [
+            candidate(title: "Zebra"),
+            candidate(title: "alpha"),
+            candidate(title: "Beta"),
+        ]
+
+        let sorted = LibrarySorter.sorted(books, by: .title, direction: .descending).map(\.title)
+        XCTAssertEqual(sorted, ["Zebra", "Beta", "alpha"])
     }
 
     func test_author_sortsAlphabeticallyThenTitle() {
@@ -87,7 +98,7 @@ final class LibrarySorterTests: XCTestCase {
             candidate(title: "C", author: "Smith"),
         ]
 
-        let sorted = LibrarySorter.sorted(books, by: .author).map(\.title)
+        let sorted = LibrarySorter.sorted(books, by: .author, direction: .ascending).map(\.title)
         XCTAssertEqual(sorted, ["A", "B", "C"])
     }
 
@@ -111,6 +122,29 @@ final class LibrarySorterTests: XCTestCase {
 
         let sorted = LibrarySorter.sorted(books, by: .duration).map(\.title)
         XCTAssertEqual(sorted, ["Long", "Mid", "Short"])
+    }
+
+    func test_ascendingDirectionReversesDateAddedOrder() {
+        let books = [
+            candidate(title: "A", addedAt: day1),
+            candidate(title: "B", addedAt: day3),
+            candidate(title: "C", addedAt: day2),
+        ]
+
+        let sorted = LibrarySorter.sorted(books, by: .dateAdded, direction: .ascending).map(\.title)
+        XCTAssertEqual(sorted, ["A", "C", "B"])
+    }
+
+    func test_libraryBookFilter_openedAndUnopened() {
+        let opened = LibraryBookFilter.opened.includes(lastPlayedAt: day1)
+        let unopened = LibraryBookFilter.unopened.includes(lastPlayedAt: nil)
+        let all = LibraryBookFilter.all.includes(lastPlayedAt: nil)
+
+        XCTAssertTrue(opened)
+        XCTAssertFalse(LibraryBookFilter.opened.includes(lastPlayedAt: nil))
+        XCTAssertTrue(unopened)
+        XCTAssertFalse(LibraryBookFilter.unopened.includes(lastPlayedAt: day1))
+        XCTAssertTrue(all)
     }
 
     private func candidate(

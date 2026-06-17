@@ -5,6 +5,61 @@
 
 import Foundation
 
+/// Filters which audiobooks appear in library lists.
+public enum LibraryBookFilter: String, CaseIterable, Sendable {
+    case all
+    case opened
+    case unopened
+
+    public var menuTitle: String {
+        switch self {
+        case .all:      return "All Books"
+        case .opened:   return "Opened"
+        case .unopened: return "Unopened"
+        }
+    }
+
+    public var next: LibraryBookFilter {
+        switch self {
+        case .all:      return .opened
+        case .opened:   return .unopened
+        case .unopened: return .all
+        }
+    }
+
+    public func includes(lastPlayedAt: Date?) -> Bool {
+        switch self {
+        case .all:      return true
+        case .opened:   return lastPlayedAt != nil
+        case .unopened: return lastPlayedAt == nil
+        }
+    }
+}
+
+/// Sort direction for library audiobook lists. Descending is the default for date/size/duration sorts.
+public enum LibrarySortDirection: String, CaseIterable, Sendable {
+    case descending
+    case ascending
+
+    public var iconName: String {
+        switch self {
+        case .descending: return "arrow.down"
+        case .ascending:  return "arrow.up"
+        }
+    }
+
+    public var accessibilityLabel: String {
+        switch self {
+        case .descending: return "Descending order"
+        case .ascending:  return "Ascending order"
+        }
+    }
+
+    public var toggled: LibrarySortDirection {
+        self == .descending ? .ascending : .descending
+    }
+}
+
 /// User-selectable ordering for library audiobook lists.
 public enum LibrarySortOrder: String, CaseIterable, Identifiable, Sendable {
     case recentlyListened
@@ -60,8 +115,17 @@ public struct LibrarySortCandidate: Sendable, Equatable {
 }
 
 public enum LibrarySorter {
-    /// Returns candidates sorted by `order`, preserving relative order only through tie-breakers.
+    /// Returns candidates sorted by `order` and `direction`.
     public static func sorted(
+        _ candidates: [LibrarySortCandidate],
+        by order: LibrarySortOrder,
+        direction: LibrarySortDirection = .descending
+    ) -> [LibrarySortCandidate] {
+        let base = sortedDescending(candidates, by: order)
+        return direction == .descending ? base : Array(base.reversed())
+    }
+
+    private static func sortedDescending(
         _ candidates: [LibrarySortCandidate],
         by order: LibrarySortOrder
     ) -> [LibrarySortCandidate] {
@@ -74,42 +138,41 @@ public enum LibrarySorter {
                 let rhsDay = calendarStartOfDay(rhs.addedAt)
                 if lhsDay != rhsDay { return lhsDay > rhsDay }
                 if lhs.addedAt != rhs.addedAt { return lhs.addedAt > rhs.addedAt }
-                return titleAscending(lhs, rhs)
+                return titleDescending(lhs, rhs)
             }
         case .timeAdded:
             return candidates.sorted { lhs, rhs in
                 let lhsSeconds = secondsSinceStartOfDay(lhs.addedAt)
                 let rhsSeconds = secondsSinceStartOfDay(rhs.addedAt)
                 if lhsSeconds != rhsSeconds { return lhsSeconds > rhsSeconds }
-                // Tie-break within the same time-of-day: newer day first.
                 let lhsDay = calendarStartOfDay(lhs.addedAt)
                 let rhsDay = calendarStartOfDay(rhs.addedAt)
                 if lhsDay != rhsDay { return lhsDay > rhsDay }
                 if lhs.addedAt != rhs.addedAt { return lhs.addedAt > rhs.addedAt }
-                return titleAscending(lhs, rhs)
+                return titleDescending(lhs, rhs)
             }
         case .title:
-            return candidates.sorted { titleAscending($0, $1) }
+            return candidates.sorted { titleDescending($0, $1) }
         case .author:
             return candidates.sorted { lhs, rhs in
                 let authorCompare = lhs.author.localizedCaseInsensitiveCompare(rhs.author)
-                if authorCompare != .orderedSame { return authorCompare == .orderedAscending }
-                return titleAscending(lhs, rhs)
+                if authorCompare != .orderedSame { return authorCompare == .orderedDescending }
+                return titleDescending(lhs, rhs)
             }
         case .fileSize:
             return candidates.sorted { lhs, rhs in
                 if lhs.fileSize != rhs.fileSize { return lhs.fileSize > rhs.fileSize }
-                return titleAscending(lhs, rhs)
+                return titleDescending(lhs, rhs)
             }
         case .duration:
             return candidates.sorted { lhs, rhs in
                 if lhs.duration != rhs.duration { return lhs.duration > rhs.duration }
-                return titleAscending(lhs, rhs)
+                return titleDescending(lhs, rhs)
             }
         }
     }
 
-    /// Listened books first (most recent play date), then never-played books by date added (newest first).
+    /// Listened books first (most recent play date), then never-played books by date added (oldest first).
     private static func sortRecentlyListened(_ candidates: [LibrarySortCandidate]) -> [LibrarySortCandidate] {
         let listened = candidates
             .filter { $0.lastPlayedAt != nil }
@@ -117,14 +180,14 @@ public enum LibrarySorter {
                 let lhsDate = lhs.lastPlayedAt!
                 let rhsDate = rhs.lastPlayedAt!
                 if lhsDate != rhsDate { return lhsDate > rhsDate }
-                return titleAscending(lhs, rhs)
+                return titleDescending(lhs, rhs)
             }
 
         let unlistened = candidates
             .filter { $0.lastPlayedAt == nil }
             .sorted { lhs, rhs in
-                if lhs.addedAt != rhs.addedAt { return lhs.addedAt > rhs.addedAt }
-                return titleAscending(lhs, rhs)
+                if lhs.addedAt != rhs.addedAt { return lhs.addedAt < rhs.addedAt }
+                return titleDescending(lhs, rhs)
             }
 
         return listened + unlistened
@@ -143,7 +206,7 @@ public enum LibrarySorter {
         return (hour * 3600) + (minute * 60) + second
     }
 
-    private static func titleAscending(_ lhs: LibrarySortCandidate, _ rhs: LibrarySortCandidate) -> Bool {
-        lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+    private static func titleDescending(_ lhs: LibrarySortCandidate, _ rhs: LibrarySortCandidate) -> Bool {
+        lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedDescending
     }
 }

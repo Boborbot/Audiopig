@@ -19,6 +19,9 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
     private var revision: UInt64 = 0
     private var skipForwardSeconds: TimeInterval = 15
     private var skipBackwardSeconds: TimeInterval = 15
+    private var defaultSpeed: Float = 1.0
+    private var universalSpeedEnabled: Bool = false
+    private var universalSpeedValue: Float = 1.0
     private var positionSyncTask: Task<Void, Never>?
     private var resumePersistTask: Task<Void, Never>?
     private var lastSyncedPosition: TimeInterval = -1
@@ -37,6 +40,9 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
         if let settings = client.latestSettings {
             skipForwardSeconds = settings.skipForwardSeconds
             skipBackwardSeconds = settings.skipBackwardSeconds
+            defaultSpeed = settings.defaultSpeed ?? defaultSpeed
+            universalSpeedEnabled = settings.universalPlaybackSpeedEnabled ?? false
+            universalSpeedValue = settings.universalPlaybackSpeed ?? universalSpeedValue
         }
 
         engine.onTimeUpdate = { [weak self] _ in
@@ -54,6 +60,11 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
         client.setSettingsHandler { [weak self] settings in
             self?.skipForwardSeconds = settings.skipForwardSeconds
             self?.skipBackwardSeconds = settings.skipBackwardSeconds
+            self?.defaultSpeed = settings.defaultSpeed ?? self?.defaultSpeed ?? 1.0
+            self?.universalSpeedEnabled = settings.universalPlaybackSpeedEnabled ?? false
+            if let uni = settings.universalPlaybackSpeed {
+                self?.universalSpeedValue = uni
+            }
         }
     }
 
@@ -106,6 +117,11 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
 
         case .setSpeed(let speed):
             engine.setSpeed(speed)
+            if universalSpeedEnabled {
+                universalSpeedValue = speed
+            } else if let bookID = currentManifest?.bookID {
+                persistPerBookSpeed(bookID: bookID, speed: speed)
+            }
             publishSnapshot(immediate: true)
             return .ok(snapshot: snapshot)
 
@@ -177,11 +193,36 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
             duration: manifest.duration,
             autoPlay: autoPlay
         )
+        let desiredSpeed: Float
+        if universalSpeedEnabled {
+            desiredSpeed = universalSpeedValue
+        } else if let saved = loadPerBookSpeed(bookID: bookID) {
+            desiredSpeed = saved
+        } else {
+            desiredSpeed = defaultSpeed
+            persistPerBookSpeed(bookID: bookID, speed: desiredSpeed)
+        }
+        engine.setSpeed(desiredSpeed)
         publishSnapshot(immediate: true, includeArtwork: true)
         if autoPlay {
             startPositionSync()
         }
         return .ok(snapshot: snapshot)
+    }
+
+    private func perBookSpeedDefaultsKey(_ bookID: UUID) -> String {
+        "watch.bookPlaybackSpeed.\(bookID.uuidString)"
+    }
+
+    private func loadPerBookSpeed(bookID: UUID) -> Float? {
+        let key = perBookSpeedDefaultsKey(bookID)
+        let stored = UserDefaults.standard.float(forKey: key)
+        return stored > 0 ? stored : nil
+    }
+
+    private func persistPerBookSpeed(bookID: UUID, speed: Float) {
+        let key = perBookSpeedDefaultsKey(bookID)
+        UserDefaults.standard.set(speed, forKey: key)
     }
 
     private func stopPlayback() {

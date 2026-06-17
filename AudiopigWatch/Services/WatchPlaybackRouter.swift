@@ -78,6 +78,12 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
              .seekToChapterIndex, .seekToChapter, .setArtworkSkipGesturesEnabled:
             return await activeCoordinator.send(command)
 
+        case .analyzeLulls, .seekToLull:
+            guard activeSource == .remote else {
+                return .failure("Available for iPhone playback only.")
+            }
+            return await remote.send(command)
+
         case .requestLocalBooks, .deleteLocalBook:
             return await local.send(command)
 

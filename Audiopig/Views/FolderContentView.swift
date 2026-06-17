@@ -8,7 +8,6 @@ import SwiftUI
 struct FolderContentView: View {
     let folder: Folder
     let viewModel: LibraryViewModel
-
     var body: some View {
         ZStack {
             DS.Color.canvas.ignoresSafeArea()
@@ -24,22 +23,7 @@ struct FolderContentView: View {
         .coralNavigationBanner()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Picker(
-                        "Order Files",
-                        selection: Binding(
-                            get: { viewModel.librarySortOrder },
-                            set: { viewModel.setLibrarySortOrder($0) }
-                        )
-                    ) {
-                        ForEach(LibrarySortOrder.allCases) { order in
-                            Text(order.menuTitle).tag(order)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                }
-                .accessibilityLabel("Order files")
+                LibraryOrderToolbarControl(viewModel: viewModel)
             }
         }
     }

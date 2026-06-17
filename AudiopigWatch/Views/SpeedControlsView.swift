@@ -46,12 +46,20 @@ struct SpeedControlsView: View {
             isHapticFeedbackEnabled: true
         )
         .onChange(of: viewModel.speedDraft) { _, newValue in
-            guard isActive else { return }
+            guard isActive else {
+                lastDetentSpeed = normalizedSpeed(newValue)
+                return
+            }
             let normalized = normalizedSpeed(newValue)
             if normalized != lastDetentSpeed {
                 lastDetentSpeed = normalized
                 viewModel.speedDraft = normalized
                 viewModel.applySpeedDraft()
+            }
+        }
+        .onChange(of: isActive) { _, active in
+            if active {
+                lastDetentSpeed = viewModel.speedDraft
             }
         }
         .onAppear {

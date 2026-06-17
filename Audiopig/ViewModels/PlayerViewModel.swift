@@ -202,7 +202,12 @@ final class PlayerViewModel {
 
     func togglePlaybackDisplayMode() {
         playbackDisplayMode = playbackDisplayMode == .entireBook ? .currentChapter : .entireBook
-        audioEngine.setNowPlayingTimelineScope(playbackDisplayMode.nowPlayingScope)
+        let newScope: PlaybackTimelineScope = (playbackDisplayMode == .entireBook)
+            ? .entireBook
+            : .currentChapter
+        settings.playbackTimelineScope = newScope
+        audioEngine.setNowPlayingTimelineScope(newScope.nowPlayingScope)
+        watchBridge?.publishSettings(settings.watchSettingsSnapshot())
         guard !isScrubbing else { return }
         applyEngineTime(audioEngine.currentTime)
     }
@@ -306,6 +311,8 @@ final class PlayerViewModel {
         self.settings = appSettings
         self.watchBridge = watchBridge
         self.monetization = monetization
+        self.playbackDisplayMode = PlaybackDisplayMode(scope: appSettings.playbackTimelineScope)
+        self.audioEngine.setNowPlayingTimelineScope(appSettings.playbackTimelineScope.nowPlayingScope)
         observeEngine()
         installBackgroundObserver()
         observeSkipIntervalSettings()
@@ -326,8 +333,22 @@ final class PlayerViewModel {
         try? modelContext.save()
         do {
             try await audioEngine.load(audiobook: audiobook)
-            audioEngine.setNowPlayingTimelineScope(playbackDisplayMode.nowPlayingScope)
-            try? audioEngine.setPlaybackSpeed(settings.defaultSpeed)
+            audioEngine.setNowPlayingTimelineScope(settings.playbackTimelineScope.nowPlayingScope)
+            let desiredSpeed: Float
+            if settings.universalPlaybackSpeedEnabled {
+                desiredSpeed = settings.universalPlaybackSpeed > 0 ? settings.universalPlaybackSpeed : settings.defaultSpeed
+                if settings.universalPlaybackSpeed <= 0 {
+                    settings.universalPlaybackSpeed = desiredSpeed
+                }
+            } else if let perBook = audiobook.lastPlaybackSpeed, perBook > 0 {
+                desiredSpeed = perBook
+            } else {
+                desiredSpeed = settings.defaultSpeed
+                audiobook.lastPlaybackSpeed = desiredSpeed
+                try? modelContext.save()
+            }
+
+            try? audioEngine.setPlaybackSpeed(desiredSpeed)
             playbackSpeed = audioEngine.playbackSpeed
             if autoPlay { try? audioEngine.play() }
         } catch {
@@ -392,6 +413,12 @@ final class PlayerViewModel {
         let normalized = Self.normalizedSpeed(speed)
         try? audioEngine.setPlaybackSpeed(normalized)
         playbackSpeed = audioEngine.playbackSpeed
+        if settings.universalPlaybackSpeedEnabled {
+            settings.universalPlaybackSpeed = playbackSpeed
+        } else if let audiobook {
+            audiobook.lastPlaybackSpeed = playbackSpeed
+            try? modelContext.save()
+        }
         publishWatchSnapshot(immediate: true, includeArtwork: false)
     }
 
@@ -442,17 +469,41 @@ final class PlayerViewModel {
         Task { try? await audioEngine.seek(to: max(0, lull.endTime - 0.5)) }
     }
 
+    /// Runs lull detection on iPhone for Watch remote commands.
+    func analyzeLullsForWatch() async -> WatchLullResult? {
+        guard audiobook != nil else { return nil }
+        guard monetization.hasAccess(to: .paragraphBreaks) else { return nil }
+        let (from, to) = lullAnalysisWindow()
+        let chapters = audioEngine.resolvedChapters
+        let lulls = (try? await lullDetector.findLulls(in: chapters, from: from, to: to)) ?? []
+        guard let lull = lulls.first else { return nil }
+        return WatchLullResult(endTime: lull.endTime, duration: lull.duration)
+    }
+
+    func seekToLullEndTime(_ endTime: TimeInterval) {
+        resetListeningSample()
+        Task {
+            try? await audioEngine.seek(to: max(0, endTime - 0.5))
+            publishWatchSnapshot(immediate: true, includeArtwork: false)
+        }
+    }
+
     private func startLullAnalysis() {
         lullAnalysisState = .analyzing
-        let skipRecent = min(max(settings.lullSkipRecentWindow, 0), 5 * 60)
-        let lookback = min(max(settings.lullLookbackWindow, 30), 15 * 60)
-        let to = max(0, audioEngine.currentTime - skipRecent)  // exclude recent audio
-        let from = max(0, to - lookback)
+        let (from, to) = lullAnalysisWindow()
         let chapters = audioEngine.resolvedChapters
         Task {
             let lulls = (try? await lullDetector.findLulls(in: chapters, from: from, to: to)) ?? []
             lullAnalysisState = .results(lulls)
         }
+    }
+
+    private func lullAnalysisWindow() -> (from: TimeInterval, to: TimeInterval) {
+        let skipRecent = min(max(settings.lullSkipRecentWindow, 0), 5 * 60)
+        let lookback = min(max(settings.lullLookbackWindow, 30), 15 * 60)
+        let to = max(0, audioEngine.currentTime - skipRecent)
+        let from = max(0, to - lookback)
+        return (from, to)
     }
 
     // MARK: - Bookmarks
@@ -879,6 +930,29 @@ final class PlayerViewModel {
 }
 
 private extension PlayerViewModel.PlaybackDisplayMode {
+    var nowPlayingScope: NowPlayingTimelineScope {
+        switch self {
+        case .entireBook: return .entireBook
+        case .currentChapter: return .currentChapter
+        }
+    }
+
+    var timelineScope: PlaybackTimelineScope {
+        switch self {
+        case .entireBook: return .entireBook
+        case .currentChapter: return .currentChapter
+        }
+    }
+
+    init(scope: PlaybackTimelineScope) {
+        switch scope {
+        case .entireBook: self = .entireBook
+        case .currentChapter: self = .currentChapter
+        }
+    }
+}
+
+private extension PlaybackTimelineScope {
     var nowPlayingScope: NowPlayingTimelineScope {
         switch self {
         case .entireBook: return .entireBook

@@ -21,6 +21,7 @@ struct MediaControlsView: View {
         ZStack {
             VStack(spacing: WDS.Spacing.sm) {
                 artworkTapZone
+                lullSection
                 titleBlock
                 timebar
                 transportRow
@@ -80,6 +81,76 @@ struct MediaControlsView: View {
                     ? "Double-tap skip forward, triple-tap skip back"
                     : "Disabled in settings"
             )
+    }
+
+    @ViewBuilder
+    private var lullSection: some View {
+        if viewModel.showsRemoteLullDetection {
+            switch viewModel.lullState {
+            case .idle:
+                Button {
+                    viewModel.analyzeLulls()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "waveform.and.magnifyingglass")
+                        Text("Find Break")
+                    }
+                    .font(.caption2.weight(.medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(WDS.Color.coral.opacity(0.15), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(!viewModel.isActive)
+
+            case .analyzing:
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text("Analyzing…")
+                        .font(.caption2)
+                }
+                .frame(maxWidth: .infinity)
+
+            case .result(let lull):
+                VStack(spacing: 4) {
+                    Button {
+                        viewModel.seekToLull(lull)
+                    } label: {
+                        Text(viewModel.lullLabel(for: lull))
+                            .font(.caption.monospacedDigit().weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(WDS.Color.coral.opacity(0.25), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button("Cancel") {
+                        viewModel.cancelLullAnalysis()
+                    }
+                    .font(.caption2)
+                    .buttonStyle(.plain)
+                }
+
+            case .empty:
+                VStack(spacing: 4) {
+                    Text("No break found")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Button("Try Again") {
+                        viewModel.retryLullAnalysis()
+                    }
+                    .font(.caption2)
+                    .buttonStyle(.plain)
+                }
+
+            case .unavailable(let message):
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
     }
 
     private var titleBlock: some View {

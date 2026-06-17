@@ -67,6 +67,12 @@ struct SettingsView: View {
                     }
                     .tint(DS.Color.coral)
 
+                    Toggle(isOn: $settings.universalPlaybackSpeedEnabled) {
+                        Label("Universal playback speed", systemImage: "globe")
+                    }
+                    .tint(DS.Color.coral)
+                    .onChange(of: settings.universalPlaybackSpeedEnabled) { _, _ in onWatchSettingsChanged?() }
+
                     Picker("Speed Button 1", selection: $settings.speedPreset1) {
                         ForEach(PlayerViewModel.availableSpeeds, id: \.self) { speed in
                             Text(speedLabel(speed)).tag(speed)

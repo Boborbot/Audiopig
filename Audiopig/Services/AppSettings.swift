@@ -61,6 +61,8 @@ final class AppSettings {
 
     private enum Keys {
         static let defaultSpeed         = "settings.defaultSpeed"
+        static let universalSpeedEnabled = "settings.universalSpeedEnabled"
+        static let universalSpeedValue   = "settings.universalSpeedValue"
         static let speedPreset1         = "settings.speedPreset1"
         static let speedPreset2         = "settings.speedPreset2"
         static let speedPreset3         = "settings.speedPreset3"
@@ -78,6 +80,8 @@ final class AppSettings {
         static let sleepTimerExpiry     = "settings.sleepTimerExpiry"
         static let watchArtworkSkipGestures = "settings.watchArtworkSkipGestures"
         static let librarySortOrder         = "settings.librarySortOrder"
+        static let libraryBookFilter        = "settings.libraryBookFilter"
+        static let librarySortDirection     = "settings.librarySortDirection"
         static let playbackTimelineScope    = "settings.playbackTimelineScope"
     }
 
@@ -87,6 +91,18 @@ final class AppSettings {
     private var _defaultSpeed: Float = {
         let stored = UserDefaults.standard.float(forKey: Keys.defaultSpeed)
         return stored > 0 ? stored : 1.0
+    }()
+
+    @ObservationIgnored
+    private var _universalSpeedEnabled: Bool = {
+        guard UserDefaults.standard.object(forKey: Keys.universalSpeedEnabled) != nil else { return false }
+        return UserDefaults.standard.bool(forKey: Keys.universalSpeedEnabled)
+    }()
+
+    @ObservationIgnored
+    private var _universalSpeedValue: Float = {
+        let stored = UserDefaults.standard.float(forKey: Keys.universalSpeedValue)
+        return stored > 0 ? stored : 0
     }()
 
     @ObservationIgnored
@@ -189,6 +205,24 @@ final class AppSettings {
     }()
 
     @ObservationIgnored
+    private var _libraryBookFilter: LibraryBookFilter = {
+        guard let raw = UserDefaults.standard.string(forKey: Keys.libraryBookFilter),
+              let filter = LibraryBookFilter(rawValue: raw) else {
+            return .all
+        }
+        return filter
+    }()
+
+    @ObservationIgnored
+    private var _librarySortDirection: LibrarySortDirection = {
+        guard let raw = UserDefaults.standard.string(forKey: Keys.librarySortDirection),
+              let direction = LibrarySortDirection(rawValue: raw) else {
+            return .descending
+        }
+        return direction
+    }()
+
+    @ObservationIgnored
     private var _playbackTimelineScope: PlaybackTimelineScope = {
         guard let raw = UserDefaults.standard.string(forKey: Keys.playbackTimelineScope),
               let scope = PlaybackTimelineScope(rawValue: raw) else {
@@ -209,6 +243,41 @@ final class AppSettings {
             withMutation(keyPath: \.defaultSpeed) {
                 _defaultSpeed = newValue
                 UserDefaults.standard.set(newValue, forKey: Keys.defaultSpeed)
+            }
+        }
+    }
+
+    /// When enabled, playback speed is global across all books (and synced to Watch).
+    /// Default: `false`.
+    var universalPlaybackSpeedEnabled: Bool {
+        get {
+            access(keyPath: \.universalPlaybackSpeedEnabled)
+            return _universalSpeedEnabled
+        }
+        set {
+            withMutation(keyPath: \.universalPlaybackSpeedEnabled) {
+                _universalSpeedEnabled = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.universalSpeedEnabled)
+            }
+            if newValue, universalPlaybackSpeed <= 0 {
+                universalPlaybackSpeed = defaultSpeed
+            }
+        }
+    }
+
+    /// The universal playback speed value when `universalPlaybackSpeedEnabled` is on.
+    ///
+    /// Stored even while universal mode is off so it can be toggled on without losing the last value.
+    var universalPlaybackSpeed: Float {
+        get {
+            access(keyPath: \.universalPlaybackSpeed)
+            return _universalSpeedValue
+        }
+        set {
+            let normalized = Self.normalizedSpeed(newValue)
+            withMutation(keyPath: \.universalPlaybackSpeed) {
+                _universalSpeedValue = normalized
+                UserDefaults.standard.set(normalized, forKey: Keys.universalSpeedValue)
             }
         }
     }
@@ -444,6 +513,34 @@ final class AppSettings {
         }
     }
 
+    /// Which audiobooks appear in library lists. Default: all books.
+    var libraryBookFilter: LibraryBookFilter {
+        get {
+            access(keyPath: \.libraryBookFilter)
+            return _libraryBookFilter
+        }
+        set {
+            withMutation(keyPath: \.libraryBookFilter) {
+                _libraryBookFilter = newValue
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.libraryBookFilter)
+            }
+        }
+    }
+
+    /// Sort direction for library lists. Default: descending.
+    var librarySortDirection: LibrarySortDirection {
+        get {
+            access(keyPath: \.librarySortDirection)
+            return _librarySortDirection
+        }
+        set {
+            withMutation(keyPath: \.librarySortDirection) {
+                _librarySortDirection = newValue
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.librarySortDirection)
+            }
+        }
+    }
+
     /// Whether the player timebar + lock-screen timeline use the whole book or current chapter.
     /// Default: entire book.
     var playbackTimelineScope: PlaybackTimelineScope {
@@ -465,7 +562,10 @@ final class AppSettings {
             skipForwardSeconds: skipForwardInterval,
             skipBackwardSeconds: skipBackwardInterval,
             speedPresets: speedPresets,
-            playbackTimelineScope: playbackTimelineScope
+            playbackTimelineScope: playbackTimelineScope,
+            defaultSpeed: defaultSpeed,
+            universalPlaybackSpeedEnabled: universalPlaybackSpeedEnabled,
+            universalPlaybackSpeed: universalPlaybackSpeedEnabled ? universalPlaybackSpeed : nil
         )
     }
 

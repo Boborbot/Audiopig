@@ -71,6 +71,15 @@ struct WatchRootView: View {
         .onChange(of: playerViewModel.snapshot.bookID) { _, bookID in
             if bookID == nil, screen == .player {
                 screen = .sourcePicker
+            } else if playerViewModel.shouldLaunchToPlayer {
+                screen = .player
+                selectedPage = 1
+            }
+        }
+        .onChange(of: playerViewModel.snapshot.playbackState) { _, _ in
+            if playerViewModel.shouldLaunchToPlayer {
+                screen = .player
+                selectedPage = 1
             }
         }
     }

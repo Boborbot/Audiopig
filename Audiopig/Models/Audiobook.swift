@@ -15,6 +15,9 @@ final class Audiobook {
     var duration: TimeInterval
     /// Resume position in the audiobook timeline. Updated on seek and periodically while playing.
     var currentPlaybackTime: TimeInterval
+    /// Last playback speed used for this book when universal speed is disabled.
+    /// When `nil`, the current app default is used and then persisted on first load.
+    var lastPlaybackSpeed: Float? = nil
     /// Last time this book was opened or had playback position saved. Used for Watch recent list.
     var lastPlayedAt: Date? = nil
     /// When the book was added to the library. `nil` for legacy records until backfilled from file metadata.
@@ -63,6 +66,7 @@ final class Audiobook {
         author: String,
         duration: TimeInterval,
         currentPlaybackTime: TimeInterval = 0,
+        lastPlaybackSpeed: Float? = nil,
         isManuallyFinished: Bool = false,
         coverArtwork: Data? = nil,
         fileURL: URL,
@@ -74,6 +78,7 @@ final class Audiobook {
         self.author = author
         self.duration = duration
         self.currentPlaybackTime = currentPlaybackTime
+        self.lastPlaybackSpeed = lastPlaybackSpeed
         self.isManuallyFinished = isManuallyFinished
         self.coverArtwork = coverArtwork
         self.fileURL = fileURL

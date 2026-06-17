@@ -56,10 +56,9 @@ struct RecentBooksView: View {
         List {
             ForEach(libraryViewModel.books) { book in
                 Button {
+                    onBookSelected()
                     Task {
-                        if await libraryViewModel.selectBook(id: book.id) {
-                            onBookSelected()
-                        }
+                        _ = await libraryViewModel.selectBook(id: book.id)
                     }
                 } label: {
                     HStack(spacing: WDS.Spacing.sm) {

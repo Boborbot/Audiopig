@@ -401,23 +401,8 @@ struct LibraryView: View {
                 }
                 .transition(.opacity)
             } else if !viewModel.isSearchActive && (!viewModel.audiobooks.isEmpty || !viewModel.folders.isEmpty) {
-                Menu {
-                    Picker(
-                        "Order Files",
-                        selection: Binding(
-                            get: { viewModel.librarySortOrder },
-                            set: { viewModel.setLibrarySortOrder($0) }
-                        )
-                    ) {
-                        ForEach(LibrarySortOrder.allCases) { order in
-                            Text(order.menuTitle).tag(order)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                }
-                .accessibilityLabel("Order files")
-                .transition(.opacity)
+                LibraryOrderToolbarControl(viewModel: viewModel)
+                    .transition(.opacity)
             }
         }
 
