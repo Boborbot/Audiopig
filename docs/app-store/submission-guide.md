@@ -10,7 +10,7 @@ Step-by-step from a clean build to App Store Connect. Assumes Apple Developer Pr
 2. Privacy policy and support page are hosted via GitHub Pages (`docs/` → `main`):
    - Support: https://boborbot.github.io/Audiopig/
    - Privacy: https://boborbot.github.io/Audiopig/privacy-policy.html
-3. Support email: `AudiopigSupprt@gmail.com`
+3. Support email: `audiopigsupport@gmail.com`
 4. Confirm bundle ID `com.nitay.Audiopig` matches your Developer account.
 5. Confirm signing: Xcode → Audiopig target → Signing & Capabilities → Team selected, "Automatically manage signing" on.
 
