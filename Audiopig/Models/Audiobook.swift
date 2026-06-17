@@ -13,7 +13,15 @@ final class Audiobook {
     var title: String
     var author: String
     var duration: TimeInterval
+    /// Resume position in the audiobook timeline. Updated on seek and periodically while playing.
     var currentPlaybackTime: TimeInterval
+    /// Last time this book was opened or had playback position saved. Used for Watch recent list.
+    var lastPlayedAt: Date? = nil
+    /// When the book was added to the library. `nil` for legacy records until backfilled from file metadata.
+    var addedAt: Date? = nil
+    /// Wall-clock content seconds actually heard while playback was running.
+    /// Grows only from small forward deltas between time-observer ticks — never from seeks or scrubs.
+    var accumulatedListeningSeconds: TimeInterval = 0
     var isManuallyFinished: Bool
     @Attribute(.externalStorage) var coverArtwork: Data?
     var fileURL: URL

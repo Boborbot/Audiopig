@@ -10,10 +10,7 @@ struct LibraryView: View {
     @State private var viewModel: LibraryViewModel
     @FocusState private var isSearchFocused: Bool
 
-    /// Drives the single shared .fileImporter modifier.
     @State private var isImporterPresented: Bool = false
-    /// When true the importer shows folders; when false it shows audio files.
-    @State private var isImportingFolder: Bool = false
 
     private static let allowedAudioTypes: [UTType] = {
         var types: [UTType] = [.mp3, .mpeg4Audio]
@@ -26,12 +23,6 @@ struct LibraryView: View {
     }
 
     private func presentFileImporter() {
-        isImportingFolder = false
-        isImporterPresented = true
-    }
-
-    private func presentFolderImporter() {
-        isImportingFolder = true
         isImporterPresented = true
     }
 
@@ -39,28 +30,15 @@ struct LibraryView: View {
         navigationContent
             .fileImporter(
                 isPresented: $isImporterPresented,
-                allowedContentTypes: isImportingFolder ? [.folder] : Self.allowedAudioTypes,
-                allowsMultipleSelection: !isImportingFolder
+                allowedContentTypes: Self.allowedAudioTypes,
+                allowsMultipleSelection: true
             ) { result in
-                if isImportingFolder {
-                    switch result {
-                    case .success(let urls):
-                        if let url = urls.first {
-                            Task { await viewModel.importFolder(url) }
-                        }
-                    case .failure(let error):
-                        if (error as NSError).code != NSUserCancelledError {
-                            viewModel.reportError("Could not open the selected folder.")
-                        }
-                    }
-                } else {
-                    switch result {
-                    case .success(let urls):
-                        Task { await viewModel.importFiles(urls) }
-                    case .failure(let error):
-                        if (error as NSError).code != NSUserCancelledError {
-                            viewModel.reportError("Could not open the selected files. Please try again.")
-                        }
+                switch result {
+                case .success(let urls):
+                    Task { await viewModel.importFiles(urls) }
+                case .failure(let error):
+                    if (error as NSError).code != NSUserCancelledError {
+                        viewModel.reportError("Could not open the selected files. Please try again.")
                     }
                 }
             }
@@ -164,6 +142,22 @@ struct LibraryView: View {
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         deleteSwipeAction(for: audiobook)
                         editSwipeAction(for: audiobook)
+                    }
+                    .contextMenu {
+                        let status = viewModel.watchStatus(for: audiobook)
+                        if status == .notOnWatch {
+                            Button {
+                                Task { await viewModel.sendToWatch(audiobook) }
+                            } label: {
+                                Label("Send to Watch", systemImage: "applewatch.and.arrow.down")
+                            }
+                        } else if status == .onWatch {
+                            Button {
+                                Task { await viewModel.removeFromWatch(audiobook) }
+                            } label: {
+                                Label("Remove from Watch", systemImage: "applewatch.slash")
+                            }
+                        }
                     }
 
                 case .folder(let folder):
@@ -406,7 +400,29 @@ struct LibraryView: View {
                     Image(systemName: "ellipsis.circle")
                 }
                 .transition(.opacity)
-            } else if !viewModel.isSearchActive {
+            } else if !viewModel.isSearchActive && (!viewModel.audiobooks.isEmpty || !viewModel.folders.isEmpty) {
+                Menu {
+                    Picker(
+                        "Order Files",
+                        selection: Binding(
+                            get: { viewModel.librarySortOrder },
+                            set: { viewModel.setLibrarySortOrder($0) }
+                        )
+                    ) {
+                        ForEach(LibrarySortOrder.allCases) { order in
+                            Text(order.menuTitle).tag(order)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .accessibilityLabel("Order files")
+                .transition(.opacity)
+            }
+        }
+
+        ToolbarItem(placement: .navigationBarLeading) {
+            if !viewModel.isSelectionModeActive && !viewModel.isSearchActive {
                 Button {
                     withAnimation(DS.Animation.standard) {
                         viewModel.isSearchActive = true
@@ -421,17 +437,8 @@ struct LibraryView: View {
 
         ToolbarItem(placement: .navigationBarTrailing) {
             if !viewModel.isSelectionModeActive {
-                Menu {
-                    Button {
-                        presentFileImporter()
-                    } label: {
-                        Label("Add Files", systemImage: "doc.badge.plus")
-                    }
-                    Button {
-                        presentFolderImporter()
-                    } label: {
-                        Label("Add Folder", systemImage: "folder.badge.plus")
-                    }
+                Button {
+                    presentFileImporter()
                 } label: {
                     Image(systemName: "plus")
                         .fontWeight(.semibold)
@@ -455,6 +462,11 @@ struct LibraryView: View {
     }
 
     // MARK: - Combine Sheet
+
+    private var canConfirmMerge: Bool {
+        !viewModel.pendingMergeTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !viewModel.isMerging
+    }
 
     private var mergeSheet: some View {
         NavigationStack {
@@ -501,10 +513,10 @@ struct LibraryView: View {
                             .fill(DS.Color.secondarySurface)
                     )
                     .environment(\.editMode, .constant(.active))
-                    .frame(minHeight: 44 * CGFloat(viewModel.mergeOrder.count))
+                    .frame(
+                        maxHeight: 44 * CGFloat(min(viewModel.mergeOrder.count, 6))
+                    )
                 }
-
-                Spacer()
 
                 Button {
                     Task { await viewModel.mergeSelected() }
@@ -517,16 +529,12 @@ struct LibraryView: View {
                         }
                     }
                 }
-                .buttonStyle(DS.ButtonStyle.primary(
-                    isDisabled: viewModel.pendingMergeTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ))
-                .disabled(
-                    viewModel.pendingMergeTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    || viewModel.isMerging
-                )
+                .buttonStyle(DS.ButtonStyle.primary(isDisabled: !canConfirmMerge))
+                .disabled(!canConfirmMerge)
                 .animation(DS.Animation.fade, value: viewModel.pendingMergeTitle.isEmpty)
             }
-            .padding(DS.Spacing.md)
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.vertical, DS.Spacing.lg)
             .navigationTitle("Combine into Volume")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -535,6 +543,20 @@ struct LibraryView: View {
                         viewModel.isMergeSheetPresented = false
                         viewModel.pendingMergeTitle = ""
                     }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task { await viewModel.mergeSelected() }
+                    } label: {
+                        if viewModel.isMerging {
+                            ProgressView()
+                        } else {
+                            Text("Combine")
+                        }
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundStyle(canConfirmMerge ? DS.Color.coral : DS.Color.secondary)
+                    .disabled(!canConfirmMerge)
                 }
             }
         }

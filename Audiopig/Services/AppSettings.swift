@@ -44,22 +44,41 @@ enum AppAppearance: String, CaseIterable {
 
 // MARK: - AppSettings
 
+@MainActor
 @Observable
 final class AppSettings {
+    private static let minPlaybackSpeed: Float = 0.25
+    private static let maxPlaybackSpeed: Float = 4.0
+    private static let playbackSpeedStep: Float = 0.05
+
+    private static func normalizedSpeed(_ speed: Float) -> Float {
+        let clamped = min(max(speed, minPlaybackSpeed), maxPlaybackSpeed)
+        let stepped = (clamped / playbackSpeedStep).rounded() * playbackSpeedStep
+        return (stepped * 100).rounded() / 100
+    }
 
     // MARK: - UserDefaults Keys
 
     private enum Keys {
         static let defaultSpeed         = "settings.defaultSpeed"
+        static let speedPreset1         = "settings.speedPreset1"
+        static let speedPreset2         = "settings.speedPreset2"
+        static let speedPreset3         = "settings.speedPreset3"
         static let skipForwardInterval  = "settings.skipForwardInterval"
         static let skipBackwardInterval = "settings.skipBackwardInterval"
+        static let lullLookbackWindow   = "settings.lullLookbackWindow"
+        static let lullSkipRecentWindow = "settings.lullSkipRecentWindow"
         static let appearance           = "settings.appearance"
+        static let orientationLock      = "settings.orientationLock"
         static let autoDeleteOnFinish   = "settings.autoDeleteOnFinish"
         static let trackReadingStats    = "settings.trackReadingStats"
         static let autoExportOnFinish   = "settings.autoExportOnFinish"
         static let autoExportOnDelete   = "settings.autoExportOnDelete"
         static let sleepTimerOption     = "settings.sleepTimerOption"
         static let sleepTimerExpiry     = "settings.sleepTimerExpiry"
+        static let watchArtworkSkipGestures = "settings.watchArtworkSkipGestures"
+        static let librarySortOrder         = "settings.librarySortOrder"
+        static let playbackTimelineScope    = "settings.playbackTimelineScope"
     }
 
     // MARK: - Backing Stores (not observed individually)
@@ -68,6 +87,24 @@ final class AppSettings {
     private var _defaultSpeed: Float = {
         let stored = UserDefaults.standard.float(forKey: Keys.defaultSpeed)
         return stored > 0 ? stored : 1.0
+    }()
+
+    @ObservationIgnored
+    private var _speedPreset1: Float = {
+        let stored = UserDefaults.standard.float(forKey: Keys.speedPreset1)
+        return stored > 0 ? stored : 1.0
+    }()
+
+    @ObservationIgnored
+    private var _speedPreset2: Float = {
+        let stored = UserDefaults.standard.float(forKey: Keys.speedPreset2)
+        return stored > 0 ? stored : 1.2
+    }()
+
+    @ObservationIgnored
+    private var _speedPreset3: Float = {
+        let stored = UserDefaults.standard.float(forKey: Keys.speedPreset3)
+        return stored > 0 ? stored : 1.5
     }()
 
     @ObservationIgnored
@@ -83,10 +120,32 @@ final class AppSettings {
     }()
 
     @ObservationIgnored
+    private var _lullLookbackWindow: TimeInterval = {
+        let stored = UserDefaults.standard.double(forKey: Keys.lullLookbackWindow)
+        // Default: 5 minutes. Clamp to [30s, 15m].
+        let value = stored > 0 ? stored : 300.0
+        return min(max(value, 30.0), 15.0 * 60.0)
+    }()
+
+    @ObservationIgnored
+    private var _lullSkipRecentWindow: TimeInterval = {
+        let stored = UserDefaults.standard.double(forKey: Keys.lullSkipRecentWindow)
+        // Default: 30 seconds. Clamp to [0s, 5m].
+        let value = stored >= 0 ? stored : 30.0
+        return min(max(value, 0.0), 5.0 * 60.0)
+    }()
+
+    @ObservationIgnored
     private var _appearance: AppAppearance = {
         guard let raw = UserDefaults.standard.string(forKey: Keys.appearance),
               let stored = AppAppearance(rawValue: raw) else { return .system }
         return stored
+    }()
+
+    @ObservationIgnored
+    private var _orientationLock: Bool = {
+        guard UserDefaults.standard.object(forKey: Keys.orientationLock) != nil else { return false }
+        return UserDefaults.standard.bool(forKey: Keys.orientationLock)
     }()
 
     @ObservationIgnored
@@ -114,9 +173,33 @@ final class AppSettings {
         return UserDefaults.standard.bool(forKey: Keys.autoExportOnDelete)
     }()
 
+    @ObservationIgnored
+    private var _watchArtworkSkipGesturesEnabled: Bool = {
+        guard UserDefaults.standard.object(forKey: Keys.watchArtworkSkipGestures) != nil else { return false }
+        return UserDefaults.standard.bool(forKey: Keys.watchArtworkSkipGestures)
+    }()
+
+    @ObservationIgnored
+    private var _librarySortOrder: LibrarySortOrder = {
+        guard let raw = UserDefaults.standard.string(forKey: Keys.librarySortOrder),
+              let order = LibrarySortOrder(rawValue: raw) else {
+            return .recentlyListened
+        }
+        return order
+    }()
+
+    @ObservationIgnored
+    private var _playbackTimelineScope: PlaybackTimelineScope = {
+        guard let raw = UserDefaults.standard.string(forKey: Keys.playbackTimelineScope),
+              let scope = PlaybackTimelineScope(rawValue: raw) else {
+            return .entireBook
+        }
+        return scope
+    }()
+
     // MARK: - Observable Properties
 
-    /// Default playback rate applied when an audiobook is first loaded. Range [0.5, 3.0].
+    /// Default playback rate applied when an audiobook is first loaded. Range [0.25, 4.0].
     var defaultSpeed: Float {
         get {
             access(keyPath: \.defaultSpeed)
@@ -128,6 +211,57 @@ final class AppSettings {
                 UserDefaults.standard.set(newValue, forKey: Keys.defaultSpeed)
             }
         }
+    }
+
+    /// Playback-speed preset button 1 used in the phone + watch players. Range [0.25, 4.0].
+    var speedPreset1: Float {
+        get {
+            access(keyPath: \.speedPreset1)
+            return _speedPreset1
+        }
+        set {
+            let normalized = Self.normalizedSpeed(newValue)
+            withMutation(keyPath: \.speedPreset1) {
+                _speedPreset1 = normalized
+                UserDefaults.standard.set(normalized, forKey: Keys.speedPreset1)
+            }
+        }
+    }
+
+    /// Playback-speed preset button 2 used in the phone + watch players. Range [0.25, 4.0].
+    var speedPreset2: Float {
+        get {
+            access(keyPath: \.speedPreset2)
+            return _speedPreset2
+        }
+        set {
+            let normalized = Self.normalizedSpeed(newValue)
+            withMutation(keyPath: \.speedPreset2) {
+                _speedPreset2 = normalized
+                UserDefaults.standard.set(normalized, forKey: Keys.speedPreset2)
+            }
+        }
+    }
+
+    /// Playback-speed preset button 3 used in the phone + watch players. Range [0.25, 4.0].
+    var speedPreset3: Float {
+        get {
+            access(keyPath: \.speedPreset3)
+            return _speedPreset3
+        }
+        set {
+            let normalized = Self.normalizedSpeed(newValue)
+            withMutation(keyPath: \.speedPreset3) {
+                _speedPreset3 = normalized
+                UserDefaults.standard.set(normalized, forKey: Keys.speedPreset3)
+            }
+        }
+    }
+
+    /// The three preset speeds, normalized and sorted ascending for consistent UI.
+    var speedPresets: [Float] {
+        let presets = [speedPreset1, speedPreset2, speedPreset3]
+        return presets.sorted()
     }
 
     /// Seconds used for the skip-forward action.
@@ -154,6 +288,40 @@ final class AppSettings {
             withMutation(keyPath: \.skipBackwardInterval) {
                 _skipBackwardInterval = newValue
                 UserDefaults.standard.set(newValue, forKey: Keys.skipBackwardInterval)
+            }
+        }
+    }
+
+    /// How far back lull detection searches for breaks (paragraph breaks feature).
+    ///
+    /// Clamped to [30 s, 15 min]. Default: 5 min.
+    var lullLookbackWindow: TimeInterval {
+        get {
+            access(keyPath: \.lullLookbackWindow)
+            return _lullLookbackWindow
+        }
+        set {
+            let clamped = min(max(newValue, 30.0), 15.0 * 60.0)
+            withMutation(keyPath: \.lullLookbackWindow) {
+                _lullLookbackWindow = clamped
+                UserDefaults.standard.set(clamped, forKey: Keys.lullLookbackWindow)
+            }
+        }
+    }
+
+    /// How much recent audio to exclude from lull detection.
+    ///
+    /// Clamped to [0 s, 5 min]. Default: 30 s.
+    var lullSkipRecentWindow: TimeInterval {
+        get {
+            access(keyPath: \.lullSkipRecentWindow)
+            return _lullSkipRecentWindow
+        }
+        set {
+            let clamped = min(max(newValue, 0.0), 5.0 * 60.0)
+            withMutation(keyPath: \.lullSkipRecentWindow) {
+                _lullSkipRecentWindow = clamped
+                UserDefaults.standard.set(clamped, forKey: Keys.lullSkipRecentWindow)
             }
         }
     }
@@ -230,6 +398,75 @@ final class AppSettings {
                 UserDefaults.standard.set(newValue.rawValue, forKey: Keys.appearance)
             }
         }
+    }
+
+    /// When `true`, the app is locked to portrait orientation.
+    /// Default: `false`.
+    var orientationLock: Bool {
+        get {
+            access(keyPath: \.orientationLock)
+            return _orientationLock
+        }
+        set {
+            withMutation(keyPath: \.orientationLock) {
+                _orientationLock = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.orientationLock)
+            }
+        }
+    }
+
+    /// When `true`, double/triple-tap on the Watch player artwork zone skips forward/back.
+    /// Default: `false`.
+    var watchArtworkSkipGesturesEnabled: Bool {
+        get {
+            access(keyPath: \.watchArtworkSkipGesturesEnabled)
+            return _watchArtworkSkipGesturesEnabled
+        }
+        set {
+            withMutation(keyPath: \.watchArtworkSkipGesturesEnabled) {
+                _watchArtworkSkipGesturesEnabled = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.watchArtworkSkipGestures)
+            }
+        }
+    }
+
+    /// How root-level library audiobooks are ordered. Default: recently listened.
+    var librarySortOrder: LibrarySortOrder {
+        get {
+            access(keyPath: \.librarySortOrder)
+            return _librarySortOrder
+        }
+        set {
+            withMutation(keyPath: \.librarySortOrder) {
+                _librarySortOrder = newValue
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.librarySortOrder)
+            }
+        }
+    }
+
+    /// Whether the player timebar + lock-screen timeline use the whole book or current chapter.
+    /// Default: entire book.
+    var playbackTimelineScope: PlaybackTimelineScope {
+        get {
+            access(keyPath: \.playbackTimelineScope)
+            return _playbackTimelineScope
+        }
+        set {
+            withMutation(keyPath: \.playbackTimelineScope) {
+                _playbackTimelineScope = newValue
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.playbackTimelineScope)
+            }
+        }
+    }
+
+    func watchSettingsSnapshot() -> WatchSettingsSnapshot {
+        WatchSettingsSnapshot(
+            artworkSkipGesturesEnabled: watchArtworkSkipGesturesEnabled,
+            skipForwardSeconds: skipForwardInterval,
+            skipBackwardSeconds: skipBackwardInterval,
+            speedPresets: speedPresets,
+            playbackTimelineScope: playbackTimelineScope
+        )
     }
 
     // MARK: - Sleep Timer Session Persistence

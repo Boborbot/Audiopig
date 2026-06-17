@@ -6,6 +6,7 @@
 import Observation
 import SwiftData
 import Foundation
+import UIKit
 
 @MainActor
 @Observable
@@ -23,6 +24,7 @@ final class LibraryViewModel {
 
     var searchText: String = ""
     var isSearchActive: Bool = false
+    var librarySortOrder: LibrarySortOrder
 
     var filteredAudiobooks: [Audiobook] {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -36,23 +38,51 @@ final class LibraryViewModel {
     }
 
     /// Items shown in the root library list.
-    /// Normal mode: folders + root-level books (no folder) interleaved by title.
+    /// Normal mode: folders + root-level books (no folder) ordered by `librarySortOrder`.
     /// Search mode: all matching books regardless of folder, no folder rows.
     var libraryItems: [LibraryItem] {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if isSearchActive && !trimmed.isEmpty {
             let query = trimmed.lowercased()
-            return audiobooks.filter { book in
+            let matching = audiobooks.filter { book in
                 book.title.lowercased().contains(query)
                     || book.author.lowercased().contains(query)
                     || book.fileURL.deletingPathExtension().lastPathComponent.lowercased().contains(query)
-            }.map { .audiobook($0) }
+            }
+            return sortedAudiobooks(matching).map { .audiobook($0) }
         }
-        let bookItems = audiobooks.filter { $0.folder == nil }.map { LibraryItem.audiobook($0) }
-        let folderItems = folders.map { LibraryItem.folder($0) }
-        return (bookItems + folderItems).sorted {
-            $0.sortTitle.localizedCaseInsensitiveCompare($1.sortTitle) == .orderedAscending
+
+        let rootBooks = sortedAudiobooks(audiobooks.filter { $0.folder == nil })
+        let bookItems = rootBooks.map { LibraryItem.audiobook($0) }
+        let sortedFolders = folders.sorted {
+            $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
         }
+        let folderItems = sortedFolders.map { LibraryItem.folder($0) }
+
+        switch librarySortOrder {
+        case .title:
+            return (bookItems + folderItems).sorted {
+                $0.sortTitle.localizedCaseInsensitiveCompare($1.sortTitle) == .orderedAscending
+            }
+        default:
+            return bookItems + folderItems
+        }
+    }
+
+    func sortedAudiobooks(_ books: [Audiobook]) -> [Audiobook] {
+        let candidates = books.map { $0.librarySortCandidate() }
+        let sortedIDs = LibrarySorter.sorted(candidates, by: librarySortOrder).map(\.id)
+        let bookByID = Dictionary(uniqueKeysWithValues: books.map { ($0.id, $0) })
+        return sortedIDs.compactMap { bookByID[$0] }
+    }
+
+    func sortedAudiobooks(in folder: Folder) -> [Audiobook] {
+        sortedAudiobooks(folder.audiobooks)
+    }
+
+    func setLibrarySortOrder(_ order: LibrarySortOrder) {
+        librarySortOrder = order
+        appSettings.librarySortOrder = order
     }
 
     // MARK: - Selection State
@@ -130,6 +160,10 @@ final class LibraryViewModel {
     private let libraryManager: any LibraryManagerProtocol
     private let appSettings: AppSettings
     let appIconManager: AppIconManager
+    private let watchBridge: (any WatchConnectivityBridgeProtocol)?
+    private let watchTransferService: (any WatchTransferServiceProtocol)?
+    private let volumeController: SystemVolumeController
+    private let monetization: any MonetizationServiceProtocol
 
     // MARK: - Init
 
@@ -138,19 +172,36 @@ final class LibraryViewModel {
         libraryManager: any LibraryManagerProtocol,
         audioEngine: any AudioEngineProtocol,
         appSettings: AppSettings,
-        appIconManager: AppIconManager
+        appIconManager: AppIconManager,
+        watchBridge: (any WatchConnectivityBridgeProtocol)? = nil,
+        watchTransferService: (any WatchTransferServiceProtocol)? = nil,
+        volumeController: SystemVolumeController,
+        monetization: any MonetizationServiceProtocol
     ) {
         self.modelContext = modelContext
         self.libraryManager = libraryManager
         self.appSettings = appSettings
         self.appIconManager = appIconManager
+        self.watchBridge = watchBridge
+        self.watchTransferService = watchTransferService
+        self.volumeController = volumeController
+        self.monetization = monetization
+        self.librarySortOrder = appSettings.librarySortOrder
         self.playerViewModel = PlayerViewModel(
             audioEngine: audioEngine,
             modelContext: modelContext,
-            appSettings: appSettings
+            appSettings: appSettings,
+            watchBridge: watchBridge,
+            monetization: monetization
         )
         self.playerViewModel.onNaturalFinish = { [weak self] audiobook in
             self?.handleNaturalFinish(audiobook)
+        }
+        self.playerViewModel.onPlaybackPositionSaved = { [weak self] in
+            self?.syncWatchRecentBooks()
+        }
+        watchBridge?.commandHandler = { [weak self] command in
+            await self?.handleWatchCommand(command) ?? .failure("Library unavailable.")
         }
         fetchAudiobooks()
     }
@@ -158,6 +209,8 @@ final class LibraryViewModel {
     // MARK: - Fetch
 
     func fetchAudiobooks() {
+        try? libraryManager.repairAudiobookFileReferences(in: modelContext)
+
         let descriptor = FetchDescriptor<Audiobook>(
             sortBy: [SortDescriptor(\.title, comparator: .localizedStandard)]
         )
@@ -169,13 +222,188 @@ final class LibraryViewModel {
         folders = (try? modelContext.fetch(folderDescriptor)) ?? []
     }
 
+    #if DEBUG
+    /// Imports bundled test audiobooks that are not already in the library.
+    func seedDevelopmentLibraryIfNeeded() async {
+        await DevelopmentLibrarySeeder.seedIfNeeded(
+            libraryManager: libraryManager,
+            modelContext: modelContext
+        )
+        fetchAudiobooks()
+    }
+    #endif
+
     // MARK: - Player Navigation
 
     /// Loads the audiobook into the engine and starts playback; the MiniPlayer appears automatically.
     func openPlayer(for audiobook: Audiobook) {
         Task {
+            try? libraryManager.repairAudiobookFileReferences(in: modelContext)
             await playerViewModel.loadAudiobook(audiobook, autoPlay: true)
+            syncWidgetRecentBooks()
+            syncWatchRecentBooks()
         }
+    }
+
+    @discardableResult
+    func playAudiobook(id: UUID) -> Bool {
+        guard let audiobook = resolveAudiobook(id: id) else { return false }
+        openPlayer(for: audiobook)
+        return true
+    }
+
+    // MARK: - Watch Commands
+
+    func handleWatchCommand(_ command: WatchCommand) async -> WatchCommandResult {
+        switch command {
+        case .requestRecentBooks:
+            let books = recentBooksForWatch(limit: 10)
+            watchBridge?.publishRecentBooks(WatchRecentBooksPayload(books: books))
+            return .ok()
+
+        case .requestSnapshot:
+            playerViewModel.syncWatchState()
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .loadBook(let bookID, let autoPlay):
+            guard let audiobook = audiobook(withID: bookID) else {
+                return .failure("Book not found.")
+            }
+            await playerViewModel.loadAudiobook(audiobook, autoPlay: autoPlay)
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply(includeArtwork: true))
+
+        case .togglePlayPause:
+            playerViewModel.togglePlayPause()
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .play:
+            playerViewModel.play()
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .pause:
+            playerViewModel.pause()
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .skipForward:
+            playerViewModel.skipForward()
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .skipBackward:
+            playerViewModel.skipBackward()
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .setSpeed(let speed):
+            playerViewModel.setSpeed(speed)
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .setVolume(let volume):
+            volumeController.setVolume(volume)
+            playerViewModel.syncWatchState()
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .seekToChapterIndex(let index):
+            guard playerViewModel.chapters.indices.contains(index) else {
+                return .failure("Chapter not found.")
+            }
+            playerViewModel.seekToChapter(playerViewModel.chapters[index])
+            playerViewModel.syncWatchState()
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .seekToChapter(let id):
+            guard let chapter = playerViewModel.chapters.first(where: { $0.id == id }) else {
+                return .failure("Chapter not found.")
+            }
+            playerViewModel.seekToChapter(chapter)
+            playerViewModel.syncWatchState()
+            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+
+        case .setArtworkSkipGesturesEnabled(let enabled):
+            appSettings.watchArtworkSkipGesturesEnabled = enabled
+            syncWatchSettings()
+            return .ok()
+
+        case .syncLocalPlaybackPosition(let bookID, let time):
+            if let audiobook = audiobook(withID: bookID) {
+                audiobook.currentPlaybackTime = time
+                try? modelContext.save()
+            }
+            return .ok()
+
+        case .acknowledgeLocalBooks(let payload):
+            watchBridge?.publishLocalBooks(payload)
+            watchTransferService?.handleLocalBooksAcknowledgement(payload)
+            return .ok()
+
+        case .requestLocalBooks, .loadLocalBook, .deleteLocalBook:
+            return .failure("Command is handled on Apple Watch.")
+        }
+    }
+
+    // MARK: - Watch Transfer
+
+    func sendToWatch(_ audiobook: Audiobook) async {
+        await watchTransferService?.transfer(audiobook: audiobook)
+    }
+
+    func sendSelectedToWatch() async {
+        await watchTransferService?.transfer(audiobooks: selectedAudiobooks)
+    }
+
+    func removeFromWatch(_ audiobook: Audiobook) async {
+        await watchTransferService?.removeFromWatch(bookID: audiobook.id)
+    }
+
+    func watchStatus(for audiobook: Audiobook) -> WatchBookTransferStatus {
+        guard let service = watchTransferService else { return .unavailable }
+        if service.isTransferring(bookID: audiobook.id) { return .transferring }
+        if service.isOnWatch(bookID: audiobook.id) { return .onWatch }
+        return .notOnWatch
+    }
+
+    var watchLocalBooks: WatchLocalBooksPayload? {
+        watchTransferService?.localBooks
+    }
+
+    func syncWatchSettings() {
+        watchBridge?.publishSettings(appSettings.watchSettingsSnapshot())
+    }
+
+    func syncWatchRecentBooks() {
+        let books = recentBooksForWatch(limit: 10)
+        watchBridge?.publishRecentBooks(WatchRecentBooksPayload(books: books))
+        syncWidgetRecentBooks()
+    }
+
+    func syncWidgetRecentBooks() {
+        WidgetSnapshotWriter.syncRecentBooks(books: recentBooksForWatch(limit: 5))
+    }
+
+    func recentBooksForWatch(limit: Int) -> [WatchBookSummary] {
+        var descriptor = FetchDescriptor<Audiobook>(
+            predicate: #Predicate { $0.lastPlayedAt != nil },
+            sortBy: [SortDescriptor(\.lastPlayedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        let books = (try? modelContext.fetch(descriptor)) ?? []
+        return books.map { book in
+            WatchSnapshotBuilder.makeBookSummary(
+                from: book,
+                coverImage: CoverArtCache.shared.image(for: book)
+            )
+        }
+    }
+
+    private func audiobook(withID id: UUID) -> Audiobook? {
+        audiobooks.first { $0.id == id }
+    }
+
+    private func resolveAudiobook(id: UUID) -> Audiobook? {
+        if let cached = audiobook(withID: id) { return cached }
+        var descriptor = FetchDescriptor<Audiobook>(
+            predicate: #Predicate { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
     }
 
     // MARK: - Selection
@@ -220,7 +448,7 @@ final class LibraryViewModel {
             title: audiobook.title,
             author: audiobook.author,
             totalSeconds: audiobook.duration,
-            listenedSeconds: audiobook.currentPlaybackTime,
+            listenedSeconds: audiobook.accumulatedListeningSeconds,
             chapterCount: audiobook.chapters.count,
             finishedAt: Date(),
             wasManuallyMarked: wasManuallyMarked
@@ -244,7 +472,7 @@ final class LibraryViewModel {
         enqueueIconUnlocks(finishEvent: finishEvent)
 
         if appSettings.autoExportOnFinish {
-            try? BookmarkExportService.export(audiobook)
+            _ = try? BookmarkExportService.export(audiobook)
         }
 
         if appSettings.autoDeleteOnFinish {
@@ -263,7 +491,7 @@ final class LibraryViewModel {
 
         let finishedLibraryTime = allBooks
             .filter(\.isFinished)
-            .reduce(0.0) { $0 + $1.currentPlaybackTime }
+            .reduce(0.0) { $0 + $1.accumulatedListeningSeconds }
         let finishedDeletedTime = records
             .filter { !libraryIDs.contains($0.audiobookID) }
             .reduce(0.0) { $0 + $1.listenedSeconds }
@@ -379,9 +607,9 @@ final class LibraryViewModel {
 
     private func delete(_ audiobook: Audiobook) {
         if appSettings.autoExportOnDelete {
-            try? BookmarkExportService.export(audiobook)
+            _ = try? BookmarkExportService.export(audiobook)
         }
-        try? libraryManager.deleteAudiobookFile(at: audiobook.fileURL)
+        _ = try? libraryManager.deleteAudiobookFile(at: audiobook.fileURL)
         modelContext.delete(audiobook)
         saveContext(errorContext: "delete audiobook")
         fetchAudiobooks()
@@ -454,14 +682,25 @@ final class LibraryViewModel {
     /// so the user can drag to set the desired playback order before confirming.
     func presentMergeSheet() {
         mergeOrder = selectedAudiobooks
+        syncSuggestedMergeTitle()
         isMergeSheetPresented = true
     }
 
     func moveMergeBook(from source: IndexSet, to destination: Int) {
+        let previousFirstTitle = mergeOrder.first?.title
         guard let sourceIndex = source.first else { return }
         let item = mergeOrder.remove(at: sourceIndex)
         let insertAt = destination > sourceIndex ? destination - 1 : destination
         mergeOrder.insert(item, at: min(insertAt, mergeOrder.count))
+
+        let trimmedTitle = pendingMergeTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedTitle.isEmpty || trimmedTitle == previousFirstTitle {
+            syncSuggestedMergeTitle()
+        }
+    }
+
+    private func syncSuggestedMergeTitle() {
+        pendingMergeTitle = mergeOrder.first?.title ?? ""
     }
 
     func mergeSelected() async {
@@ -524,9 +763,9 @@ final class LibraryViewModel {
         let booksToDelete = folder.audiobooks
         for book in booksToDelete {
             if appSettings.autoExportOnDelete {
-                try? BookmarkExportService.export(book)
+                _ = try? BookmarkExportService.export(book)
             }
-            try? libraryManager.deleteAudiobookFile(at: book.fileURL)
+            _ = try? libraryManager.deleteAudiobookFile(at: book.fileURL)
             modelContext.delete(book)
         }
         modelContext.delete(folder)

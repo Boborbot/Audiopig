@@ -35,4 +35,14 @@ protocol LibraryManagerProtocol: AnyObject {
 
     /// Verifies that a file URL still resolves to an accessible resource on disk.
     func fileExists(at fileURL: URL) -> Bool
+
+    /// Re-resolves a stored file URL against the managed library directory when the
+    /// absolute path is stale (e.g. after a simulator reinstall).
+    func repairStoredFileURL(_ storedURL: URL) -> URL
+
+    /// Updates audiobook and chapter file URLs when their stored paths no longer exist.
+    func repairAudiobookFileReferences(in context: ModelContext) throws
+
+    /// Returns true when every chapter file for the audiobook is reachable on disk.
+    func isAudiobookPlayable(_ audiobook: Audiobook) -> Bool
 }

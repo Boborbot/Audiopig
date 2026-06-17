@@ -6,8 +6,65 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C1D8ECB02FD6B9000023D41A /* AudiopigWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C1D8ECA32FD6B9000023D41A /* AudiopigWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C1D8ECB82FD6BA000023D41A /* AudiopigWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = C1D8ECB12FD6BA000023D41A /* AudiopigWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C1D8ECA82FD6B9000023D41A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C1D8EC622FD6AD510023D41A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C1D8ECA22FD6B9000023D41A;
+			remoteInfo = AudiopigWidget;
+		};
+		C1D8ECB92FD6BA000023D41A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C1D8EC622FD6AD510023D41A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C1D8ECB32FD6BA000023D41A;
+			remoteInfo = AudiopigWatch;
+		};
+		TST1062FD6C2000023D41A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C1D8EC622FD6AD510023D41A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C1D8EC692FD6AD510023D41A;
+			remoteInfo = Audiopig;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C1D8ECA72FD6B9000023D41A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C1D8ECB02FD6B9000023D41A /* AudiopigWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1D8ECB72FD6BA000023D41A /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				C1D8ECB82FD6BA000023D41A /* AudiopigWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		C1D8EC6A2FD6AD510023D41A /* Audiopig.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Audiopig.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1D8ECA32FD6B9000023D41A /* AudiopigWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AudiopigWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C1D8ECB12FD6BA000023D41A /* AudiopigWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AudiopigWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		TST1002FD6C2000023D41A /* AudiopigTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AudiopigTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -17,6 +74,13 @@
 				Info.plist,
 			);
 			target = C1D8EC692FD6AD510023D41A /* Audiopig */;
+		};
+		C1D8ECAD2FD6B9000023D41A /* Exceptions for "AudiopigWidget" folder in "AudiopigWidget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C1D8ECA22FD6B9000023D41A /* AudiopigWidget */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -29,10 +93,54 @@
 			path = Audiopig;
 			sourceTree = "<group>";
 		};
+		C1D8ECA02FD6B9000023D41A /* AudiopigShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AudiopigShared;
+			sourceTree = "<group>";
+		};
+		C1D8ECA12FD6B9000023D41A /* AudiopigWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C1D8ECAD2FD6B9000023D41A /* Exceptions for "AudiopigWidget" folder in "AudiopigWidget" target */,
+			);
+			path = AudiopigWidget;
+			sourceTree = "<group>";
+		};
+		C1D8ECB22FD6BA000023D41A /* AudiopigWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AudiopigWatch;
+			sourceTree = "<group>";
+		};
+		TST1012FD6C2000023D41A /* AudiopigTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AudiopigTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		C1D8EC672FD6AD510023D41A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1D8ECA52FD6B9000023D41A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1D8ECB52FD6BA000023D41A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TST1042FD6C2000023D41A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -46,6 +154,10 @@
 			isa = PBXGroup;
 			children = (
 				C1D8EC6C2FD6AD510023D41A /* Audiopig */,
+				C1D8ECA02FD6B9000023D41A /* AudiopigShared */,
+				C1D8ECA12FD6B9000023D41A /* AudiopigWidget */,
+				C1D8ECB22FD6BA000023D41A /* AudiopigWatch */,
+				TST1012FD6C2000023D41A /* AudiopigTests */,
 				C1D8EC6B2FD6AD510023D41A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -54,6 +166,9 @@
 			isa = PBXGroup;
 			children = (
 				C1D8EC6A2FD6AD510023D41A /* Audiopig.app */,
+				C1D8ECA32FD6B9000023D41A /* AudiopigWidget.appex */,
+				C1D8ECB12FD6BA000023D41A /* AudiopigWatch.app */,
+				TST1002FD6C2000023D41A /* AudiopigTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -67,14 +182,20 @@
 			buildPhases = (
 				C1D8EC662FD6AD510023D41A /* Sources */,
 				C1D8EC672FD6AD510023D41A /* Frameworks */,
+				TST001A2FD6C0000023D41A /* Copy Test Assets */,
 				C1D8EC682FD6AD510023D41A /* Resources */,
+				C1D8ECA72FD6B9000023D41A /* Embed Foundation Extensions */,
+				C1D8ECB72FD6BA000023D41A /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				C1D8ECA92FD6B9000023D41A /* PBXTargetDependency */,
+				C1D8ECBA2FD6BA000023D41A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C1D8EC6C2FD6AD510023D41A /* Audiopig */,
+				C1D8ECA02FD6B9000023D41A /* AudiopigShared */,
 			);
 			name = Audiopig;
 			packageProductDependencies = (
@@ -82,6 +203,75 @@
 			productName = Audiopig;
 			productReference = C1D8EC6A2FD6AD510023D41A /* Audiopig.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C1D8ECA22FD6B9000023D41A /* AudiopigWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C1D8ECAC2FD6B9000023D41A /* Build configuration list for PBXNativeTarget "AudiopigWidget" */;
+			buildPhases = (
+				C1D8ECA42FD6B9000023D41A /* Sources */,
+				C1D8ECA52FD6B9000023D41A /* Frameworks */,
+				C1D8ECA62FD6B9000023D41A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C1D8ECA02FD6B9000023D41A /* AudiopigShared */,
+				C1D8ECA12FD6B9000023D41A /* AudiopigWidget */,
+			);
+			name = AudiopigWidget;
+			packageProductDependencies = (
+			);
+			productName = AudiopigWidget;
+			productReference = C1D8ECA32FD6B9000023D41A /* AudiopigWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		C1D8ECB32FD6BA000023D41A /* AudiopigWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C1D8ECBD2FD6BA000023D41A /* Build configuration list for PBXNativeTarget "AudiopigWatch" */;
+			buildPhases = (
+				C1D8ECB42FD6BA000023D41A /* Sources */,
+				C1D8ECB52FD6BA000023D41A /* Frameworks */,
+				C1D8ECB62FD6BA000023D41A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C1D8ECA02FD6B9000023D41A /* AudiopigShared */,
+				C1D8ECB22FD6BA000023D41A /* AudiopigWatch */,
+			);
+			name = AudiopigWatch;
+			packageProductDependencies = (
+			);
+			productName = AudiopigWatch;
+			productReference = C1D8ECB12FD6BA000023D41A /* AudiopigWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		TST1022FD6C2000023D41A /* AudiopigTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = TST1082FD6C2000023D41A /* Build configuration list for PBXNativeTarget "AudiopigTests" */;
+			buildPhases = (
+				TST1032FD6C2000023D41A /* Sources */,
+				TST1042FD6C2000023D41A /* Frameworks */,
+				TST1052FD6C2000023D41A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TST1072FD6C2000023D41A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				TST1012FD6C2000023D41A /* AudiopigTests */,
+			);
+			name = AudiopigTests;
+			packageProductDependencies = (
+			);
+			productName = AudiopigTests;
+			productReference = TST1002FD6C2000023D41A /* AudiopigTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -95,6 +285,21 @@
 				TargetAttributes = {
 					C1D8EC692FD6AD510023D41A = {
 						CreatedOnToolsVersion = 26.5;
+						SystemCapabilities = {
+							com.apple.InAppPurchase = {
+								enabled = 1;
+							};
+						};
+					};
+					C1D8ECA22FD6B9000023D41A = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					C1D8ECB32FD6BA000023D41A = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					TST1022FD6C2000023D41A = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = C1D8EC692FD6AD510023D41A;
 					};
 				};
 			};
@@ -113,6 +318,9 @@
 			projectRoot = "";
 			targets = (
 				C1D8EC692FD6AD510023D41A /* Audiopig */,
+				C1D8ECA22FD6B9000023D41A /* AudiopigWidget */,
+				C1D8ECB32FD6BA000023D41A /* AudiopigWatch */,
+				TST1022FD6C2000023D41A /* AudiopigTests */,
 			);
 		};
 /* End PBXProject section */
@@ -125,7 +333,48 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C1D8ECA62FD6B9000023D41A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1D8ECB62FD6BA000023D41A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TST1052FD6C2000023D41A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		TST001A2FD6C0000023D41A /* Copy Test Assets */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Assets for Testing",
+			);
+			name = "Copy Test Assets";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Assets for Testing",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -d \"${SRCROOT}/Assets for Testing\" ]; then\n  mkdir -p \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Assets for Testing\"\n  /usr/bin/rsync -a --delete \"${SRCROOT}/Assets for Testing/\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Assets for Testing/\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C1D8EC662FD6AD510023D41A /* Sources */ = {
@@ -135,7 +384,46 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C1D8ECA42FD6B9000023D41A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C1D8ECB42FD6BA000023D41A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TST1032FD6C2000023D41A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C1D8ECA92FD6B9000023D41A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C1D8ECA22FD6B9000023D41A /* AudiopigWidget */;
+			targetProxy = C1D8ECA82FD6B9000023D41A /* PBXContainerItemProxy */;
+		};
+		C1D8ECBA2FD6BA000023D41A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C1D8ECB32FD6BA000023D41A /* AudiopigWatch */;
+			targetProxy = C1D8ECB92FD6BA000023D41A /* PBXContainerItemProxy */;
+		};
+		TST1072FD6C2000023D41A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C1D8EC692FD6AD510023D41A /* Audiopig */;
+			targetProxy = TST1062FD6C2000023D41A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		C1D8EC732FD6AD520023D41A /* Debug */ = {
@@ -260,13 +548,15 @@
 		C1D8EC762FD6AD520023D41A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-10h AppIcon-20h AppIcon-50h AppIcon-100h AppIcon-200h AppIcon-500h AppIcon-ChristmasDay AppIcon-NewYearsEve";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-10h AppIcon-20h AppIcon-50h AppIcon-100h AppIcon-200h AppIcon-500h AppIcon-1000h AppIcon-1500h AppIcon-ChristmasDay AppIcon-NewYearsEve";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Audiopig/Audiopig.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AQTL3YUMV3;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Audiopig/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -274,6 +564,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.nitay.Audiopig.watchkitapp;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -294,13 +585,15 @@
 		C1D8EC772FD6AD520023D41A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-10h AppIcon-20h AppIcon-50h AppIcon-100h AppIcon-200h AppIcon-500h AppIcon-ChristmasDay AppIcon-NewYearsEve";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-10h AppIcon-20h AppIcon-50h AppIcon-100h AppIcon-200h AppIcon-500h AppIcon-1000h AppIcon-1500h AppIcon-ChristmasDay AppIcon-NewYearsEve";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Audiopig/Audiopig.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AQTL3YUMV3;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Audiopig/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -308,6 +601,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.nitay.Audiopig.watchkitapp;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -322,6 +616,176 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C1D8ECAA2FD6B9000023D41A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = AudiopigWidget/AudiopigWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AQTL3YUMV3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AudiopigWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Audiopig;
+				INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nitay.Audiopig.AudiopigWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C1D8ECAB2FD6B9000023D41A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = AudiopigWidget/AudiopigWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AQTL3YUMV3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AudiopigWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Audiopig;
+				INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nitay.Audiopig.AudiopigWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C1D8ECBB2FD6BA000023D41A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AQTL3YUMV3;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Audiopig;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.nitay.Audiopig;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nitay.Audiopig.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		C1D8ECBC2FD6BA000023D41A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AQTL3YUMV3;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Audiopig;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.nitay.Audiopig;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nitay.Audiopig.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
+		TST1092FD6C2000023D41A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AQTL3YUMV3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nitay.AudiopigTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Audiopig.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Audiopig";
+			};
+			name = Debug;
+		};
+		TST1102FD6C2000023D41A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AQTL3YUMV3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nitay.AudiopigTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Audiopig.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Audiopig";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -342,6 +806,33 @@
 			buildConfigurations = (
 				C1D8EC762FD6AD520023D41A /* Debug */,
 				C1D8EC772FD6AD520023D41A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C1D8ECAC2FD6B9000023D41A /* Build configuration list for PBXNativeTarget "AudiopigWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C1D8ECAA2FD6B9000023D41A /* Debug */,
+				C1D8ECAB2FD6B9000023D41A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C1D8ECBD2FD6BA000023D41A /* Build configuration list for PBXNativeTarget "AudiopigWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C1D8ECBB2FD6BA000023D41A /* Debug */,
+				C1D8ECBC2FD6BA000023D41A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		TST1082FD6C2000023D41A /* Build configuration list for PBXNativeTarget "AudiopigTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				TST1092FD6C2000023D41A /* Debug */,
+				TST1102FD6C2000023D41A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

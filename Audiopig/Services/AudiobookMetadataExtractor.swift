@@ -16,6 +16,8 @@ enum SupportedAudioExtension: String, CaseIterable, Sendable {
 }
 
 struct AudiobookMetadataExtractor: Sendable {
+    nonisolated init() {}
+
     private let titleIdentifiers: [AVMetadataIdentifier] = [
         .commonIdentifierTitle,
         .iTunesMetadataSongName,

@@ -30,7 +30,7 @@ Local audiobooks, beautifully
 ## Promotional Text (170 characters max, editable without new version)
 
 ```
-Import MP3 and M4B audiobooks from Files, merge chapters, bookmark moments, and listen with lock screen controls. No account, no cloud — your library stays on your device.
+Core player free. Try Find Paragraph Breaks free for 7 days with Audiopig Plus. Import, bookmark, and listen — your library stays on your device.
 ```
 
 ---
@@ -56,15 +56,18 @@ BUILT FOR LISTENING
 NEVER LOSE YOUR PLACE
 • Playback position saved automatically
 • Named bookmarks with export
-• Find paragraph breaks with smart silence detection
+• Find paragraph breaks with smart silence detection (Audiopig Plus — 7-day free trial)
 
 MOTIVATION WITHOUT THE NOISE
 • Track total listening time and finished books
 • Unlock alternate app icons as you listen
 • Celebrate finished books — optionally remove them when you're done
 
-NO SUBSCRIPTION. NO ACCOUNT. NO CLOUD.
-Audiopig does not collect your data. Your audiobooks and listening history stay on your iPhone.
+FREE TO START. PLUS WHEN YOU NEED IT.
+Core playback, library, bookmarks, stats, and Watch support are free. Audiopig Plus unlocks Find Paragraph Breaks (~$3.99/mo after a 7-day trial). Optional "Feed a Student" tips support indie development.
+
+NO ACCOUNT. NO CLOUD.
+Audiopig does not collect your data. Your audiobooks and listening history stay on your iPhone. Purchases are processed by Apple.
 
 Supported formats: MP3 and M4B (non-DRM).
 ```
@@ -136,6 +139,10 @@ To test:
 2. Tap + → Import Files (or Import Folder)
 3. Select an MP3 or M4B from Files / iCloud Drive
 4. Tap the book to play; use the player sheet for speed, bookmarks, and sleep timer
+5. Tap "Find Paragraph Breaks" — without Plus, a trial paywall appears; with StoreKit testing or sandbox Plus, analysis runs
+6. Settings → Audiopig Plus / Feed a Student for subscription management and optional tips
+
+StoreKit: Xcode scheme uses Audiopig.storekit for local testing. Sandbox account required on device for real IAP QA.
 
 Microphone and camera are used only when the user chooses to set custom cover art from the camera in Edit Details. No audio is recorded.
 
