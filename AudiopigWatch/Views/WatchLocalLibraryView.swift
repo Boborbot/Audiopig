@@ -77,9 +77,11 @@ struct WatchLocalLibraryView: View {
 
             ForEach(libraryViewModel.books) { book in
                 Button {
-                    onBookSelected()
                     Task {
-                        _ = await libraryViewModel.selectBook(id: book.id)
+                        let loaded = await libraryViewModel.selectBook(id: book.id)
+                        if loaded {
+                            onBookSelected()
+                        }
                     }
                 } label: {
                     HStack(spacing: WDS.Spacing.sm) {
@@ -94,11 +96,10 @@ struct WatchLocalLibraryView: View {
                 .disabled(libraryViewModel.isLoading)
             }
         }
-        .overlay(alignment: .bottom) {
+        .safeAreaInset(edge: .top, spacing: 0) {
             if let error = libraryViewModel.errorMessage {
-                Text(error)
-                    .font(.caption2)
-                    .foregroundStyle(.red)
+                WatchConnectivityBanner(message: error)
+                    .padding(.horizontal, WDS.Spacing.sm)
                     .padding(.bottom, WDS.Spacing.xs)
             }
         }

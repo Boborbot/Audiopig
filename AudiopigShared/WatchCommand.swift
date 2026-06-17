@@ -26,6 +26,7 @@ public enum WatchCommand: Codable, Sendable, Equatable {
     case deleteLocalBook(bookID: UUID)
     case syncLocalPlaybackPosition(bookID: UUID, time: TimeInterval)
     case acknowledgeLocalBooks(WatchLocalBooksPayload)
+    case reportTransferIngestFailed(bookID: UUID, errorMessage: String)
 
     private enum CodingKeys: String, CodingKey {
         case kind
@@ -38,6 +39,7 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case enabled
         case time
         case localBooks
+        case errorMessage
     }
 
     private enum Kind: String, Codable {
@@ -61,6 +63,7 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case deleteLocalBook
         case syncLocalPlaybackPosition
         case acknowledgeLocalBooks
+        case reportTransferIngestFailed
     }
 
     public init(from decoder: Decoder) throws {
@@ -105,6 +108,10 @@ public enum WatchCommand: Codable, Sendable, Equatable {
             self = .syncLocalPlaybackPosition(bookID: id, time: time)
         case .acknowledgeLocalBooks:
             self = .acknowledgeLocalBooks(try container.decode(WatchLocalBooksPayload.self, forKey: .localBooks))
+        case .reportTransferIngestFailed:
+            let id = try container.decode(UUID.self, forKey: .bookID)
+            let message = try container.decode(String.self, forKey: .errorMessage)
+            self = .reportTransferIngestFailed(bookID: id, errorMessage: message)
         }
     }
 
@@ -165,6 +172,10 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case .acknowledgeLocalBooks(let payload):
             try container.encode(Kind.acknowledgeLocalBooks, forKey: .kind)
             try container.encode(payload, forKey: .localBooks)
+        case .reportTransferIngestFailed(let bookID, let errorMessage):
+            try container.encode(Kind.reportTransferIngestFailed, forKey: .kind)
+            try container.encode(bookID, forKey: .bookID)
+            try container.encode(errorMessage, forKey: .errorMessage)
         }
     }
 }
@@ -174,24 +185,28 @@ public struct WatchCommandResult: Codable, Sendable, Equatable {
     public let errorMessage: String?
     public let snapshot: WatchPlaybackSnapshot?
     public let lullResult: WatchLullResult?
+    public let localBooks: WatchLocalBooksPayload?
 
     public init(
         success: Bool,
         errorMessage: String? = nil,
         snapshot: WatchPlaybackSnapshot? = nil,
-        lullResult: WatchLullResult? = nil
+        lullResult: WatchLullResult? = nil,
+        localBooks: WatchLocalBooksPayload? = nil
     ) {
         self.success = success
         self.errorMessage = errorMessage
         self.snapshot = snapshot
         self.lullResult = lullResult
+        self.localBooks = localBooks
     }
 
     public static func ok(
         snapshot: WatchPlaybackSnapshot? = nil,
-        lullResult: WatchLullResult? = nil
+        lullResult: WatchLullResult? = nil,
+        localBooks: WatchLocalBooksPayload? = nil
     ) -> WatchCommandResult {
-        WatchCommandResult(success: true, snapshot: snapshot, lullResult: lullResult)
+        WatchCommandResult(success: true, snapshot: snapshot, lullResult: lullResult, localBooks: localBooks)
     }
 
     public static func failure(_ message: String) -> WatchCommandResult {

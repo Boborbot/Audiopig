@@ -16,6 +16,8 @@ struct MediaControlsView: View {
 
     @State private var tapCount = 0
     @State private var tapTask: Task<Void, Never>?
+    @State private var crownVolume: Float = 0.5
+    @State private var lastDetentVolume: Float = 0.5
 
     var body: some View {
         ZStack {
@@ -25,9 +27,19 @@ struct MediaControlsView: View {
                 titleBlock
                 timebar
                 transportRow
-                connectionStatus
             }
             .padding(.horizontal, WDS.Spacing.sm)
+
+            if let message = viewModel.connectionMessage {
+                VStack {
+                    WatchConnectivityBanner(message: message)
+                        .padding(.horizontal, WDS.Spacing.sm)
+                        .padding(.top, 30)
+                    Spacer(minLength: 0)
+                }
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
 
             if viewModel.showVolumeOverlay {
                 volumeOverlay
@@ -35,21 +47,52 @@ struct MediaControlsView: View {
         }
         .focusable(isActive)
         .digitalCrownRotation(
-            $viewModel.volumeDraft,
+            $crownVolume,
             from: 0,
             through: 1,
-            by: 0.02,
+            by: WatchVolumeRange.crownStep,
             sensitivity: .medium,
             isContinuous: false,
-            isHapticFeedbackEnabled: true
+            isHapticFeedbackEnabled: false
         )
-        .onChange(of: viewModel.volumeDraft) { _, _ in
-            guard isActive else { return }
+        .onChange(of: crownVolume) { _, newValue in
+            guard isActive else {
+                lastDetentVolume = WatchVolumeRange.normalized(newValue)
+                return
+            }
+            let normalized = WatchVolumeRange.normalized(newValue)
+            if normalized != crownVolume {
+                crownVolume = normalized
+            }
+            guard normalized != lastDetentVolume else { return }
+            lastDetentVolume = normalized
+            viewModel.volumeDraft = normalized
             viewModel.applyVolumeDraft()
+        }
+        .onChange(of: viewModel.volumeDraft) { _, newValue in
+            guard !viewModel.isVolumeAdjustmentActive else { return }
+            let normalized = WatchVolumeRange.normalized(newValue)
+            lastDetentVolume = normalized
+            if abs(crownVolume - normalized) > WatchVolumeRange.tolerance {
+                crownVolume = normalized
+            }
+        }
+        .onChange(of: isActive) { _, active in
+            if active {
+                let normalized = WatchVolumeRange.normalized(viewModel.volumeDraft)
+                crownVolume = normalized
+                lastDetentVolume = normalized
+            }
+        }
+        .onAppear {
+            let normalized = WatchVolumeRange.normalized(viewModel.volumeDraft)
+            crownVolume = normalized
+            lastDetentVolume = normalized
         }
         .task {
             await viewModel.refresh()
         }
+        .animation(.easeInOut(duration: 0.2), value: viewModel.connectionMessage)
     }
 
     private var artworkTapZone: some View {
@@ -145,10 +188,8 @@ struct MediaControlsView: View {
                 }
 
             case .unavailable(let message):
-                Text(message)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                WatchConnectivityBanner(message: message)
+                    .padding(.horizontal, WDS.Spacing.xs)
             }
         }
     }
@@ -223,17 +264,6 @@ struct MediaControlsView: View {
         }
     }
 
-    @ViewBuilder
-    private var connectionStatus: some View {
-        if let message = viewModel.connectionMessage {
-            Text(message)
-                .font(.caption2)
-                .foregroundStyle(.red)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-        }
-    }
-
     private var volumeOverlay: some View {
         Image(systemName: volumeSymbol)
             .font(.title)
@@ -244,7 +274,7 @@ struct MediaControlsView: View {
     }
 
     private var volumeSymbol: String {
-        let level = viewModel.volumeDraft
+        let level = crownVolume
         if level <= 0.01 { return "speaker.slash.fill" }
         if level < 0.34 { return "speaker.wave.1.fill" }
         if level < 0.67 { return "speaker.wave.2.fill" }

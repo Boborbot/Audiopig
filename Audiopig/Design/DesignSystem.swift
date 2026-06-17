@@ -150,6 +150,14 @@ enum DS {
         static let playerH: CGFloat = 28
     }
 
+    // MARK: - Layout
+
+    enum Layout {
+        /// Space reserved above the tab bar when `MiniPlayerView` is visible.
+        /// Pill intrinsic height (62 pt) + 6 pt floating gap above the tab bar.
+        static let miniPlayerClearance: CGFloat = 68
+    }
+
     // MARK: - Corner Radius
 
     enum Radius {

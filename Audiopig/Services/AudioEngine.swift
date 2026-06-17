@@ -54,6 +54,7 @@ final class AudioEngine: AudioEngineProtocol {
     private var _loadedAudiobookID: UUID?
     private var _loadedDuration: TimeInterval = 0
     private var _playbackSpeed: Float = 1.0
+    var shouldAutoAdvanceAtChapterEnd: Bool = true
 
     // MARK: - Private Observers
 
@@ -368,6 +369,16 @@ final class AudioEngine: AudioEngineProtocol {
         guard nextIndex < resolvedChapters.count else {
             _currentTime.send(_loadedDuration)
             _playbackState.send(.finished)
+            return
+        }
+
+        if !shouldAutoAdvanceAtChapterEnd {
+            let chapter = resolvedChapters[currentChapterIndex]
+            let chapterEndTime = chapter.startTime + chapter.duration
+            player.pause()
+            _currentTime.send(chapterEndTime)
+            _playbackState.send(.paused)
+            updateNowPlayingInfo(elapsedTime: chapterEndTime)
             return
         }
 

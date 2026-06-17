@@ -14,12 +14,16 @@ struct PlaybackSourcePickerView: View {
             HStack(spacing: WDS.Spacing.md) {
                 sourceButton(
                     systemImage: "iphone",
-                    title: "iPhone",
+                    title: "iPhone playback",
+                    isEnabled: true,
+                    showsUnderConstruction: false,
                     action: onSelectPhone
                 )
                 sourceButton(
                     systemImage: "applewatch",
-                    title: "Watch",
+                    title: "Watch playback",
+                    isEnabled: WatchFeatures.localPlaybackEnabled,
+                    showsUnderConstruction: !WatchFeatures.localPlaybackEnabled,
                     action: onSelectWatch
                 )
             }
@@ -27,20 +31,39 @@ struct PlaybackSourcePickerView: View {
         .padding()
     }
 
-    private func sourceButton(systemImage: String, title: String, action: @escaping () -> Void) -> some View {
+    private func sourceButton(
+        systemImage: String,
+        title: String,
+        isEnabled: Bool,
+        showsUnderConstruction: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
-            VStack(spacing: WDS.Spacing.sm) {
-                Image(systemName: systemImage)
-                    .font(.title2)
-                    .foregroundStyle(WDS.Color.coral)
-                Text(title)
-                    .font(.caption2)
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: WDS.Spacing.sm) {
+                    Image(systemName: systemImage)
+                        .font(.title2)
+                        .foregroundStyle(isEnabled ? WDS.Color.coral : .secondary)
+                    Text(title)
+                        .font(.caption2)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(isEnabled ? .primary : .secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, WDS.Spacing.md)
+                .background(WDS.Color.placeholder.opacity(isEnabled ? 0.5 : 0.35))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                if showsUnderConstruction {
+                    Image(systemName: "hammer.circle.fill")
+                        .font(.caption)
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(WDS.Color.coral, .secondary.opacity(0.25))
+                        .padding(6)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, WDS.Spacing.md)
-            .background(WDS.Color.placeholder.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .disabled(!isEnabled)
     }
 }

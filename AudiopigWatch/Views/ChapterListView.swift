@@ -74,7 +74,7 @@ struct ChapterListView: View {
                     by: 1,
                     sensitivity: .medium,
                     isContinuous: false,
-                    isHapticFeedbackEnabled: true
+                    isHapticFeedbackEnabled: false
                 )
             }
         }

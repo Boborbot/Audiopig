@@ -32,16 +32,20 @@ final class WatchPlayerViewModel: ObservableObject {
     @Published var volumeDraft: Float = 0.5
     @Published var showVolumeOverlay = false
     @Published private(set) var lullState: WatchLullState = .idle
+    @Published private(set) var hasParagraphBreaksAccess = false
 
     private let coordinator: any WatchPlaybackCoordinating
     private let client: WatchConnectivityClient
     private var interpolationTimer: Timer?
     private var lastAuthoritativeSnapshot: WatchPlaybackSnapshot = .idle
     private var lastSentSpeed: Float?
+    private var lastSentVolume: Float?
+    private var lastVolumeAdjustmentTime: Date?
     private var lastVolumeSendTime: Date?
     private var pendingVolume: Float?
     private var volumeSendTask: Task<Void, Never>?
     private var volumeOverlayTask: Task<Void, Never>?
+    private var lastVolumeHapticTime: Date?
 
     init(coordinator: any WatchPlaybackCoordinating, client: WatchConnectivityClient) {
         self.coordinator = coordinator
@@ -88,7 +92,9 @@ final class WatchPlayerViewModel: ObservableObject {
     }
 
     var showsRemoteLullDetection: Bool {
-        snapshot.bookID != nil && snapshot.source == .remote
+        snapshot.bookID != nil
+            && snapshot.source == .remote
+            && hasParagraphBreaksAccess
     }
 
     func lullLabel(for lull: WatchLullResult) -> String {
@@ -249,11 +255,22 @@ final class WatchPlayerViewModel: ObservableObject {
         applySpeedDraft()
     }
 
+    var isVolumeAdjustmentActive: Bool {
+        guard let lastVolumeAdjustmentTime else { return false }
+        return Date().timeIntervalSince(lastVolumeAdjustmentTime) < 0.5
+    }
+
     func applyVolumeDraft() {
-        let clamped = max(0, min(1, volumeDraft))
-        volumeDraft = clamped
-        pendingVolume = clamped
+        let normalized = WatchVolumeRange.normalized(volumeDraft)
+        volumeDraft = normalized
+        pendingVolume = normalized
+        lastVolumeAdjustmentTime = Date()
         showVolumeOverlay = true
+        let now = Date()
+        if lastVolumeHapticTime == nil || now.timeIntervalSince(lastVolumeHapticTime!) >= 0.12 {
+            lastVolumeHapticTime = now
+            WatchHaptics.click()
+        }
         volumeOverlayTask?.cancel()
         volumeOverlayTask = Task {
             try? await Task.sleep(for: .seconds(1.5))
@@ -294,12 +311,17 @@ final class WatchPlayerViewModel: ObservableObject {
         await coordinator.send(.setArtworkSkipGesturesEnabled(enabled))
     }
 
+    func preferLocalPlayback(_ preferred: Bool) {
+        (coordinator as? WatchPlaybackRouter)?.preferLocalPlayback(preferred)
+    }
+
     private func applyAuthoritativeSnapshot(_ incoming: WatchPlaybackSnapshot) {
-        if incoming.revision < lastAuthoritativeSnapshot.revision {
+        if WatchSnapshotFreshness.shouldReject(incoming: incoming, comparedTo: lastAuthoritativeSnapshot) {
             return
         }
 
         let bookChanged = incoming.bookID != lastAuthoritativeSnapshot.bookID
+            || incoming.source != lastAuthoritativeSnapshot.source
         lastAuthoritativeSnapshot = incoming
         snapshot = incoming
         optimisticState = nil
@@ -310,11 +332,21 @@ final class WatchPlayerViewModel: ObservableObject {
 
         if bookChanged {
             lullState = .idle
+            if let cached = client.latestChapters, cached.bookID == incoming.bookID {
+                applyChapters(cached)
+            } else {
+                chapters = []
+            }
+            lastSentVolume = nil
+            pendingVolume = nil
+            lastVolumeAdjustmentTime = nil
+            volumeDraft = WatchVolumeRange.normalized(incoming.systemVolume)
         }
 
         reconcileSpeed(from: incoming.playbackSpeed)
-
-        volumeDraft = incoming.systemVolume
+        if !bookChanged {
+            reconcileVolume(from: incoming.systemVolume)
+        }
         restartInterpolationIfNeeded()
     }
 
@@ -327,6 +359,31 @@ final class WatchPlayerViewModel: ObservableObject {
             }
         } else if abs(speedDraft - phoneSpeed) > tolerance {
             speedDraft = phoneSpeed
+        }
+    }
+
+    private func reconcileVolume(from phoneVolume: Float) {
+        let normalized = WatchVolumeRange.normalized(phoneVolume)
+        let tolerance = WatchVolumeRange.tolerance
+
+        if pendingVolume != nil {
+            return
+        }
+
+        if isVolumeAdjustmentActive {
+            return
+        }
+
+        if let sent = lastSentVolume {
+            if abs(normalized - sent) <= tolerance {
+                volumeDraft = normalized
+                lastSentVolume = nil
+            }
+            return
+        }
+
+        if abs(volumeDraft - normalized) > tolerance {
+            volumeDraft = normalized
         }
     }
 
@@ -357,6 +414,10 @@ final class WatchPlayerViewModel: ObservableObject {
 
     private func applySettings(_ settings: WatchSettingsSnapshot) {
         artworkSkipGesturesEnabled = settings.artworkSkipGesturesEnabled
+        hasParagraphBreaksAccess = settings.hasParagraphBreaksAccess ?? false
+        if !hasParagraphBreaksAccess {
+            lullState = .idle
+        }
         if let incomingPresets = settings.speedPresets, !incomingPresets.isEmpty {
             speedPresets = incomingPresets.sorted()
         } else {
@@ -375,6 +436,7 @@ final class WatchPlayerViewModel: ObservableObject {
         } else if !result.success {
             optimisticState = nil
             lastSentSpeed = nil
+            lastSentVolume = nil
             reconcileSpeed(from: snapshot.playbackSpeed)
             connectionMessage = result.errorMessage ?? client.connectionErrorMessage
             WatchHaptics.error()
@@ -406,6 +468,7 @@ final class WatchPlayerViewModel: ObservableObject {
         guard let volume = pendingVolume else { return }
         pendingVolume = nil
         lastVolumeSendTime = Date()
+        lastSentVolume = volume
         let result = await coordinator.send(.setVolume(volume))
         await handleCommandResult(result)
     }

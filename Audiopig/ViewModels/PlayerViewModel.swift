@@ -207,7 +207,11 @@ final class PlayerViewModel {
             : .currentChapter
         settings.playbackTimelineScope = newScope
         audioEngine.setNowPlayingTimelineScope(newScope.nowPlayingScope)
-        watchBridge?.publishSettings(settings.watchSettingsSnapshot())
+        watchBridge?.publishSettings(
+            settings.watchSettingsSnapshot(
+                hasParagraphBreaksAccess: monetization.hasAccess(to: .paragraphBreaks)
+            )
+        )
         guard !isScrubbing else { return }
         applyEngineTime(audioEngine.currentTime)
     }
@@ -334,19 +338,7 @@ final class PlayerViewModel {
         do {
             try await audioEngine.load(audiobook: audiobook)
             audioEngine.setNowPlayingTimelineScope(settings.playbackTimelineScope.nowPlayingScope)
-            let desiredSpeed: Float
-            if settings.universalPlaybackSpeedEnabled {
-                desiredSpeed = settings.universalPlaybackSpeed > 0 ? settings.universalPlaybackSpeed : settings.defaultSpeed
-                if settings.universalPlaybackSpeed <= 0 {
-                    settings.universalPlaybackSpeed = desiredSpeed
-                }
-            } else if let perBook = audiobook.lastPlaybackSpeed, perBook > 0 {
-                desiredSpeed = perBook
-            } else {
-                desiredSpeed = settings.defaultSpeed
-                audiobook.lastPlaybackSpeed = desiredSpeed
-                try? modelContext.save()
-            }
+            let desiredSpeed = playbackSpeedForLoad(of: audiobook)
 
             try? audioEngine.setPlaybackSpeed(desiredSpeed)
             playbackSpeed = audioEngine.playbackSpeed
@@ -630,6 +622,31 @@ final class PlayerViewModel {
             settings.saveSleepTimer(option: "minutes(\(n))", expiryDate: expiryDate)
             startMinutesTimer()
         }
+
+        syncChapterEndAutoAdvance()
+    }
+
+    private func syncChapterEndAutoAdvance() {
+        audioEngine.shouldAutoAdvanceAtChapterEnd = sleepTimerOption != .endOfChapter
+    }
+
+    private func handleEndOfChapterSleepTimer(stoppingAfterChapterIndex index: Int) {
+        guard sleepTimerOption == .endOfChapter else { return }
+        guard index < chapters.count else { return }
+
+        sleepTimerOption = .off
+        settings.clearSleepTimer()
+        syncChapterEndAutoAdvance()
+
+        let chapterEnd = chapters[index].startTime + chapters[index].duration
+
+        Task {
+            if audioEngine.currentTime > chapterEnd + 0.05 {
+                try? await audioEngine.seek(to: chapterEnd)
+            }
+            audioEngine.pause()
+            savePlaybackPosition()
+        }
     }
 
     private func startMinutesTimer() {
@@ -657,6 +674,7 @@ final class PlayerViewModel {
 
         if saved.option == "endOfChapter" {
             sleepTimerOption = .endOfChapter
+            syncChapterEndAutoAdvance()
             return
         }
 
@@ -707,12 +725,14 @@ final class PlayerViewModel {
                 }
                 self.applyEngineTime(time)
                 self.publishWatchSnapshot(immediate: false, includeArtwork: false)
-                // Sleep-timer: endOfChapter — pause as soon as the chapter advances.
-                if self.sleepTimerOption == .endOfChapter
-                    && self.currentChapterIndex > prevChapterIndex {
-                    self.audioEngine.pause()
-                    self.savePlaybackPosition()
-                    self.sleepTimerOption = .off
+                // Sleep-timer: endOfChapter — pause when the active chapter's end time is reached.
+                if self.sleepTimerOption == .endOfChapter,
+                   prevChapterIndex < self.chapters.count {
+                    let chapterEnd = self.chapters[prevChapterIndex].startTime
+                        + self.chapters[prevChapterIndex].duration
+                    if time >= chapterEnd {
+                        self.handleEndOfChapterSleepTimer(stoppingAfterChapterIndex: prevChapterIndex)
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -731,11 +751,17 @@ final class PlayerViewModel {
                     self.resetListeningSample()
                     self.stopPositionSaveTimer()
                     self.savePlaybackPosition()
-                    if case .finished = state,
-                       !self.didReportNaturalFinish,
-                       let book = self.audiobook {
-                        self.didReportNaturalFinish = true
-                        self.onNaturalFinish?(book)
+                    if case .finished = state {
+                        if self.sleepTimerOption == .endOfChapter {
+                            self.sleepTimerOption = .off
+                            self.settings.clearSleepTimer()
+                            self.syncChapterEndAutoAdvance()
+                        }
+                        if !self.didReportNaturalFinish,
+                           let book = self.audiobook {
+                            self.didReportNaturalFinish = true
+                            self.onNaturalFinish?(book)
+                        }
                     }
                 default:
                     self.resetListeningSample()
@@ -748,8 +774,15 @@ final class PlayerViewModel {
 
     // MARK: - Watch Sync
 
-    func watchSnapshotForReply(includeArtwork: Bool = false) -> WatchPlaybackSnapshot {
-        makeWatchSnapshot(revision: watchRevision, includeArtwork: includeArtwork)
+    func watchSnapshotForReply(
+        includeArtwork: Bool = false,
+        systemVolumeOverride: Float? = nil
+    ) -> WatchPlaybackSnapshot {
+        makeWatchSnapshot(
+            revision: watchRevision,
+            includeArtwork: includeArtwork,
+            systemVolumeOverride: systemVolumeOverride
+        )
     }
 
     private func publishWatchSnapshot(immediate: Bool, includeArtwork: Bool) {
@@ -765,20 +798,25 @@ final class PlayerViewModel {
         watchBridge.publishSnapshot(snapshot, includeArtwork: shouldIncludeArtwork)
     }
 
-    private func makeWatchSnapshot(revision: UInt64, includeArtwork: Bool) -> WatchPlaybackSnapshot {
+    private func makeWatchSnapshot(
+        revision: UInt64,
+        includeArtwork: Bool,
+        systemVolumeOverride: Float? = nil
+    ) -> WatchPlaybackSnapshot {
         WatchSnapshotBuilder.makeSnapshot(
             revision: revision,
             audiobook: audiobook,
             chapters: chapters,
             currentChapterIndex: currentChapterIndex,
-            playbackState: playbackState,
+            playbackState: audioEngine.playbackState,
             playbackSpeed: playbackSpeed,
             skipForwardSeconds: settings.skipForwardInterval,
             skipBackwardSeconds: settings.skipBackwardInterval,
             globalTime: audioEngine.currentTime,
             globalDuration: audioEngine.duration,
             coverImage: coverImage,
-            includeArtwork: includeArtwork
+            includeArtwork: includeArtwork,
+            systemVolumeOverride: systemVolumeOverride
         )
     }
 
@@ -866,6 +904,24 @@ final class PlayerViewModel {
         lastListenedPositionSample = nil
     }
 
+    // MARK: - Private — Playback Speed
+
+    private func playbackSpeedForLoad(of audiobook: Audiobook) -> Float {
+        if settings.universalPlaybackSpeedEnabled {
+            let speed = settings.universalPlaybackSpeed > 0
+                ? settings.universalPlaybackSpeed
+                : settings.defaultSpeed
+            if settings.universalPlaybackSpeed <= 0 {
+                settings.universalPlaybackSpeed = speed
+            }
+            return speed
+        }
+        if let perBook = audiobook.lastPlaybackSpeed, perBook > 0 {
+            return perBook
+        }
+        return settings.defaultSpeed
+    }
+
     // MARK: - Private — Persistence
 
     private func savePlaybackPosition() {
@@ -873,7 +929,11 @@ final class PlayerViewModel {
         audiobook.currentPlaybackTime = audioEngine.currentTime
         audiobook.lastPlayedAt = .now
         try? modelContext.save()
-        WidgetSnapshotWriter.updateLastPlayed(title: audiobook.title, author: audiobook.author)
+        WidgetSnapshotWriter.updateLastPlayed(
+            title: audiobook.title,
+            author: audiobook.author,
+            audiobookID: audiobook.id
+        )
         onPlaybackPositionSaved?()
     }
 

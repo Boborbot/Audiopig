@@ -74,22 +74,71 @@ private struct WeeklyListeningWidgetView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: isMedium ? WeeklyWidgetSpacing.md : WeeklyWidgetSpacing.sm) {
-            Text(WidgetWeeklyListeningSnapshot.formatWeeklyTotal(entry.snapshot.totalSeconds))
-                .font(isMedium ? .title2.weight(.bold) : .title3.weight(.bold))
-                .foregroundStyle(WeeklyWidgetPalette.primary)
+        ZStack(alignment: .topLeading) {
+            if isMedium {
+                mediumLayout
+            } else {
+                smallLayout
+            }
 
-            HStack(alignment: .bottom, spacing: isMedium ? WeeklyWidgetSpacing.sm : WeeklyWidgetSpacing.xs) {
+            WidgetBrandBadge(size: isMedium ? WidgetBrandSpacing.chartBadgeSize : WidgetBrandSpacing.standardBadgeSize)
+                .padding(WidgetBrandSpacing.badgeInset)
+        }
+    }
+
+    private var smallLayout: some View {
+        VStack(alignment: .leading, spacing: WeeklyWidgetSpacing.sm) {
+            Text(WidgetWeeklyListeningSnapshot.formatWeeklyTotal(entry.snapshot.totalSeconds))
+                .font(.title3.weight(.bold))
+                .foregroundStyle(WeeklyWidgetPalette.primary)
+                .padding(.top, WidgetBrandSpacing.standardContentTopPadding)
+
+            HStack(alignment: .bottom, spacing: WeeklyWidgetSpacing.xs) {
                 ForEach(Array(entry.snapshot.days.enumerated()), id: \.offset) { _, day in
-                    dayColumn(day)
+                    dayColumn(day, barHeight: 48)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
-        .padding(isMedium ? WeeklyWidgetSpacing.lg : WeeklyWidgetSpacing.md)
+        .padding(WeeklyWidgetSpacing.md)
     }
 
-    private func dayColumn(_ day: WidgetWeeklyListeningSnapshot.DayBucket) -> some View {
+    private var mediumLayout: some View {
+        HStack(alignment: .bottom, spacing: WeeklyWidgetSpacing.md) {
+            weeklyTotalLabel
+                .padding(.bottom, 2)
+
+            HStack(alignment: .bottom, spacing: WeeklyWidgetSpacing.sm) {
+                ForEach(Array(entry.snapshot.days.enumerated()), id: \.offset) { _, day in
+                    dayColumn(day, barHeight: 72)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        }
+        .padding(WeeklyWidgetSpacing.lg)
+        .padding(.top, WidgetBrandSpacing.prominentContentTopPadding)
+    }
+
+    private var weeklyTotalLabel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(WidgetWeeklyListeningSnapshot.formatWeeklyTotalHoursMinutes(entry.snapshot.totalSeconds))
+                .font(.title3.weight(.bold))
+                .foregroundStyle(WeeklyWidgetPalette.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text("listened to")
+                .font(.caption2)
+                .foregroundStyle(WeeklyWidgetPalette.secondary)
+
+            Text("this week")
+                .font(.caption2)
+                .foregroundStyle(WeeklyWidgetPalette.secondary)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func dayColumn(_ day: WidgetWeeklyListeningSnapshot.DayBucket, barHeight: CGFloat) -> some View {
         VStack(spacing: WeeklyWidgetSpacing.xs) {
             GeometryReader { geometry in
                 let height = max(4, geometry.size.height * CGFloat(day.seconds / maxSeconds))
@@ -100,13 +149,18 @@ private struct WeeklyListeningWidgetView: View {
                         .frame(height: height)
                 }
             }
-            .frame(height: isMedium ? 72 : 48)
+            .frame(height: barHeight)
 
             Text(WidgetWeeklyListeningSnapshot.formatDayBarHours(day.seconds))
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(WeeklyWidgetPalette.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+
+            Text(WidgetWeeklyListeningSnapshot.weekdayLetter(for: day.dayKey))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(WeeklyWidgetPalette.secondary)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity)
     }

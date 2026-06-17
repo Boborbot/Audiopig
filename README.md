@@ -30,8 +30,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Finish celebrations** — confetti and optional delete confirmation when marking a book finished
 - **Appearance** — system, light, or dark mode; optional portrait orientation lock
 - **Audiopig Plus** — monthly subscription unlocks lull detection; optional "Feed a Student" consumable tips in Settings
-- **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback (recent books, controls, chapters, artwork skip gestures) or **on-Watch local playback** after transfer
-- **Send to Watch** — transfer audiobooks from iPhone via `WCSession`; manage storage and queue from Settings → Watch Library
+- **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback (recent books, controls, chapters, artwork skip gestures). On-Watch local library transfer is archived until a future release (`WatchFeatures.localPlaybackEnabled`).
 - **Home screen widgets** (`AudiopigWidget`) — now-playing, recent books, listening stats, and hour-club progress via App Group snapshots
 - **Volume control** — hardware volume integration through `SystemVolumeController`
 
@@ -73,10 +72,9 @@ Audiopig/
 │   ├── docs/app-store/         QA checklist, listing copy, privacy policy, submission guide
 │   └── Assets.xcassets/        App icon (+ unlockable tier variants), gallery thumbnails
 ├── AudiopigShared/             Shared Swift sources compiled into app, Watch, and Widget targets
-├── AudiopigWatch/              watchOS companion (remote + local playback, transfer ingest, player)
+├── AudiopigWatch/              watchOS companion (remote playback; local transfer archived)
 ├── AudiopigWidget/             WidgetKit extension (now playing, hour club)
-├── AudiopigTests/              Unit tests (ChapterProgressCalculator, export formatting, achievements)
-└── Assets for Testing/         Local QA audiobooks (gitignored; see README inside folder)
+└── AudiopigTests/              Unit tests (ChapterProgressCalculator, export formatting, achievements)
 ```
 
 ---
@@ -106,12 +104,6 @@ xcodebuild test -project Audiopig.xcodeproj -scheme Audiopig \
   -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
-### Debug test library
-
-Copy local `.mp3` / `.m4b` files into `Assets for Testing/` (gitignored). Debug builds bundle them automatically via the "Copy Test Assets" build phase and `DevelopmentLibrarySeeder` imports them on launch.
-
----
-
 ## App Store Submission
 
 See `docs/app-store/` for:
@@ -131,7 +123,7 @@ See `docs/app-store/` for:
 | Automated tests | `AudiopigTests` covers pure logic; no UI or AVFoundation integration tests yet |
 | Per-book playback speed | Global default from Settings applies on load; not saved per book |
 | Format support | Only `.mp3` and `.m4b`; no `.aax`, `.opus`, etc. |
-| Watch local transfer | Single-file books only; merged multi-chapter timelines transfer the primary file |
+| Watch local transfer | Archived (`WatchFeatures.localPlaybackEnabled`); code retained for a future release |
 
 ---
 
@@ -143,4 +135,4 @@ See `docs/app-store/` for:
 | 9 | Stable audio engine, mini-player, multi-chapter virtual timeline |
 | 10 | Folder import, merge file cleanup, dead code removal, README |
 | 11 | Stats tab, lull detection, unlockable icons, bookmarks export, edit details, App Store prep |
-| 12 | Watch companion (remote + local transfer), widgets, AudiopigShared, StoreKit monetization, icon gallery, orientation lock, unit tests |
+| 12 | Watch companion (remote playback), widgets, AudiopigShared, StoreKit monetization, icon gallery, orientation lock, unit tests |

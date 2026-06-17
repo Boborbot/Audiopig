@@ -15,14 +15,22 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
     private var pendingTransfers: [UUID: WatchTransferManifest] = [:]
     private var pendingTransferURLs: [UUID: URL] = [:]
     private var transferRetryCount: [UUID: Int] = [:]
+    private var activeFileTransfers: [UUID: WCSessionFileTransfer] = [:]
+    private var cancelledBookIDs: Set<UUID> = []
 
     var commandHandler: (@MainActor (WatchCommand) async -> WatchCommandResult)?
     var transferCompletionHandler: (@MainActor (UUID, Bool, String?) -> Void)?
+    var fileDeliveredHandler: (@MainActor (UUID) -> Void)?
+    var fileProgressHandler: (@MainActor (UUID, Double) -> Void)?
+    var reachabilityHandler: (@MainActor (Bool) -> Void)?
     private(set) var latestLocalBooks: WatchLocalBooksPayload?
+    private var fileProgressObservations: [UUID: NSKeyValueObservation] = [:]
+    private var fileProgressPollTasks: [UUID: Task<Void, Never>] = [:]
 
     var isPaired: Bool { session.isPaired }
     var isWatchAppInstalled: Bool { session.isWatchAppInstalled }
     var isReachable: Bool { session.isReachable }
+    var isSessionActivated: Bool { session.activationState == .activated }
 
     override init() {
         self.session = WCSession.default
@@ -33,6 +41,16 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
         guard WCSession.isSupported() else { return }
         session.delegate = self
         session.activate()
+    }
+
+    func ensureSessionActivated(timeout: TimeInterval = 8) async -> Bool {
+        if session.activationState == .activated { return true }
+        let deadline = Date().addingTimeInterval(timeout)
+        while session.activationState != .activated {
+            if Date() >= deadline { return false }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return true
     }
 
     func publishSnapshot(_ snapshot: WatchPlaybackSnapshot, includeArtwork: Bool) {
@@ -79,23 +97,75 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
 
     func publishLocalBooks(_ payload: WatchLocalBooksPayload) {
         latestLocalBooks = payload
+        WatchLocalBooksCache.save(payload)
         pushToContext(key: WatchMessageKeys.localBooks, encodable: payload)
+    }
+
+    func restoreLocalBooksCache(_ payload: WatchLocalBooksPayload) {
+        latestLocalBooks = payload
     }
 
     func publishSettings(_ settings: WatchSettingsSnapshot) {
         pushToContext(key: WatchMessageKeys.settings, encodable: settings)
     }
 
-    func transferBook(manifest: WatchTransferManifest, fileURL: URL) {
-        guard session.activationState == .activated else { return }
+    @discardableResult
+    func transferBook(manifest: WatchTransferManifest, fileURL: URL) async -> Bool {
+        guard WatchFeatures.localPlaybackEnabled else { return false }
+        guard await ensureSessionActivated() else { return false }
+        guard session.isPaired, session.isWatchAppInstalled else { return false }
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return false }
+
+        let wireManifest = manifest.wireTransferCopy()
+        guard let manifestData = try? WatchMessageCodec.encode(wireManifest) else { return false }
+
+        let stagedURL: URL
+        do {
+            stagedURL = try WatchTransferStaging.stageOutgoingFile(
+                bookID: manifest.bookID,
+                sourceURL: fileURL,
+                fileExtension: manifest.fileExtension
+            )
+        } catch {
+            return false
+        }
+
         pendingTransfers[manifest.bookID] = manifest
-        pendingTransferURLs[manifest.bookID] = fileURL
-        guard let manifestData = try? WatchMessageCodec.encode(manifest) else { return }
-        let metadata: [String: Any] = [
+        pendingTransferURLs[manifest.bookID] = stagedURL
+
+        for outstanding in session.outstandingFileTransfers {
+            guard let idString = outstanding.file.metadata?[WatchMessageKeys.transferBookID] as? String,
+                  let outstandingID = UUID(uuidString: idString),
+                  outstandingID == manifest.bookID else { continue }
+            outstanding.cancel()
+            stopObservingFileTransferProgress(for: manifest.bookID)
+        }
+
+        // Deliver manifest before the file; also embed slim manifest on the file itself as a fallback.
+        session.transferUserInfo([
+            WatchMessageKeys.transferBookID: manifest.bookID.uuidString,
+            WatchMessageKeys.transferManifest: manifestData
+        ])
+
+        let fileMetadata: [String: Any] = [
             WatchMessageKeys.transferBookID: manifest.bookID.uuidString,
             WatchMessageKeys.transferManifest: manifestData
         ]
-        session.transferFile(fileURL, metadata: metadata)
+        let transfer = session.transferFile(stagedURL, metadata: fileMetadata)
+        activeFileTransfers[manifest.bookID] = transfer
+        observeFileTransferProgress(for: manifest.bookID, transfer: transfer)
+        return true
+    }
+
+    func cancelTransfer(bookID: UUID) {
+        cancelledBookIDs.insert(bookID)
+        activeFileTransfers[bookID]?.cancel()
+        activeFileTransfers.removeValue(forKey: bookID)
+        stopObservingFileTransferProgress(for: bookID)
+        pendingTransfers.removeValue(forKey: bookID)
+        pendingTransferURLs.removeValue(forKey: bookID)
+        transferRetryCount.removeValue(forKey: bookID)
+        WatchTransferStaging.removeOutgoingStage(bookID: bookID)
     }
 
     func sendCommandToWatch(_ command: WatchCommand) async -> WatchCommandResult {
@@ -111,6 +181,10 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
         }
 
         guard session.isReachable else {
+            if case .requestLocalBooks = command {
+                session.transferUserInfo(payload)
+                return .ok()
+            }
             return .failure("Open Audiopig on Apple Watch.")
         }
 
@@ -124,9 +198,14 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
                         continuation.resume(returning: .ok())
                     }
                 }
-            }, errorHandler: { _ in
+            }, errorHandler: { [session] _ in
                 Task { @MainActor in
-                    continuation.resume(returning: .failure("Could not reach Apple Watch."))
+                    if case .requestLocalBooks = command {
+                        session.transferUserInfo(payload)
+                        continuation.resume(returning: .ok())
+                    } else {
+                        continuation.resume(returning: .failure("Could not reach Apple Watch."))
+                    }
                 }
             })
         }
@@ -168,9 +247,12 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
     }
 
     private func completeTransfer(bookID: UUID, success: Bool, errorMessage: String?) {
+        activeFileTransfers.removeValue(forKey: bookID)
+        stopObservingFileTransferProgress(for: bookID)
         pendingTransfers.removeValue(forKey: bookID)
         pendingTransferURLs.removeValue(forKey: bookID)
         transferRetryCount.removeValue(forKey: bookID)
+        WatchTransferStaging.removeOutgoingStage(bookID: bookID)
         transferCompletionHandler?(bookID, success, errorMessage)
     }
 
@@ -187,7 +269,44 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
             completeTransfer(bookID: bookID, success: false, errorMessage: "Source file missing.")
             return
         }
-        transferBook(manifest: manifest, fileURL: fileURL)
+        Task {
+            _ = await transferBook(manifest: manifest, fileURL: fileURL)
+        }
+    }
+
+    private func bookID(from metadata: [String: Any]?) -> UUID? {
+        guard let idString = metadata?[WatchMessageKeys.transferBookID] as? String else { return nil }
+        return UUID(uuidString: idString)
+    }
+
+    private func observeFileTransferProgress(for bookID: UUID, transfer: WCSessionFileTransfer) {
+        stopObservingFileTransferProgress(for: bookID)
+        fileProgressObservations[bookID] = transfer.progress.observe(\.fractionCompleted, options: [.initial, .new]) { [weak self] progress, _ in
+            let fraction = progress.fractionCompleted
+            Task { @MainActor in
+                self?.fileProgressHandler?(bookID, fraction)
+            }
+        }
+        startProgressPolling(for: bookID, transfer: transfer)
+    }
+
+    private func startProgressPolling(for bookID: UUID, transfer: WCSessionFileTransfer) {
+        fileProgressPollTasks[bookID]?.cancel()
+        fileProgressPollTasks[bookID] = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                let fraction = transfer.progress.fractionCompleted
+                self?.fileProgressHandler?(bookID, fraction)
+            }
+        }
+    }
+
+    private func stopObservingFileTransferProgress(for bookID: UUID) {
+        fileProgressObservations[bookID]?.invalidate()
+        fileProgressObservations.removeValue(forKey: bookID)
+        fileProgressPollTasks[bookID]?.cancel()
+        fileProgressPollTasks.removeValue(forKey: bookID)
     }
 }
 
@@ -203,6 +322,7 @@ extension WatchConnectivityService: WCSessionDelegate {
             if let snapshot = lastSnapshot {
                 publishSnapshot(snapshot, includeArtwork: true)
             }
+            reachabilityHandler?(session.isReachable)
         }
     }
 
@@ -212,7 +332,11 @@ extension WatchConnectivityService: WCSessionDelegate {
         session.activate()
     }
 
-    nonisolated func sessionReachabilityDidChange(_ session: WCSession) {}
+    nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
+        Task { @MainActor in
+            reachabilityHandler?(session.isReachable)
+        }
+    }
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         Task { @MainActor in
@@ -252,13 +376,24 @@ extension WatchConnectivityService: WCSessionDelegate {
         error: Error?
     ) {
         Task { @MainActor in
-            guard let manifestData = fileTransfer.file.metadata?[WatchMessageKeys.transferManifest] as? Data,
-                  let manifest = try? WatchMessageCodec.decode(WatchTransferManifest.self, from: manifestData) else {
+            let bookID = bookID(from: fileTransfer.file.metadata)
+                ?? activeFileTransfers.first(where: { $0.value === fileTransfer })?.key
+            guard let bookID else { return }
+
+            activeFileTransfers.removeValue(forKey: bookID)
+            stopObservingFileTransferProgress(for: bookID)
+
+            if cancelledBookIDs.contains(bookID) {
+                cancelledBookIDs.remove(bookID)
+                WatchTransferStaging.removeOutgoingStage(bookID: bookID)
                 return
             }
 
             if error != nil {
-                retryTransferIfNeeded(bookID: manifest.bookID)
+                retryTransferIfNeeded(bookID: bookID)
+            } else {
+                WatchTransferStaging.removeOutgoingStage(bookID: bookID)
+                fileDeliveredHandler?(bookID)
             }
         }
     }

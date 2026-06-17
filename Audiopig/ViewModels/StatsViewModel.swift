@@ -81,10 +81,14 @@ final class StatsViewModel {
         finishedListenedSeconds = finishedLibraryTime + finishedDeletedTime
     }
 
-    /// Permanently removes all finished-book records from SwiftData.
+    /// Permanently removes all reading stats from SwiftData.
     func deleteAllStats() {
         let records = (try? modelContext.fetch(FetchDescriptor<FinishedRecord>())) ?? []
         records.forEach { modelContext.delete($0) }
+
+        let audiobooks = (try? modelContext.fetch(FetchDescriptor<Audiobook>())) ?? []
+        audiobooks.forEach { $0.accumulatedListeningSeconds = 0 }
+
         try? modelContext.save()
         refresh()
     }

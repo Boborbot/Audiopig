@@ -13,6 +13,7 @@ struct SettingsView: View {
     var onWatchSettingsChanged: (() -> Void)?
 
     @State private var isDeleteStatsConfirmationPresented = false
+    @State private var isDeleteStatsFinalConfirmationPresented = false
     @State private var isShareAllExportedPresented = false
     @State private var shareAllExportedItems: [Any] = []
     @State private var exportedNoteCount = 0
@@ -199,14 +200,6 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    if let libraryViewModel {
-                        NavigationLink {
-                            WatchLibraryManagementView(libraryViewModel: libraryViewModel)
-                        } label: {
-                            Label("Watch Library", systemImage: "applewatch.and.arrow.down")
-                        }
-                    }
-
                     Toggle(isOn: $settings.watchArtworkSkipGesturesEnabled) {
                         Label("Artwork skip gestures", systemImage: "applewatch")
                     }
@@ -235,19 +228,34 @@ struct SettingsView: View {
                     Text("About")
                         .sectionTitle()
                 } footer: {
-                    LegalDocumentLinks()
+                    VStack(alignment: .leading, spacing: DS.Spacing.xs) {
+                        LegalDocumentLinks()
+                        Link("Contact Support", destination: AppSupport.supportEmailURL)
+                            .font(DS.Typography.caption)
+                            .foregroundStyle(DS.Color.tertiary)
+                            .tint(DS.Color.tertiary)
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
             .background(DS.Color.canvas.ignoresSafeArea())
+            .miniPlayerScrollClearance()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
             .coralNavigationBanner()
-            .alert("Delete all reading data?", isPresented: $isDeleteStatsConfirmationPresented) {
-                Button("Delete", role: .destructive) { statsViewModel.deleteAllStats() }
+            .alert("Are you sure?", isPresented: $isDeleteStatsConfirmationPresented) {
+                Button("Delete", role: .destructive) {
+                    isDeleteStatsFinalConfirmationPresented = true
+                }
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Your entire reading history will be permanently removed. This cannot be undone.")
+            }
+            .alert("Are you really sure?", isPresented: $isDeleteStatsFinalConfirmationPresented) {
+                Button("Delete Everything", role: .destructive) { statsViewModel.deleteAllStats() }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Total listening time, finished books, and all related stats will be erased forever.")
             }
             .sheet(isPresented: $isShareAllExportedPresented) {
                 ShareActivityView(activityItems: shareAllExportedItems)
@@ -266,7 +274,10 @@ struct SettingsView: View {
 
             if monetizationViewModel.showsSubscribeAction {
                 Button {
-                    Task { await monetizationViewModel.subscribeToPlus() }
+                    Task {
+                        await monetizationViewModel.subscribeToPlus()
+                        onWatchSettingsChanged?()
+                    }
                 } label: {
                     if monetizationViewModel.isProcessing {
                         HStack {
@@ -289,7 +300,10 @@ struct SettingsView: View {
             }
 
             Button {
-                Task { await monetizationViewModel.restorePurchases() }
+                Task {
+                    await monetizationViewModel.restorePurchases()
+                    onWatchSettingsChanged?()
+                }
             } label: {
                 Label("Restore Purchases", systemImage: "arrow.clockwise")
             }

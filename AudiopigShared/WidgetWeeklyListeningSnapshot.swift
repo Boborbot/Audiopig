@@ -61,7 +61,40 @@ enum WidgetWeeklyListeningSnapshot {
         return "\(rounded)h"
     }
 
+    /// Weekly total with hours and minutes, e.g. "12h30m", "42m", "0m".
+    static func formatWeeklyTotalHoursMinutes(_ seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds))
+        let hours = total / 3_600
+        var minutes = (total % 3_600) / 60
+        if total > 0 && hours == 0 && minutes == 0 {
+            minutes = 1
+        }
+        if hours > 0 {
+            return "\(hours)h\(minutes)m"
+        }
+        return "\(minutes)m"
+    }
+
+    /// First letter of the weekday for a stored day key, e.g. "M" for Monday.
+    static func weekdayLetter(for dayKey: String) -> String {
+        guard let date = dayKeyDateFormatter.date(from: dayKey),
+              let symbols = dayKeyDateFormatter.shortWeekdaySymbols else {
+            return ""
+        }
+        let weekday = Calendar.current.component(.weekday, from: date)
+        guard weekday >= 1, weekday <= symbols.count else { return "" }
+        return String(symbols[weekday - 1].prefix(1))
+    }
+
     // MARK: - Private
+
+    private static let dayKeyDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar.current
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
     private static func sharedDefaults() -> UserDefaults? {
         UserDefaults(suiteName: WidgetListeningSnapshot.appGroupID)

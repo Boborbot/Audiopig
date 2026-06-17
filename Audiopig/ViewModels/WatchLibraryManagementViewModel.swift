@@ -20,17 +20,32 @@ final class WatchLibraryManagementViewModel {
     }
 
     var usedBytes: Int64 {
-        libraryViewModel.watchLocalBooks?.usedBytes ?? 0
+        _ = libraryViewModel.watchTransferStateRevision
+        return libraryViewModel.watchLocalBooks?.usedBytes ?? 0
     }
 
     var budgetBytes: Int64 {
-        libraryViewModel.watchLocalBooks?.budgetBytes ?? WatchStorageBudget.defaultBudgetBytes
+        _ = libraryViewModel.watchTransferStateRevision
+        return libraryViewModel.watchLocalBooks?.budgetBytes ?? WatchStorageBudget.defaultBudgetBytes
     }
 
     var storageLabel: String {
+        _ = libraryViewModel.watchTransferStateRevision
         let usedMB = Double(usedBytes) / 1_048_576
         let budgetMB = Double(budgetBytes) / 1_048_576
         return String(format: "%.0f / %.0f MB on Watch", usedMB, budgetMB)
+    }
+
+    var transferStateRevision: UInt64 {
+        libraryViewModel.watchTransferStateRevision
+    }
+
+    var hasActiveTransfers: Bool {
+        _ = libraryViewModel.watchTransferStateRevision
+        return audiobooks.contains {
+            if case .transferring = libraryViewModel.watchStatus(for: $0) { return true }
+            return false
+        }
     }
 
     func refresh() {
@@ -38,7 +53,8 @@ final class WatchLibraryManagementViewModel {
     }
 
     func status(for audiobook: Audiobook) -> WatchBookTransferStatus {
-        libraryViewModel.watchStatus(for: audiobook)
+        _ = libraryViewModel.watchTransferStateRevision
+        return libraryViewModel.watchStatus(for: audiobook)
     }
 
     func isSelected(_ audiobook: Audiobook) -> Bool {
@@ -55,8 +71,13 @@ final class WatchLibraryManagementViewModel {
 
     func transferSelected() async {
         let books = audiobooks.filter { selectedIDs.contains($0.id) }
-        for book in books where status(for: book) == .notOnWatch {
-            await libraryViewModel.sendToWatch(book)
+        for book in books {
+            switch status(for: book) {
+            case .notOnWatch, .failed:
+                await libraryViewModel.sendToWatch(book)
+            case .onWatch, .transferring, .unavailable:
+                break
+            }
         }
         selectedIDs.removeAll()
     }
@@ -65,7 +86,15 @@ final class WatchLibraryManagementViewModel {
         await libraryViewModel.removeFromWatch(audiobook)
     }
 
+    func cancelTransfer(_ audiobook: Audiobook) {
+        libraryViewModel.cancelWatchTransfer(audiobook)
+    }
+
     func transfer(_ audiobook: Audiobook) async {
         await libraryViewModel.sendToWatch(audiobook)
+    }
+
+    func syncWatchLibrary() async {
+        await libraryViewModel.syncWatchLocalBooks()
     }
 }

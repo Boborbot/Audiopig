@@ -29,6 +29,9 @@ protocol AudioEngineProtocol: AnyObject {
     /// Used by LullDetector to map file URLs and global offsets without re-reading SwiftData.
     var resolvedChapters: [ResolvedChapter] { get }
 
+    /// When `false`, reaching the end of a chapter file pauses instead of loading the next chapter.
+    var shouldAutoAdvanceAtChapterEnd: Bool { get set }
+
     // MARK: - Combine Observation
 
     /// Emits the current global timeline position at ~0.5 s intervals during playback.

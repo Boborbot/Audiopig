@@ -67,40 +67,56 @@ private struct ListeningStatsWidgetView: View {
     let entry: ListeningStatsEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: WidgetSpacing.xs) {
-            Spacer(minLength: 0)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(WidgetListeningSnapshot.formatTodayListening(entry.snapshot.todayListenedSeconds))
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(WidgetPalette.primary)
-                    .minimumScaleFactor(0.8)
-                    .lineLimit(1)
+        if let playURL = WidgetListeningSnapshot.playURL(for: entry.snapshot) {
+            Link(destination: playURL) {
+                widgetContent
             }
+        } else {
+            widgetContent
+        }
+    }
 
-            Spacer(minLength: 0)
+    private var widgetContent: some View {
+        ZStack(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: WidgetSpacing.xs) {
+                Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: 2) {
-                if entry.snapshot.lastPlayedTitle.isEmpty {
-                    Text("No audiobook yet")
-                        .font(.caption.weight(.semibold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(WidgetListeningSnapshot.formatTodayListening(entry.snapshot.todayListenedSeconds))
+                        .font(.title2.weight(.bold))
                         .foregroundStyle(WidgetPalette.primary)
-                        .lineLimit(2)
-                } else {
-                    Text(entry.snapshot.lastPlayedTitle)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(WidgetPalette.primary)
-                        .lineLimit(2)
-                    if !entry.snapshot.lastPlayedAuthor.isEmpty {
-                        Text(entry.snapshot.lastPlayedAuthor)
-                            .font(.caption2)
-                            .foregroundStyle(WidgetPalette.secondary)
-                            .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(1)
+                }
+                .padding(.top, WidgetBrandSpacing.prominentContentTopPadding)
+
+                Spacer(minLength: 0)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if entry.snapshot.lastPlayedTitle.isEmpty {
+                        Text("No audiobook yet")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(WidgetPalette.primary)
+                            .lineLimit(2)
+                    } else {
+                        Text(entry.snapshot.lastPlayedTitle)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(WidgetPalette.primary)
+                            .lineLimit(2)
+                        if !entry.snapshot.lastPlayedAuthor.isEmpty {
+                            Text(entry.snapshot.lastPlayedAuthor)
+                                .font(.caption2)
+                                .foregroundStyle(WidgetPalette.secondary)
+                                .lineLimit(1)
+                        }
                     }
                 }
             }
+            .padding(WidgetSpacing.md)
+
+            WidgetBrandBadge(size: WidgetBrandSpacing.prominentBadgeSize)
+                .padding(WidgetBrandSpacing.badgeInset)
         }
-        .padding(WidgetSpacing.md)
     }
 }
 

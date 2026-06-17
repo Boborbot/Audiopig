@@ -19,6 +19,8 @@ public struct WatchSettingsSnapshot: Codable, Sendable, Equatable {
     public let universalPlaybackSpeedEnabled: Bool?
     /// Optional to allow older payloads to decode.
     public let universalPlaybackSpeed: Float?
+    /// Whether Find Paragraph Breaks is unlocked on iPhone (Plus or trial).
+    public let hasParagraphBreaksAccess: Bool?
 
     public init(
         artworkSkipGesturesEnabled: Bool,
@@ -28,7 +30,8 @@ public struct WatchSettingsSnapshot: Codable, Sendable, Equatable {
         playbackTimelineScope: PlaybackTimelineScope? = nil,
         defaultSpeed: Float? = nil,
         universalPlaybackSpeedEnabled: Bool? = nil,
-        universalPlaybackSpeed: Float? = nil
+        universalPlaybackSpeed: Float? = nil,
+        hasParagraphBreaksAccess: Bool? = nil
     ) {
         self.artworkSkipGesturesEnabled = artworkSkipGesturesEnabled
         self.skipForwardSeconds = skipForwardSeconds
@@ -38,5 +41,6 @@ public struct WatchSettingsSnapshot: Codable, Sendable, Equatable {
         self.defaultSpeed = defaultSpeed
         self.universalPlaybackSpeedEnabled = universalPlaybackSpeedEnabled
         self.universalPlaybackSpeed = universalPlaybackSpeed
+        self.hasParagraphBreaksAccess = hasParagraphBreaksAccess
     }
 }

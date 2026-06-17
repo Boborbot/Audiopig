@@ -14,12 +14,24 @@ public protocol WatchPlaybackCoordinating: AnyObject {
     func setSnapshotHandler(_ handler: @escaping (WatchPlaybackSnapshot) -> Void)
 }
 
+public enum WatchVolumeRange {
+    /// Matches iOS system output volume granularity (~16 steps).
+    public static let step: Float = 1.0 / 16.0
+    public static let crownStep: Float = step
+    public static let tolerance: Float = step / 2
+
+    public static func normalized(_ volume: Float) -> Float {
+        let stepped = (volume / step).rounded() * step
+        return min(1, max(0, stepped))
+    }
+}
+
 public enum WatchSpeedRange {
     public static let min: Float = 0.25
     public static let max: Float = 4.0
     public static let step: Float = 0.05
-    /// Crown detent size — 3× coarser than `step` for less sensitive crown control.
-    public static let crownStep: Float = step * 3
+    /// Crown detent size for the speed panel — 9× coarser than `step` for less sensitive crown control.
+    public static let crownStep: Float = step * 9
     /// Default preset buttons shown on the Watch player (and mirrored on iPhone).
     public static let presets: [Float] = [1.0, 1.2, 1.5]
 }

@@ -16,15 +16,25 @@ struct PlayerView: View {
             Color.clear
                 .playerBackground(image: viewModel.coverImage)
 
-            ScrollView {
+            GeometryReader { geometry in
+                let contentWidth = geometry.size.width - (DS.Spacing.playerH * 2)
+                let artworkHeight = contentWidth
+
                 VStack(spacing: 0) {
-                    Spacer().frame(height: DS.Spacing.xl)
-                    artworkSection
+                    Spacer(minLength: DS.Spacing.sm)
+
+                    artworkSection(width: contentWidth, height: artworkHeight)
+
                     titleSection
+                        .layoutPriority(1)
+
                     controlsPanel
-                    Spacer().frame(height: DS.Spacing.xl)
+                        .layoutPriority(1)
+
+                    Spacer(minLength: DS.Spacing.sm)
                 }
                 .padding(.horizontal, DS.Spacing.playerH)
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
         .sheet(isPresented: $viewModel.isChaptersPresented) {
@@ -53,26 +63,23 @@ struct PlayerView: View {
 
     // MARK: - Artwork
 
-    private var artworkSection: some View {
+    private func artworkSection(width: CGFloat, height: CGFloat) -> some View {
         Group {
             if let uiImage = viewModel.coverImage {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(1, contentMode: .fit)
-                    .playerCoverArtClip()
+                PlayerCoverArt(
+                    image: uiImage,
+                    containerWidth: width,
+                    containerHeight: height
+                )
             } else {
-                artworkPlaceholder
+                artworkPlaceholder(width: width, height: height)
             }
         }
-        .applyShadows(DS.Shadow.coverArt)
-        .padding(.top, DS.Spacing.sm)
         .scaleEffect(viewModel.playbackState == .playing ? 1.0 : 0.94)
         .animation(DS.Animation.reveal, value: viewModel.playbackState == .playing)
     }
 
-    private var artworkPlaceholder: some View {
+    private func artworkPlaceholder(width: CGFloat, height: CGFloat) -> some View {
         let accent = viewModel.audiobook?.placeholderColor ?? DS.Color.artworkPlaceholder
         return ZStack {
             RoundedRectangle(cornerRadius: DS.Radius.coverArt, style: .continuous)
@@ -83,7 +90,6 @@ struct PlayerView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .aspectRatio(1, contentMode: .fit)
 
             VStack(spacing: DS.Spacing.md) {
                 Image(systemName: "headphones")
@@ -100,6 +106,8 @@ struct PlayerView: View {
                 }
             }
         }
+        .frame(width: width, height: height)
+        .applyShadows(DS.Shadow.coverArt)
     }
 
     // MARK: - Title & Author

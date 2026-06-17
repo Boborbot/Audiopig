@@ -43,7 +43,7 @@ struct SpeedControlsView: View {
             by: WatchSpeedRange.crownStep,
             sensitivity: .low,
             isContinuous: false,
-            isHapticFeedbackEnabled: true
+            isHapticFeedbackEnabled: false
         )
         .onChange(of: viewModel.speedDraft) { _, newValue in
             guard isActive else {

@@ -64,6 +64,7 @@ final class WatchTransferManifestTests: XCTestCase {
             .deleteLocalBook(bookID: bookID),
             .syncLocalPlaybackPosition(bookID: bookID, time: 99.5),
             .acknowledgeLocalBooks(WatchLocalBooksPayload(books: [], usedBytes: 0, budgetBytes: 100)),
+            .reportTransferIngestFailed(bookID: bookID, errorMessage: "Checksum mismatch"),
             .analyzeLulls,
             .seekToLull(endTime: 123.5)
         ]
@@ -73,5 +74,54 @@ final class WatchTransferManifestTests: XCTestCase {
             let decoded = try WatchMessageCodec.decode(WatchCommand.self, from: data)
             XCTAssertEqual(decoded, command)
         }
+    }
+
+    func test_localBooksPayloadSlimSyncCopyOmitsThumbnails() {
+        let book = WatchBookSummary(
+            id: UUID(),
+            title: "Local",
+            author: "Author",
+            duration: 100,
+            currentPlaybackTime: 10,
+            lastPlayedAt: .now,
+            thumbnailJPEG: Data([0xFF, 0xD8, 0xFF])
+        )
+        let payload = WatchLocalBooksPayload(
+            books: [book],
+            usedBytes: 500,
+            budgetBytes: WatchStorageBudget.defaultBudgetBytes
+        )
+        let slim = payload.slimSyncCopy()
+        XCTAssertEqual(slim.books.count, 1)
+        XCTAssertNil(slim.books[0].thumbnailJPEG)
+        XCTAssertEqual(slim.usedBytes, payload.usedBytes)
+    }
+
+    func test_overallPercentCombinesPhases() {
+        let preparing = WatchTransferProgress(bookID: UUID(), phase: .preparing, fractionCompleted: 0.5)
+        XCTAssertEqual(preparing.overallPercent, 4)
+
+        let sending = WatchTransferProgress(bookID: UUID(), phase: .transferring, fractionCompleted: 0.5)
+        XCTAssertEqual(sending.overallPercent, 52)
+
+        let installing = WatchTransferProgress(bookID: UUID(), phase: .installing)
+        XCTAssertEqual(installing.overallPercent, 95)
+    }
+
+    func test_wireTransferCopyOmitsThumbnail() {
+        let thumbnail = Data([0xFF, 0xD8, 0xFF])
+        let manifest = WatchTransferManifest(
+            bookID: UUID(),
+            title: "Test",
+            author: "Author",
+            duration: 60,
+            chapters: [],
+            fileByteCount: 100,
+            sha256: "abc",
+            fileExtension: "m4b",
+            thumbnailJPEG: thumbnail
+        )
+        XCTAssertEqual(manifest.wireTransferCopy().thumbnailJPEG, nil)
+        XCTAssertEqual(manifest.wireTransferCopy().bookID, manifest.bookID)
     }
 }

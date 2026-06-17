@@ -139,6 +139,14 @@ enum WidgetListeningSnapshot {
         touchSnapshot(defaults)
     }
 
+    // MARK: - Deep links
+
+    static func playURL(for snapshot: Data) -> URL? {
+        guard let idString = snapshot.lastPlayedAudiobookID,
+              let bookID = UUID(uuidString: idString) else { return nil }
+        return URL(string: "audiopig://play/\(bookID.uuidString)")
+    }
+
     // MARK: - Formatting
 
     /// E.g. "2.4h", "42m", "1m", "0m".

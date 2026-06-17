@@ -8,11 +8,16 @@ import SwiftUI
 struct FolderContentView: View {
     let folder: Folder
     let viewModel: LibraryViewModel
+
+    private var folderBooks: [Audiobook] {
+        viewModel.sortedAudiobooks(in: folder)
+    }
+
     var body: some View {
         ZStack {
             DS.Color.canvas.ignoresSafeArea()
 
-            if viewModel.sortedAudiobooks(in: folder).isEmpty {
+            if folderBooks.isEmpty {
                 emptyState
             } else {
                 bookList
@@ -21,9 +26,10 @@ struct FolderContentView: View {
         .navigationTitle(folder.title)
         .navigationBarTitleDisplayMode(.large)
         .coralNavigationBanner()
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                LibraryOrderToolbarControl(viewModel: viewModel)
+        .toolbar { toolbarItems }
+        .onDisappear {
+            if viewModel.isSelectionModeActive {
+                viewModel.toggleSelectionMode()
             }
         }
     }
@@ -32,13 +38,13 @@ struct FolderContentView: View {
 
     private var bookList: some View {
         List {
-            ForEach(viewModel.sortedAudiobooks(in: folder)) { audiobook in
+            ForEach(folderBooks, id: \.id) { audiobook in
                 AudiobookRowView(
                     audiobook: audiobook,
-                    isSelectionModeActive: false,
-                    isSelected: false,
+                    isSelectionModeActive: viewModel.isSelectionModeActive,
+                    isSelected: viewModel.isSelected(audiobook),
                     onTap: { viewModel.openPlayer(for: audiobook) },
-                    onToggleSelection: {}
+                    onToggleSelection: { viewModel.toggleSelection(audiobook) }
                 )
                 .libraryCard()
                 .listRowBackground(Color.clear)
@@ -60,6 +66,50 @@ struct FolderContentView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .miniPlayerScrollClearance()
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbarItems: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            if viewModel.isSelectionModeActive {
+                Menu {
+                    Button(role: .destructive) {
+                        viewModel.requestBulkDelete()
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .disabled(!viewModel.canDeleteSelected)
+
+                    Button {
+                        viewModel.presentMergeSheet()
+                    } label: {
+                        Label("Combine into Volume", systemImage: "rectangle.stack.badge.plus")
+                    }
+                    .disabled(!viewModel.canMergeSelected)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .transition(.opacity)
+            } else if !folderBooks.isEmpty {
+                LibraryOrderToolbarControl(viewModel: viewModel)
+                    .transition(.opacity)
+            }
+        }
+
+        ToolbarItem(placement: .navigationBarTrailing) {
+            if !folderBooks.isEmpty {
+                Button(viewModel.isSelectionModeActive ? "Done" : "Select") {
+                    withAnimation(DS.Animation.standard) {
+                        viewModel.toggleSelectionMode()
+                    }
+                }
+                .fontWeight(.medium)
+                .animation(nil, value: viewModel.isSelectionModeActive)
+            }
+        }
     }
 
     // MARK: - Swipe Actions

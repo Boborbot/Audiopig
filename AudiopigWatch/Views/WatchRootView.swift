@@ -8,26 +8,23 @@ import SwiftUI
 private enum WatchScreen: Equatable {
     case sourcePicker
     case phoneRecentBooks
-    case watchLocalLibrary
     case player
 }
 
 struct WatchRootView: View {
     @ObservedObject var playerViewModel: WatchPlayerViewModel
     @ObservedObject var libraryViewModel: WatchLibraryViewModel
-    @ObservedObject var localLibraryViewModel: WatchLocalLibraryViewModel
 
     @State private var screen: WatchScreen
     @State private var selectedPage = 1
+    @State private var userDismissedPlayer = false
 
     init(
         playerViewModel: WatchPlayerViewModel,
-        libraryViewModel: WatchLibraryViewModel,
-        localLibraryViewModel: WatchLocalLibraryViewModel
+        libraryViewModel: WatchLibraryViewModel
     ) {
         _playerViewModel = ObservedObject(wrappedValue: playerViewModel)
         _libraryViewModel = ObservedObject(wrappedValue: libraryViewModel)
-        _localLibraryViewModel = ObservedObject(wrappedValue: localLibraryViewModel)
         let initial: WatchScreen = playerViewModel.shouldLaunchToPlayer ? .player : .sourcePicker
         _screen = State(initialValue: initial)
     }
@@ -37,26 +34,18 @@ struct WatchRootView: View {
             switch screen {
             case .sourcePicker:
                 PlaybackSourcePickerView(
-                    onSelectPhone: { screen = .phoneRecentBooks },
-                    onSelectWatch: { screen = .watchLocalLibrary }
+                    onSelectPhone: {
+                        playerViewModel.preferLocalPlayback(false)
+                        screen = .phoneRecentBooks
+                    },
+                    onSelectWatch: {}
                 )
             case .phoneRecentBooks:
                 RecentBooksView(
                     libraryViewModel: libraryViewModel,
                     playerViewModel: playerViewModel,
                     onBookSelected: {
-                        screen = .player
-                        selectedPage = 1
-                    },
-                    onBack: { screen = .sourcePicker }
-                )
-            case .watchLocalLibrary:
-                WatchLocalLibraryView(
-                    libraryViewModel: localLibraryViewModel,
-                    playerViewModel: playerViewModel,
-                    onBookSelected: {
-                        screen = .player
-                        selectedPage = 1
+                        openPlayer()
                     },
                     onBack: { screen = .sourcePicker }
                 )
@@ -64,6 +53,7 @@ struct WatchRootView: View {
                 WatchPlayerPagerView(viewModel: playerViewModel, selectedPage: $selectedPage)
                     .overlay(alignment: .topLeading) {
                         backButton
+                            .zIndex(1)
                     }
             }
         }
@@ -71,29 +61,61 @@ struct WatchRootView: View {
         .onChange(of: playerViewModel.snapshot.bookID) { _, bookID in
             if bookID == nil, screen == .player {
                 screen = .sourcePicker
-            } else if playerViewModel.shouldLaunchToPlayer {
-                screen = .player
-                selectedPage = 1
+                userDismissedPlayer = false
+            } else {
+                autoLaunchToPlayerIfNeeded()
             }
         }
-        .onChange(of: playerViewModel.snapshot.playbackState) { _, _ in
-            if playerViewModel.shouldLaunchToPlayer {
+        .onChange(of: playerViewModel.snapshot.playbackState) { oldState, newState in
+            guard !userDismissedPlayer else { return }
+            guard allowsRemoteAutoLaunch else { return }
+            let becameActive = !oldState.isActive && newState.isActive
+            if becameActive, playerViewModel.snapshot.bookID != nil {
                 screen = .player
                 selectedPage = 1
             }
         }
     }
 
+    private var allowsRemoteAutoLaunch: Bool {
+        switch screen {
+        case .sourcePicker:
+            return false
+        case .phoneRecentBooks, .player:
+            return playerViewModel.snapshot.source != .local
+        }
+    }
+
     private var backButton: some View {
         Button {
-            screen = .sourcePicker
+            dismissPlayer()
         } label: {
             Image(systemName: "chevron.left")
                 .font(.caption.weight(.semibold))
-                .padding(8)
+                .frame(minWidth: 36, minHeight: 36)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .padding(.leading, 2)
         .padding(.top, 2)
+    }
+
+    private func openPlayer() {
+        userDismissedPlayer = false
+        playerViewModel.preferLocalPlayback(false)
+        screen = .player
+        selectedPage = 1
+    }
+
+    private func dismissPlayer() {
+        userDismissedPlayer = true
+        screen = .phoneRecentBooks
+    }
+
+    private func autoLaunchToPlayerIfNeeded() {
+        guard playerViewModel.shouldLaunchToPlayer, !userDismissedPlayer else { return }
+        guard allowsRemoteAutoLaunch else { return }
+        screen = .player
+        selectedPage = 1
     }
 }

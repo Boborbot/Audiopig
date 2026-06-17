@@ -13,6 +13,8 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
     private var activeSource: WatchPlaybackSource = .remote
     private var snapshotHandler: ((WatchPlaybackSnapshot) -> Void)?
     private var chaptersHandler: ((WatchChaptersPayload) -> Void)?
+    /// When true, iPhone playback snapshots must not take over the Watch UI or stop local playback.
+    private(set) var prefersLocalPlayback = false
 
     var snapshot: WatchPlaybackSnapshot? {
         activeCoordinator.snapshot
@@ -30,9 +32,19 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
         self.local = local
 
         remote.setSnapshotHandler { [weak self] snap in
-            guard let self else { return }
-            if self.activeSource == .remote || snap.bookID == nil {
-                if snap.bookID != nil { self.activeSource = .remote }
+            guard let self, snap.source == .remote else { return }
+            guard !self.prefersLocalPlayback else { return }
+
+            if let bookID = snap.bookID {
+                if self.activeSource == .local {
+                    self.local.stopPlaybackIfActive()
+                }
+                self.activeSource = .remote
+                self.snapshotHandler?(snap)
+                return
+            }
+
+            if self.activeSource == .remote {
                 self.snapshotHandler?(snap)
             }
         }
@@ -51,6 +63,13 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
         }
     }
 
+    func preferLocalPlayback(_ preferred: Bool) {
+        prefersLocalPlayback = preferred
+        if preferred {
+            activeSource = .local
+        }
+    }
+
     func setSnapshotHandler(_ handler: @escaping (WatchPlaybackSnapshot) -> Void) {
         snapshotHandler = handler
         if let snap = snapshot {
@@ -65,10 +84,12 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
     func send(_ command: WatchCommand) async -> WatchCommandResult {
         switch command {
         case .loadLocalBook:
+            prefersLocalPlayback = true
             activeSource = .local
             return await local.send(command)
 
         case .loadBook:
+            prefersLocalPlayback = false
             local.stopPlaybackIfActive()
             activeSource = .remote
             return await remote.send(command)
@@ -87,7 +108,7 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
         case .requestLocalBooks, .deleteLocalBook:
             return await local.send(command)
 
-        case .syncLocalPlaybackPosition, .acknowledgeLocalBooks:
+        case .syncLocalPlaybackPosition, .acknowledgeLocalBooks, .reportTransferIngestFailed:
             return await remote.send(command)
         }
     }

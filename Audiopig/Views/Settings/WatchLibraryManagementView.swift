@@ -13,6 +13,8 @@ struct WatchLibraryManagementView: View {
     }
 
     var body: some View {
+        let _ = viewModel.transferStateRevision
+
         List {
             Section {
                 Text(viewModel.storageLabel)
@@ -24,7 +26,7 @@ struct WatchLibraryManagementView: View {
             }
 
             Section {
-                ForEach(viewModel.audiobooks) { audiobook in
+                ForEach(viewModel.audiobooks, id: \.id) { audiobook in
                     HStack {
                         Button {
                             viewModel.toggleSelection(audiobook)
@@ -38,7 +40,7 @@ struct WatchLibraryManagementView: View {
                                         .foregroundStyle(DS.Color.primary)
                                     Text(statusLabel(for: audiobook))
                                         .font(DS.Typography.caption)
-                                        .foregroundStyle(DS.Color.secondary)
+                                        .foregroundStyle(statusColor(for: audiobook))
                                 }
                             }
                         }
@@ -53,7 +55,7 @@ struct WatchLibraryManagementView: View {
                 Text("Library")
                     .sectionTitle()
             } footer: {
-                Text("Keep devices nearby during transfer.")
+                Text("Large audiobooks can take several minutes. Open Audiopig on your Watch before transferring.")
                     .font(DS.Typography.caption)
                     .foregroundStyle(DS.Color.tertiary)
             }
@@ -68,7 +70,18 @@ struct WatchLibraryManagementView: View {
                 .disabled(viewModel.selectedIDs.isEmpty)
             }
         }
-        .onAppear { viewModel.refresh() }
+        .onAppear {
+            viewModel.refresh()
+            Task { await viewModel.syncWatchLibrary() }
+        }
+        .task {
+            while !Task.isCancelled {
+                if viewModel.hasActiveTransfers {
+                    await viewModel.syncWatchLibrary()
+                }
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
     }
 
     @ViewBuilder
@@ -86,9 +99,23 @@ struct WatchLibraryManagementView: View {
             }
             .font(DS.Typography.caption)
             .foregroundStyle(DS.Color.coral)
-        case .transferring:
-            ProgressView()
-                .controlSize(.small)
+        case .transferring(let progress):
+            HStack(spacing: DS.Spacing.sm) {
+                ProgressView(value: progress.overallFraction)
+                    .controlSize(.small)
+                    .frame(width: 28)
+                Button("Cancel") {
+                    viewModel.cancelTransfer(audiobook)
+                }
+                .font(DS.Typography.caption)
+                .foregroundStyle(DS.Color.secondary)
+            }
+        case .failed:
+            Button("Retry") {
+                Task { await viewModel.transfer(audiobook) }
+            }
+            .font(DS.Typography.caption)
+            .foregroundStyle(DS.Color.coral)
         case .unavailable:
             EmptyView()
         }
@@ -96,10 +123,23 @@ struct WatchLibraryManagementView: View {
 
     private func statusLabel(for audiobook: Audiobook) -> String {
         switch viewModel.status(for: audiobook) {
-        case .onWatch: return "On Watch"
-        case .transferring: return "Transferring…"
-        case .notOnWatch: return "Not on Watch"
-        case .unavailable: return "Watch unavailable"
+        case .onWatch:
+            return "On Watch"
+        case .transferring(let progress):
+            return "\(progress.displayLabel) \(progress.overallPercent)%"
+        case .notOnWatch:
+            return "Not on Watch"
+        case .failed(let message):
+            return message
+        case .unavailable:
+            return "Watch unavailable"
         }
+    }
+
+    private func statusColor(for audiobook: Audiobook) -> Color {
+        if case .failed = viewModel.status(for: audiobook) {
+            return DS.Color.coral
+        }
+        return DS.Color.secondary
     }
 }

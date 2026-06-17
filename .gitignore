@@ -6,7 +6,7 @@ xcuserdata/
 # macOS
 .DS_Store
 
-# Local test audiobooks (~1 GB) — see Assets for Testing/README.md
+# Local test audiobooks — keep large files untracked
 Assets for Testing/*.m4b
 Assets for Testing/*.mp3
 Assets for Testing/*.M4B

@@ -16,7 +16,7 @@ final class Audiobook {
     /// Resume position in the audiobook timeline. Updated on seek and periodically while playing.
     var currentPlaybackTime: TimeInterval
     /// Last playback speed used for this book when universal speed is disabled.
-    /// When `nil`, the current app default is used and then persisted on first load.
+    /// When `nil`, the app's default playback speed is used until the user changes speed for this book.
     var lastPlaybackSpeed: Float? = nil
     /// Last time this book was opened or had playback position saved. Used for Watch recent list.
     var lastPlayedAt: Date? = nil

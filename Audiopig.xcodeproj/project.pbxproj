@@ -182,7 +182,6 @@
 			buildPhases = (
 				C1D8EC662FD6AD510023D41A /* Sources */,
 				C1D8EC672FD6AD510023D41A /* Frameworks */,
-				TST001A2FD6C0000023D41A /* Copy Test Assets */,
 				C1D8EC682FD6AD510023D41A /* Resources */,
 				C1D8ECA72FD6B9000023D41A /* Embed Foundation Extensions */,
 				C1D8ECB72FD6BA000023D41A /* Embed Watch Content */,
@@ -355,26 +354,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		TST001A2FD6C0000023D41A /* Copy Test Assets */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/Assets for Testing",
-			);
-			name = "Copy Test Assets";
-			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Assets for Testing",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "if [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -d \"${SRCROOT}/Assets for Testing\" ]; then\n  mkdir -p \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Assets for Testing\"\n  /usr/bin/rsync -a --delete \"${SRCROOT}/Assets for Testing/\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Assets for Testing/\"\nfi\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C1D8EC662FD6AD510023D41A /* Sources */ = {
@@ -623,6 +602,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = AudiopigWidget/AudiopigWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -654,6 +634,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = AudiopigWidget/AudiopigWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

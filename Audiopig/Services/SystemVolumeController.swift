@@ -12,7 +12,6 @@ import UIKit
 final class SystemVolumeController {
     private let volumeView: MPVolumeView = {
         let view = MPVolumeView(frame: CGRect(x: -1000, y: -1000, width: 1, height: 1))
-        view.showsRouteButton = false
         view.isHidden = true
         view.alpha = 0.01
         return view

@@ -19,7 +19,8 @@ enum WatchSnapshotBuilder {
         globalTime: TimeInterval,
         globalDuration: TimeInterval,
         coverImage: UIImage?,
-        includeArtwork: Bool
+        includeArtwork: Bool,
+        systemVolumeOverride: Float? = nil
     ) -> WatchPlaybackSnapshot {
         let timings = chapters
             .sorted { $0.orderIndex < $1.orderIndex }
@@ -35,7 +36,7 @@ enum WatchSnapshotBuilder {
         }
 
         let watchState = mapPlaybackState(playbackState)
-        let volume = AVAudioSession.sharedInstance().outputVolume
+        let volume = systemVolumeOverride ?? AVAudioSession.sharedInstance().outputVolume
 
         let artwork: Data?
         if includeArtwork, let coverImage {

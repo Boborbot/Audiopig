@@ -69,35 +69,54 @@ struct RecentBooksWidget: Widget {
         }
         .configurationDisplayName("Recent Books")
         .description("Recently listened audiobooks. Tap to play.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemMedium])
     }
 }
 
 // MARK: - View
 
 private struct RecentBooksWidgetView: View {
-    @Environment(\.widgetFamily) private var widgetFamily
     let entry: RecentBooksEntry
 
-    private var isMedium: Bool { widgetFamily == .systemMedium }
-    private var tileSize: CGFloat { isMedium ? 72 : 56 }
+    private let maxBooks = 5
+    private let maxTileSize: CGFloat = 72
+
     private var visibleBooks: [WidgetRecentBooksSnapshot.Book] {
-        let limit = isMedium ? 5 : 3
-        return Array(entry.snapshot.books.prefix(limit))
+        Array(entry.snapshot.books.prefix(maxBooks))
     }
 
     var body: some View {
-        if entry.snapshot.books.isEmpty {
-            emptyState
-        } else {
-            HStack(spacing: isMedium ? RecentBooksSpacing.md : RecentBooksSpacing.sm) {
+        ZStack(alignment: .topLeading) {
+            if entry.snapshot.books.isEmpty {
+                emptyState
+            } else {
+                bookGallery
+            }
+
+            WidgetBrandBadge()
+                .padding(WidgetBrandSpacing.badgeInset)
+        }
+    }
+
+    private var bookGallery: some View {
+        GeometryReader { geometry in
+            let spacing = RecentBooksSpacing.md
+            let count = CGFloat(visibleBooks.count)
+            let totalSpacing = spacing * max(0, count - 1)
+            let tileSize = min(
+                maxTileSize,
+                floor((geometry.size.width - totalSpacing) / max(count, 1))
+            )
+
+            HStack(alignment: .top, spacing: spacing) {
                 ForEach(visibleBooks) { book in
-                    bookTile(book)
+                    bookTile(book, tileSize: tileSize)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(isMedium ? RecentBooksSpacing.lg : RecentBooksSpacing.md)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
+        .padding(RecentBooksSpacing.lg)
+        .padding(.top, 18)
     }
 
     private var emptyState: some View {
@@ -112,7 +131,7 @@ private struct RecentBooksWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func bookTile(_ book: WidgetRecentBooksSnapshot.Book) -> some View {
+    private func bookTile(_ book: WidgetRecentBooksSnapshot.Book, tileSize: CGFloat) -> some View {
         Link(destination: WidgetRecentBooksSnapshot.playURL(for: book.id)) {
             VStack(spacing: RecentBooksSpacing.xs) {
                 Group {
@@ -133,16 +152,14 @@ private struct RecentBooksWidgetView: View {
                 .frame(width: tileSize, height: tileSize)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-                if isMedium {
-                    Text(book.title)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(RecentBooksPalette.primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                        .frame(width: tileSize)
-                }
+                Text(book.title)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(RecentBooksPalette.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(width: tileSize)
             }
-            .frame(maxWidth: .infinity)
+            .frame(width: tileSize)
         }
     }
 }

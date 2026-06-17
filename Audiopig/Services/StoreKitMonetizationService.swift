@@ -11,6 +11,15 @@ import StoreKit
 @Observable
 final class StoreKitMonetizationService: MonetizationServiceProtocol {
 
+    // MARK: - QA
+
+    #if DEBUG
+    /// When `true`, every Plus-gated feature is available without a subscription.
+    static let unlockAllPremiumForQA = true
+    #else
+    static let unlockAllPremiumForQA = false
+    #endif
+
     private(set) var hasPlusSubscription = false
     private(set) var isEligibleForIntroOffer = true
     private(set) var isInTrialPeriod = false
@@ -31,7 +40,8 @@ final class StoreKitMonetizationService: MonetizationServiceProtocol {
     // MARK: - Access
 
     func hasAccess(to feature: PremiumFeature) -> Bool {
-        hasPremiumAccess(to: feature, hasPlusEntitlement: hasPlusSubscription)
+        if Self.unlockAllPremiumForQA { return true }
+        return hasPremiumAccess(to: feature, hasPlusEntitlement: hasPlusSubscription)
     }
 
     func displayPrice(for tier: TipTier) -> String? {

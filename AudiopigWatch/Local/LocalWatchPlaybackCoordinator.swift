@@ -88,6 +88,7 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
             return await loadBook(bookID: bookID, autoPlay: autoPlay)
 
         case .requestLocalBooks:
+            await client.publishLocalBooksToPhone()
             return .ok()
 
         case .togglePlayPause:
@@ -126,7 +127,8 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
             return .ok(snapshot: snapshot)
 
         case .setVolume(let volume):
-            engine.setVolume(volume)
+            let normalized = WatchVolumeRange.normalized(volume)
+            engine.setVolume(normalized)
             publishSnapshot(immediate: true)
             return .ok(snapshot: snapshot)
 
@@ -200,7 +202,6 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
             desiredSpeed = saved
         } else {
             desiredSpeed = defaultSpeed
-            persistPerBookSpeed(bookID: bookID, speed: desiredSpeed)
         }
         engine.setSpeed(desiredSpeed)
         publishSnapshot(immediate: true, includeArtwork: true)

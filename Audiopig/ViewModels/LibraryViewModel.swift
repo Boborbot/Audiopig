@@ -176,6 +176,10 @@ final class LibraryViewModel {
     private var pendingSwipeDeleteIndexSet: IndexSet?
     private var pendingSwipeDeleteBook: Audiobook?
 
+    // MARK: - Watch Transfer UI
+
+    private(set) var watchTransferStateRevision: UInt64 = 0
+
     // MARK: - Dependencies
 
     private let modelContext: ModelContext
@@ -227,6 +231,13 @@ final class LibraryViewModel {
         watchBridge?.commandHandler = { [weak self] command in
             await self?.handleWatchCommand(command) ?? .failure("Library unavailable.")
         }
+        watchTransferService?.onStateChanged = { [weak self] in
+            self?.watchTransferStateRevision &+= 1
+        }
+        watchBridge?.reachabilityHandler = { [weak self] isReachable in
+            guard isReachable, WatchFeatures.localPlaybackEnabled else { return }
+            Task { await self?.syncWatchLocalBooks() }
+        }
         fetchAudiobooks()
     }
 
@@ -245,17 +256,6 @@ final class LibraryViewModel {
         )
         folders = (try? modelContext.fetch(folderDescriptor)) ?? []
     }
-
-    #if DEBUG
-    /// Imports bundled test audiobooks that are not already in the library.
-    func seedDevelopmentLibraryIfNeeded() async {
-        await DevelopmentLibrarySeeder.seedIfNeeded(
-            libraryManager: libraryManager,
-            modelContext: modelContext
-        )
-        fetchAudiobooks()
-    }
-    #endif
 
     // MARK: - Player Navigation
 
@@ -321,9 +321,12 @@ final class LibraryViewModel {
             return .ok(snapshot: playerViewModel.watchSnapshotForReply())
 
         case .setVolume(let volume):
-            volumeController.setVolume(volume)
+            let normalized = WatchVolumeRange.normalized(volume)
+            volumeController.setVolume(normalized)
             playerViewModel.syncWatchState()
-            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+            return .ok(
+                snapshot: playerViewModel.watchSnapshotForReply(systemVolumeOverride: normalized)
+            )
 
         case .seekToChapterIndex(let index):
             guard playerViewModel.chapters.indices.contains(index) else {
@@ -371,8 +374,14 @@ final class LibraryViewModel {
             return .ok()
 
         case .acknowledgeLocalBooks(let payload):
+            guard WatchFeatures.localPlaybackEnabled else { return .ok() }
             watchBridge?.publishLocalBooks(payload)
             watchTransferService?.handleLocalBooksAcknowledgement(payload)
+            return .ok()
+
+        case .reportTransferIngestFailed(let bookID, let errorMessage):
+            guard WatchFeatures.localPlaybackEnabled else { return .ok() }
+            watchTransferService?.handleTransferFailure(bookID: bookID, errorMessage: errorMessage)
             return .ok()
 
         case .requestLocalBooks, .loadLocalBook, .deleteLocalBook:
@@ -394,19 +403,39 @@ final class LibraryViewModel {
         await watchTransferService?.removeFromWatch(bookID: audiobook.id)
     }
 
+    func cancelWatchTransfer(_ audiobook: Audiobook) {
+        watchTransferService?.cancelTransfer(bookID: audiobook.id)
+    }
+
     func watchStatus(for audiobook: Audiobook) -> WatchBookTransferStatus {
+        _ = watchTransferStateRevision
         guard let service = watchTransferService else { return .unavailable }
-        if service.isTransferring(bookID: audiobook.id) { return .transferring }
         if service.isOnWatch(bookID: audiobook.id) { return .onWatch }
+        if let progress = service.transferProgress(for: audiobook.id), service.isTransferring(bookID: audiobook.id) {
+            return .transferring(progress: progress)
+        }
+        if let message = service.transferFailureMessage(for: audiobook.id) {
+            return .failed(message)
+        }
         return .notOnWatch
     }
 
     var watchLocalBooks: WatchLocalBooksPayload? {
-        watchTransferService?.localBooks
+        _ = watchTransferStateRevision
+        return watchTransferService?.localBooks
+    }
+
+    func syncWatchLocalBooks() async {
+        guard WatchFeatures.localPlaybackEnabled else { return }
+        await watchTransferService?.refreshWatchLibraryState()
     }
 
     func syncWatchSettings() {
-        watchBridge?.publishSettings(appSettings.watchSettingsSnapshot())
+        watchBridge?.publishSettings(
+            appSettings.watchSettingsSnapshot(
+                hasParagraphBreaksAccess: monetization.hasAccess(to: .paragraphBreaks)
+            )
+        )
     }
 
     func syncWatchRecentBooks() {

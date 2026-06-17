@@ -143,22 +143,6 @@ struct LibraryView: View {
                         deleteSwipeAction(for: audiobook)
                         editSwipeAction(for: audiobook)
                     }
-                    .contextMenu {
-                        let status = viewModel.watchStatus(for: audiobook)
-                        if status == .notOnWatch {
-                            Button {
-                                Task { await viewModel.sendToWatch(audiobook) }
-                            } label: {
-                                Label("Send to Watch", systemImage: "applewatch.and.arrow.down")
-                            }
-                        } else if status == .onWatch {
-                            Button {
-                                Task { await viewModel.removeFromWatch(audiobook) }
-                            } label: {
-                                Label("Remove from Watch", systemImage: "applewatch.slash")
-                            }
-                        }
-                    }
 
                 case .folder(let folder):
                     FolderListRow(folder: folder, viewModel: viewModel)
@@ -168,6 +152,7 @@ struct LibraryView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .miniPlayerScrollClearance()
         // Attached to the List (never leaves the hierarchy) so the swipe-row
         // collapse animation cannot dismiss the dialog mid-presentation.
         .confirmationDialog(
@@ -480,7 +465,7 @@ struct LibraryView: View {
                         .tracking(0.5)
 
                     List {
-                        ForEach(viewModel.mergeOrder) { book in
+                        ForEach(viewModel.mergeOrder, id: \.id) { book in
                             HStack {
                                 Image(systemName: "line.3.horizontal")
                                     .foregroundStyle(Color(UIColor.systemGray3))

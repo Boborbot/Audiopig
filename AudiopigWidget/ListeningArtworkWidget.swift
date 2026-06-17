@@ -79,6 +79,16 @@ private struct ListeningArtworkWidgetView: View {
     private var theme: WidgetListeningSnapshot.Theme { entry.snapshot.theme }
 
     var body: some View {
+        if let playURL = WidgetListeningSnapshot.playURL(for: entry.snapshot) {
+            Link(destination: playURL) {
+                widgetContent
+            }
+        } else {
+            widgetContent
+        }
+    }
+
+    private var widgetContent: some View {
         VStack(spacing: WidgetSpacing.xs) {
             coverArtwork
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

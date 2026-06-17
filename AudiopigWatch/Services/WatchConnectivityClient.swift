@@ -25,6 +25,8 @@ final class WatchConnectivityClient: NSObject {
 
     private weak var localStore: WatchLocalLibraryStore?
     private weak var localCoordinator: LocalWatchPlaybackCoordinator?
+    private var pendingTransferManifests: [UUID: WatchTransferManifest] = [:]
+    private var acceptsTransfers = false
 
     private(set) var latestSnapshot: WatchPlaybackSnapshot?
     private(set) var latestRecentBooks: WatchRecentBooksPayload?
@@ -38,9 +40,14 @@ final class WatchConnectivityClient: NSObject {
         super.init()
     }
 
-    func configure(localStore: WatchLocalLibraryStore, localCoordinator: LocalWatchPlaybackCoordinator) {
+    func configure(
+        localStore: WatchLocalLibraryStore,
+        localCoordinator: LocalWatchPlaybackCoordinator,
+        acceptsTransfers: Bool = WatchFeatures.localPlaybackEnabled
+    ) {
         self.localStore = localStore
         self.localCoordinator = localCoordinator
+        self.acceptsTransfers = acceptsTransfers
     }
 
     func activate() {
@@ -97,6 +104,37 @@ final class WatchConnectivityClient: NSObject {
     }
 
     func send(_ command: WatchCommand) async -> WatchCommandResult {
+        await deliverCommandToPhone(command)
+    }
+
+    func publishLocalBooksToPhone() async {
+        guard acceptsTransfers, let localStore else { return }
+        let payload = localStore.localBooksPayload()
+        latestLocalBooks = payload
+        localBooksHandler?(payload)
+        let syncPayload = payload.slimSyncCopy()
+        _ = await deliverCommandToPhone(.acknowledgeLocalBooks(syncPayload))
+    }
+
+    var connectionErrorMessage: String {
+        switch connectionState {
+        case .companionNotInstalled:
+            return "Install Audiopig on iPhone"
+        case .notReachable:
+            return "Open Audiopig on iPhone"
+        case .activating:
+            return "Connecting to iPhone…"
+        case .reachable:
+            return "Open Audiopig on iPhone"
+        }
+    }
+
+    private func applySnapshot(_ snapshot: WatchPlaybackSnapshot) {
+        latestSnapshot = snapshot
+        snapshotHandler?(snapshot)
+    }
+
+    private func deliverCommandToPhone(_ command: WatchCommand) async -> WatchCommandResult {
         guard session.activationState == .activated else {
             return .failure(connectionErrorMessage)
         }
@@ -106,6 +144,18 @@ final class WatchConnectivityClient: NSObject {
             payload = [WatchMessageKeys.command: try WatchMessageCodec.encode(command)]
         } catch {
             return .failure("Could not encode command.")
+        }
+
+        let isTransferStatusCommand: Bool = switch command {
+        case .acknowledgeLocalBooks, .reportTransferIngestFailed:
+            true
+        default:
+            false
+        }
+
+        if isTransferStatusCommand {
+            session.transferUserInfo(payload)
+            return .ok(snapshot: latestSnapshot)
         }
 
         if session.isReachable {
@@ -119,12 +169,13 @@ final class WatchConnectivityClient: NSObject {
                             }
                             continuation.resume(returning: result)
                         } else {
-                            continuation.resume(returning: .failure("No response from iPhone."))
+                            continuation.resume(returning: .failure("No response from iPhone"))
                         }
                     }
-                }, errorHandler: { _ in
+                }, errorHandler: { [session] _ in
                     Task { @MainActor in
-                        continuation.resume(returning: .failure("Could not reach iPhone."))
+                        session.transferUserInfo(payload)
+                        continuation.resume(returning: .ok(snapshot: self.latestSnapshot))
                     }
                 })
             }
@@ -132,33 +183,6 @@ final class WatchConnectivityClient: NSObject {
 
         session.transferUserInfo(payload)
         return .ok(snapshot: latestSnapshot)
-    }
-
-    func publishLocalBooksToPhone() async {
-        guard let localStore else { return }
-        let payload = localStore.localBooksPayload()
-        latestLocalBooks = payload
-        localBooksHandler?(payload)
-        guard isReachable else { return }
-        _ = await send(.acknowledgeLocalBooks(payload))
-    }
-
-    var connectionErrorMessage: String {
-        switch connectionState {
-        case .companionNotInstalled:
-            return "Install Audiopig on iPhone."
-        case .notReachable:
-            return "Open Audiopig on iPhone."
-        case .activating:
-            return "Connecting to iPhone…"
-        case .reachable:
-            return "Not connected to iPhone."
-        }
-    }
-
-    private func applySnapshot(_ snapshot: WatchPlaybackSnapshot) {
-        latestSnapshot = snapshot
-        snapshotHandler?(snapshot)
     }
 
     private func ingestContext(_ context: [String: Any]) {
@@ -210,20 +234,76 @@ final class WatchConnectivityClient: NSObject {
         connectionStateHandler?(connectionState)
     }
 
-    private func handleIncomingFile(_ file: WCSessionFile) {
-        guard let localStore else { return }
+    private func handleIncomingFile(at fileURL: URL, metadata: [String: Any]?) async {
+        defer { try? FileManager.default.removeItem(at: fileURL) }
 
-        guard let manifestData = file.metadata?[WatchMessageKeys.transferManifest] as? Data,
-              let manifest = try? WatchMessageCodec.decode(WatchTransferManifest.self, from: manifestData) else {
-            try? FileManager.default.removeItem(at: file.fileURL)
+        guard acceptsTransfers else { return }
+        guard let localStore else {
+            reportIngestFailureIfPossible(metadata: metadata, message: "Watch library is not ready.")
             return
         }
 
+        guard let manifest = await resolveManifest(for: metadata) else {
+            reportIngestFailureIfPossible(metadata: metadata, message: "Could not read transfer metadata.")
+            return
+        }
+
+        pendingTransferManifests.removeValue(forKey: manifest.bookID)
+
         do {
-            _ = try localStore.ingest(transferredFile: file.fileURL, manifest: manifest)
-            Task { await publishLocalBooksToPhone() }
+            _ = try localStore.ingest(transferredFile: fileURL, manifest: manifest)
+            await publishLocalBooksToPhone()
         } catch {
-            try? FileManager.default.removeItem(at: file.fileURL)
+            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            _ = await deliverCommandToPhone(
+                .reportTransferIngestFailed(bookID: manifest.bookID, errorMessage: message)
+            )
+        }
+    }
+
+    private func resolveManifest(for metadata: [String: Any]?) async -> WatchTransferManifest? {
+        for _ in 0..<24 {
+            if let manifest = resolveManifestSynchronously(for: metadata) {
+                return manifest
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        return resolveManifestSynchronously(for: metadata)
+    }
+
+    private func resolveManifestSynchronously(for metadata: [String: Any]?) -> WatchTransferManifest? {
+        if let bookIDString = metadata?[WatchMessageKeys.transferBookID] as? String,
+           let bookID = UUID(uuidString: bookIDString),
+           let manifest = pendingTransferManifests[bookID] {
+            return manifest
+        }
+
+        if let manifestData = metadata?[WatchMessageKeys.transferManifest] as? Data,
+           let manifest = try? WatchMessageCodec.decode(WatchTransferManifest.self, from: manifestData) {
+            return manifest
+        }
+
+        return nil
+    }
+
+    private func ingestTransferManifestPayload(_ payload: [String: Any]) {
+        guard acceptsTransfers else { return }
+        guard let bookIDString = payload[WatchMessageKeys.transferBookID] as? String,
+              let bookID = UUID(uuidString: bookIDString),
+              let manifestData = payload[WatchMessageKeys.transferManifest] as? Data,
+              let manifest = try? WatchMessageCodec.decode(WatchTransferManifest.self, from: manifestData) else {
+            return
+        }
+        pendingTransferManifests[bookID] = manifest
+    }
+
+    private func reportIngestFailureIfPossible(metadata: [String: Any]?, message: String) {
+        guard let bookIDString = metadata?[WatchMessageKeys.transferBookID] as? String,
+              let bookID = UUID(uuidString: bookIDString) else { return }
+        Task {
+            _ = await deliverCommandToPhone(
+                .reportTransferIngestFailed(bookID: bookID, errorMessage: message)
+            )
         }
     }
 }
@@ -256,9 +336,31 @@ extension WatchConnectivityClient: WCSessionDelegate {
         }
     }
 
-    nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
+    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
         Task { @MainActor in
-            handleIncomingFile(file)
+            ingestTransferManifestPayload(userInfo)
+            _ = await handlePhoneMessage(userInfo)
+        }
+    }
+
+    nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        let metadata = file.metadata
+        let stagedURL: URL?
+        do {
+            stagedURL = try WatchTransferStaging.copyIncomingFile(from: file.fileURL)
+        } catch {
+            stagedURL = nil
+        }
+
+        Task { @MainActor in
+            guard let stagedURL else {
+                reportIngestFailureIfPossible(
+                    metadata: metadata,
+                    message: "Could not save incoming transfer file."
+                )
+                return
+            }
+            await handleIncomingFile(at: stagedURL, metadata: metadata)
         }
     }
 
@@ -288,10 +390,23 @@ extension WatchConnectivityClient: WCSessionDelegate {
 
         switch command {
         case .deleteLocalBook(let bookID):
+            guard acceptsTransfers else {
+                return encodeResult(.failure("Watch library is not available."))
+            }
             localCoordinator?.unloadIfPlaying(bookID: bookID)
             try? localStore?.remove(bookID: bookID)
             await publishLocalBooksToPhone()
             return encodeResult(.ok())
+
+        case .requestLocalBooks:
+            guard acceptsTransfers, let localStore else {
+                return encodeResult(.failure("Watch library is not available."))
+            }
+            let payload = localStore.localBooksPayload().slimSyncCopy()
+            latestLocalBooks = payload
+            localBooksHandler?(payload)
+            await publishLocalBooksToPhone()
+            return encodeResult(.ok(localBooks: payload))
 
         default:
             return [:]

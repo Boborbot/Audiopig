@@ -11,9 +11,9 @@
 //    tab bar height is a well-known iOS constant (49 pt) and does NOT vary by device;
 //    only the home-indicator inset below it varies, and that is already handled by the
 //    ZStack respecting its parent's safe area.
-//  - Each tab's content view receives a transparent .safeAreaInset so its scroll view
-//    extends its bottom inset by exactly the MiniPlayer height (62 pt). Without this,
-//    the last list row would scroll under the MiniPlayer and be unreachable.
+//  - Tab content reads `\.miniPlayerClearance` from the environment and applies
+//    `.miniPlayerScrollClearance()` on its scroll views so the last row rests above
+//    the mini player instead of scrolling underneath it.
 //  - The full PlayerView sheet is owned here so it persists across tab switches.
 //
 
@@ -30,10 +30,6 @@ struct MainTabView: View {
 
     /// Standard iOS tab-bar height (does not vary by device type or screen size).
     private static let tabBarHeight: CGFloat = 49
-
-    /// Intrinsic height of MiniPlayerView (vertical padding 11 × 2 + 40 pt art row = 62 pt)
-    /// plus the 6 pt floating gap between the pill's bottom edge and the tab bar.
-    private static let miniPlayerHeight: CGFloat = 68
 
     init(
         libraryViewModel: LibraryViewModel,
@@ -53,11 +49,9 @@ struct MainTabView: View {
         ZStack(alignment: .bottom) {
             TabView {
                 LibraryView(viewModel: viewModel)
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }
                     .tabItem { Label("Library", systemImage: "books.vertical") }
 
                 StatsView(viewModel: statsViewModel, appIconManager: appIconManager)
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }
                     .tabItem { Label("Stats", systemImage: "chart.bar.fill") }
 
                 SettingsView(
@@ -68,9 +62,12 @@ struct MainTabView: View {
                 ) {
                     viewModel.syncWatchSettings()
                 }
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }
                     .tabItem { Label("Settings", systemImage: "gearshape") }
             }
+            .environment(
+                \.miniPlayerClearance,
+                viewModel.playerViewModel.isActive ? DS.Layout.miniPlayerClearance : 0
+            )
 
             // MiniPlayer sits between tab-bar items and scroll content.
             // Horizontal padding floats the pill away from screen edges;
@@ -104,21 +101,6 @@ struct MainTabView: View {
         }
         .onOpenURL { url in
             handleWidgetURL(url)
-        }
-        #if DEBUG
-        .task {
-            await viewModel.seedDevelopmentLibraryIfNeeded()
-        }
-        #endif
-    }
-
-    /// A transparent placeholder whose height equals the MiniPlayer. Injected as a
-    /// .safeAreaInset on each tab's content so scroll views extend their inset by exactly
-    /// this amount, keeping the last row reachable above the MiniPlayer.
-    @ViewBuilder
-    private var miniPlayerSpacer: some View {
-        if viewModel.playerViewModel.isActive {
-            Color.clear.frame(height: Self.miniPlayerHeight)
         }
     }
 

@@ -154,7 +154,7 @@ To test:
 
 StoreKit: Xcode scheme uses Audiopig.storekit for local testing. Sandbox account required on device for real IAP QA.
 
-Microphone and camera are used only when the user chooses to set custom cover art from the camera in Edit Details. No audio is recorded.
+Photo library and camera are used only when you choose custom cover art in Edit Details. No audio is recorded.
 
 Encryption: app uses only standard HTTPS for system services; ITSAppUsesNonExemptEncryption is false.
 ```

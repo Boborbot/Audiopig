@@ -15,4 +15,23 @@ public struct WatchLocalBooksPayload: Codable, Sendable, Equatable {
         self.usedBytes = usedBytes
         self.budgetBytes = budgetBytes
     }
+
+    /// Library snapshot without thumbnails — safe for WatchConnectivity command payloads.
+    public func slimSyncCopy() -> WatchLocalBooksPayload {
+        WatchLocalBooksPayload(
+            books: books.map {
+                WatchBookSummary(
+                    id: $0.id,
+                    title: $0.title,
+                    author: $0.author,
+                    duration: $0.duration,
+                    currentPlaybackTime: $0.currentPlaybackTime,
+                    lastPlayedAt: $0.lastPlayedAt,
+                    thumbnailJPEG: nil
+                )
+            },
+            usedBytes: usedBytes,
+            budgetBytes: budgetBytes
+        )
+    }
 }

@@ -9,27 +9,41 @@
 import WatchKit
 
 enum WatchHaptics {
+    /// watchOS exposes fixed haptic types only — step down one notch to approximate half strength.
+    private static func playSoftened(_ type: WKHapticType) {
+        WKInterfaceDevice.current().play(softened(type))
+    }
+
+    private static func softened(_ type: WKHapticType) -> WKHapticType {
+        switch type {
+        case .start, .notification: .directionUp
+        case .stop: .directionDown
+        case .directionUp, .directionDown: .click
+        default: type
+        }
+    }
+
     static func click() {
         WKInterfaceDevice.current().play(.click)
     }
 
     static func play() {
-        WKInterfaceDevice.current().play(.start)
+        playSoftened(.start)
     }
 
     static func pause() {
-        WKInterfaceDevice.current().play(.stop)
+        playSoftened(.stop)
     }
 
     static func error() {
-        WKInterfaceDevice.current().play(.notification)
+        playSoftened(.notification)
     }
 
     static func directionUp() {
-        WKInterfaceDevice.current().play(.directionUp)
+        playSoftened(.directionUp)
     }
 
     static func directionDown() {
-        WKInterfaceDevice.current().play(.directionDown)
+        playSoftened(.directionDown)
     }
 }

@@ -44,12 +44,7 @@ struct AudiopigApp: App {
             )
             DependencyContainer.shared = dc
             watchBridge.activate()
-            Task {
-                await monetizationService.refreshEntitlements()
-                await monetizationService.loadProducts()
-            }
-            self.container = dc
-            self.libraryViewModel = LibraryViewModel(
+            let libraryVM = LibraryViewModel(
                 modelContext: dc.modelContainer.mainContext,
                 libraryManager: dc.libraryManager,
                 audioEngine: dc.audioEngine,
@@ -60,8 +55,20 @@ struct AudiopigApp: App {
                 volumeController: volumeController,
                 monetization: dc.monetization
             )
-            libraryViewModel.syncWatchSettings()
-            libraryViewModel.syncWatchRecentBooks()
+            self.container = dc
+            self.libraryViewModel = libraryVM
+            libraryVM.syncWatchSettings()
+            libraryVM.syncWatchRecentBooks()
+            Task {
+                if WatchFeatures.localPlaybackEnabled {
+                    await libraryVM.syncWatchLocalBooks()
+                }
+                await monetizationService.refreshEntitlements()
+                await monetizationService.loadProducts()
+                await MainActor.run {
+                    libraryVM.syncWatchSettings()
+                }
+            }
             self.statsViewModel = StatsViewModel(
                 modelContext: dc.modelContainer.mainContext
             )

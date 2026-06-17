@@ -148,40 +148,29 @@ Test with **Xcode StoreKit Configuration** (`Audiopig.storekit`) on Simulator, t
 - [ ] Track reading stats toggle behaves as expected
 - [ ] Audiopig Plus section shows status, subscribe, manage, restore
 - [ ] Feed a Student tips show prices and thank-you on purchase
-- [ ] Watch Library: storage label, select books, send to Watch, remove from Watch
+- [ ] Apple Watch settings: artwork skip gestures toggle
 - [ ] About section displays correctly
 
 ---
 
 ## Apple Watch
 
-Test with iPhone paired and Audiopig installed on both. Use a short book for transfer QA.
+Test with iPhone paired and Audiopig installed on both.
 
-### Remote playback (iPhone as source)
+### Source picker and remote playback (iPhone as source)
 
-- [ ] Watch app launches; source picker shows iPhone and Watch options
-- [ ] Recent books list loads from iPhone
+- [ ] Watch app launches; source picker shows **iPhone playback** and **Watch playback**
+- [ ] Watch playback option shows under-construction state and is not tappable
+- [ ] iPhone playback → recent books list loads from iPhone
 - [ ] Tap book → player; play / pause works
 - [ ] Skip forward / back; speed controls
 - [ ] Chapter list loads and seek works
-- [ ] Artwork skip gestures (if enabled in Watch settings)
+- [ ] Artwork skip gestures (if enabled in iPhone Settings → Apple Watch)
 - [ ] iPhone unreachable → sensible connection message
 
-### Send to Watch (iPhone)
+### Watch local transfer (archived — skip until re-enabled)
 
-- [ ] Library context menu → Send to Watch queues transfer
-- [ ] Settings → Watch Library → send selected books
-- [ ] Transfer progress / status updates on iPhone
-- [ ] Completed transfer appears in Watch Library on phone settings
-
-### Local playback (Watch)
-
-- [ ] Transferred book appears in Watch local library
-- [ ] Play locally without iPhone in range (after transfer completes)
-- [ ] Chapter navigation and speed on Watch
-- [ ] Position syncs back to iPhone when reachable
-- [ ] Delete book from Watch library (Settings on phone or Watch)
-- [ ] Storage budget: eviction or error when Watch storage full
+Local library and Send to Watch are disabled (`WatchFeatures.localPlaybackEnabled`). Do not QA transfer flows until the feature is turned back on.
 
 ---
 

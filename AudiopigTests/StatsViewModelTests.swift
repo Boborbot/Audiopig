@@ -46,4 +46,34 @@ final class StatsViewModelTests: XCTestCase {
         XCTAssertTrue(remaining.isEmpty)
         XCTAssertEqual(viewModel.finishedBooksCount, 0)
     }
+
+    func testDeleteAllStatsClearsAccumulatedListeningTime() throws {
+        let addedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let lastPlayedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let audiobook = Audiobook(
+            title: "In Progress",
+            author: "Author",
+            duration: 3600,
+            currentPlaybackTime: 600,
+            isManuallyFinished: true,
+            fileURL: URL(fileURLWithPath: "/tmp/book.m4b")
+        )
+        audiobook.accumulatedListeningSeconds = 5400
+        audiobook.addedAt = addedAt
+        audiobook.lastPlayedAt = lastPlayedAt
+        context.insert(audiobook)
+        try context.save()
+
+        let viewModel = StatsViewModel(modelContext: context)
+        XCTAssertEqual(viewModel.totalListenedSeconds, 5400, accuracy: 0.01)
+
+        viewModel.deleteAllStats()
+
+        XCTAssertEqual(audiobook.accumulatedListeningSeconds, 0, accuracy: 0.01)
+        XCTAssertEqual(audiobook.currentPlaybackTime, 600, accuracy: 0.01)
+        XCTAssertEqual(audiobook.lastPlayedAt, lastPlayedAt)
+        XCTAssertEqual(audiobook.addedAt, addedAt)
+        XCTAssertTrue(audiobook.isManuallyFinished)
+        XCTAssertEqual(viewModel.totalListenedSeconds, 0, accuracy: 0.01)
+    }
 }

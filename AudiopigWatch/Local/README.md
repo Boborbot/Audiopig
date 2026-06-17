@@ -1,22 +1,20 @@
 # On-device Watch playback
 
-The Watch app supports **remote** (iPhone) and **local** (transferred) playback via `WatchPlaybackRouter`.
+> **Archived:** Local Watch library and iPhone → Watch transfer are disabled (`WatchFeatures.localPlaybackEnabled`). Remote iPhone playback from the Watch remains active.
 
-## Components
+The Watch app supports **remote** (iPhone) playback via `WatchPlaybackRouter`. Local playback code remains for a future release.
+
+## Components (local — dormant)
 
 - **`WatchLocalLibraryStore`** — manifest of books on Watch, `localURL(for:)`, LRU eviction (2 GB budget)
 - **`LocalWatchPlaybackCoordinator`** — implements `WatchPlaybackCoordinating` with `WatchAudioEngine` (`AVPlayer`)
 - **`WatchTransferService`** (iPhone) — stages files and sends via `WCSession.transferFile`
 
-## iPhone → Watch transfer
+## iPhone → Watch transfer (dormant)
 
-1. User sends from iPhone (context menu or Settings → Watch Library)
-2. iPhone copies file to a temp path and calls `WCSession.transferFile` with `WatchTransferManifest` metadata
-3. Watch ingests into `Application Support/TransferredBooks/<bookID>/`
-4. Watch acknowledges library via `acknowledgeLocalBooks` command
-5. Position syncs back to iPhone via `syncLocalPlaybackPosition`
+Re-enable `WatchFeatures.localPlaybackEnabled` when ready to ship transfer again.
 
 ## Watch UI
 
-- **Playback source picker** — iPhone (recent books, remote) vs Watch (local library)
-- **+** on Watch library opens import instructions (phone-only transfer)
+- **Playback source picker** — iPhone playback (active) vs Watch playback (under construction)
+- **Recent books** — remote playback from iPhone

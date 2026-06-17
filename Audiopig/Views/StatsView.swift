@@ -36,6 +36,7 @@ struct StatsView: View {
             }
             .scrollContentBackground(.hidden)
             .background(DS.Color.canvas.ignoresSafeArea())
+            .miniPlayerScrollClearance()
             .navigationTitle("Stats")
             .coralNavigationBanner()
             .onAppear { viewModel.refresh() }

@@ -556,7 +556,7 @@ final class AppSettings {
         }
     }
 
-    func watchSettingsSnapshot() -> WatchSettingsSnapshot {
+    func watchSettingsSnapshot(hasParagraphBreaksAccess: Bool) -> WatchSettingsSnapshot {
         WatchSettingsSnapshot(
             artworkSkipGesturesEnabled: watchArtworkSkipGesturesEnabled,
             skipForwardSeconds: skipForwardInterval,
@@ -565,7 +565,8 @@ final class AppSettings {
             playbackTimelineScope: playbackTimelineScope,
             defaultSpeed: defaultSpeed,
             universalPlaybackSpeedEnabled: universalPlaybackSpeedEnabled,
-            universalPlaybackSpeed: universalPlaybackSpeedEnabled ? universalPlaybackSpeed : nil
+            universalPlaybackSpeed: universalPlaybackSpeedEnabled ? universalPlaybackSpeed : nil,
+            hasParagraphBreaksAccess: hasParagraphBreaksAccess
         )
     }
 

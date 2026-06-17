@@ -119,6 +119,44 @@ extension View {
     }
 }
 
+// MARK: - Mini Player Scroll Clearance
+
+private struct MiniPlayerClearanceKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    /// Bottom inset (pt) that scroll content should reserve when the mini player is visible.
+    var miniPlayerClearance: CGFloat {
+        get { self[MiniPlayerClearanceKey.self] }
+        set { self[MiniPlayerClearanceKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Extends scrollable content so the last row can rest above the floating mini player.
+    func miniPlayerScrollClearance() -> some View {
+        modifier(MiniPlayerScrollClearanceModifier())
+    }
+}
+
+private struct MiniPlayerScrollClearanceModifier: ViewModifier {
+    @Environment(\.miniPlayerClearance) private var clearance
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            if clearance > 0 {
+                Color.clear
+                    .frame(height: clearance)
+                    .animation(
+                        .spring(response: 0.38, dampingFraction: 0.80),
+                        value: clearance
+                    )
+            }
+        }
+    }
+}
+
 // MARK: - Drag Handle
 
 extension View {
