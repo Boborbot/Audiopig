@@ -23,6 +23,9 @@ struct PaywallSheet: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, DS.Spacing.md)
             }
+            LegalDocumentLinks(alignment: .center)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
         }
         .padding(.top, DS.Spacing.xl)
         .padding(.bottom, DS.Spacing.lg)

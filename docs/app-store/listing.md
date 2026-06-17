@@ -129,6 +129,16 @@ https://boborbot.github.io/Audiopig/privacy-policy.html
 
 ---
 
+## Terms of Use (EULA) URL
+
+**Required for subscriptions.** Hosted copy (keep in sync with `docs/app-store/terms.html`). In App Store Connect → App Information → **License Agreement**, choose custom EULA and paste this URL:
+
+```
+https://boborbot.github.io/Audiopig/terms.html
+```
+
+---
+
 ## App Review Notes (for Apple reviewer)
 
 ```

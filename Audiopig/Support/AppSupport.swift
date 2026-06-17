@@ -9,4 +9,5 @@ import Foundation
 enum AppSupport {
     static let supportEmail = "audiopigsupport@gmail.com"
     static let privacyPolicyURL = URL(string: "https://boborbot.github.io/Audiopig/privacy-policy.html")!
+    static let termsOfUseURL = URL(string: "https://boborbot.github.io/Audiopig/terms.html")!
 }

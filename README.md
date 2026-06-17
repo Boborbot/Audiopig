@@ -119,6 +119,7 @@ See `docs/app-store/` for:
 - `qa-checklist.md` — manual device QA before submit
 - `listing.md` — description, subtitle, keywords, promotional text
 - `privacy-policy.html` — canonical copy in `docs/app-store/`; public URL: https://boborbot.github.io/Audiopig/privacy-policy.html
+- `terms.html` — Terms of Use (EULA); public URL: https://boborbot.github.io/Audiopig/terms.html
 - `submission-guide.md` — archive, upload, and Connect checklist
 
 ---

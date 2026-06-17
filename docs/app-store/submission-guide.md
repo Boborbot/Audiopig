@@ -7,9 +7,10 @@ Step-by-step from a clean build to App Store Connect. Assumes Apple Developer Pr
 ## Before you archive
 
 1. Complete `qa-checklist.md` on a physical device.
-2. Privacy policy and support page are hosted via GitHub Pages (`docs/` → `main`):
+2. Legal pages are hosted via GitHub Pages (`docs/` → `main`):
    - Support: https://boborbot.github.io/Audiopig/
    - Privacy: https://boborbot.github.io/Audiopig/privacy-policy.html
+   - Terms: https://boborbot.github.io/Audiopig/terms.html
 3. Support email: `audiopigsupport@gmail.com`
 4. Confirm bundle ID `com.nitay.Audiopig` matches your Developer account.
 5. Confirm signing: Xcode → Audiopig target → Signing & Capabilities → Team selected, "Automatically manage signing" on.
@@ -60,7 +61,7 @@ Simulator: `Cmd+S` after `Window → Physical Size` for clean frames.
 
 1. [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → **My Apps** → **+** → New App
 2. Platform: iOS; Name: Audiopig; Primary language; Bundle ID: `com.nitay.Audiopig`
-3. **App Information:** category Books; content rights as applicable
+3. **App Information:** category Books; content rights as applicable; custom EULA URL `https://boborbot.github.io/Audiopig/terms.html`
 4. **Pricing:** Free (or your choice)
 5. **App Privacy:** No data collected (matches `PrivacyInfo.xcprivacy`)
 6. **Age Rating:** complete questionnaire (typically 4+)
