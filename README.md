@@ -118,7 +118,7 @@ See `docs/app-store/` for:
 
 - `qa-checklist.md` — manual device QA before submit
 - `listing.md` — description, subtitle, keywords, promotional text
-- `privacy-policy.html` — host this and paste the URL into App Store Connect
+- `privacy-policy.html` — canonical copy in `docs/app-store/`; public URL: https://boborbot.github.io/Audiopig/privacy-policy.html
 - `submission-guide.md` — archive, upload, and Connect checklist
 
 ---
