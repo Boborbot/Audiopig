@@ -7,6 +7,12 @@ import AVFoundation
 import Combine
 import Foundation
 
+/// Whether lock-screen elapsed/duration reflect the whole book or the active chapter.
+enum NowPlayingTimelineScope: Equatable {
+    case entireBook
+    case currentChapter
+}
+
 /// Manages AVPlayer lifecycle, global timeline resolution, playback state, and background audio session.
 @MainActor
 protocol AudioEngineProtocol: AnyObject {
@@ -59,4 +65,7 @@ protocol AudioEngineProtocol: AnyObject {
 
     /// Updates the lock-screen skip-forward and skip-backward intervals for the remote command center.
     func updateRemoteSkipIntervals(forward: TimeInterval, backward: TimeInterval)
+
+    /// Scopes lock-screen elapsed time and duration to the whole book or the active chapter.
+    func setNowPlayingTimelineScope(_ scope: NowPlayingTimelineScope)
 }

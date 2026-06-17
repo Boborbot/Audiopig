@@ -2,14 +2,11 @@
 //  AppIconManager.swift
 //  Audiopig
 //
-//  Manages unlockable app icon tiers and secret achievement icons.
+//  Manages unlockable achievement icons and secret achievement icons.
 //
 //  Unlock state and the active icon selection are persisted in UserDefaults.
 //  Call `checkForNewUnlocks(...)` after every book-finish event — it returns
 //  any newly unlocked icons so callers can trigger celebration overlays.
-//
-//  Calling `applyIcon(named:)` invokes `UIApplication.setAlternateIconName`, which
-//  shows a standard system confirmation sheet. Pass `nil` to revert to the default icon.
 //
 
 import Observation
@@ -18,6 +15,17 @@ import UIKit
 @MainActor
 @Observable
 final class AppIconManager {
+
+    // MARK: - QA
+
+    #if DEBUG
+    /// When `true`, every icon appears unlocked in the gallery without meeting requirements.
+    static let unlockAllIconsForQA = true
+    #else
+    static let unlockAllIconsForQA = false
+    #endif
+
+    var treatsAllIconsAsUnlocked: Bool { Self.unlockAllIconsForQA }
 
     // MARK: - UserDefaults keys
 
@@ -35,16 +43,16 @@ final class AppIconManager {
     // MARK: - Derived
 
     var unlockedTiers: [AppIconTier] {
-        AppIconTier.allCases.filter { unlockedTierRawValues.contains($0.rawValue) }
+        AppIconTier.allCases.filter { isUnlocked($0) }
     }
 
     var unlockedSecrets: [SecretAchievement] {
-        SecretAchievement.allCases.filter { unlockedSecretRawValues.contains($0.rawValue) }
+        SecretAchievement.allCases.filter { isUnlocked($0) }
     }
 
     var activeTier: AppIconTier? {
-        guard let activeIconName else { return nil }
-        return AppIconTier.allCases.first { $0.iconName == activeIconName }
+        if activeIconName == nil { return .original }
+        return AppIconTier.allCases.first { $0.alternateIconName == activeIconName }
     }
 
     var activeSecret: SecretAchievement? {
@@ -53,15 +61,20 @@ final class AppIconManager {
     }
 
     func isUnlocked(_ tier: AppIconTier) -> Bool {
-        unlockedTierRawValues.contains(tier.rawValue)
+        if Self.unlockAllIconsForQA || tier.isAlwaysUnlocked { return true }
+        return unlockedTierRawValues.contains(tier.rawValue)
     }
 
     func isUnlocked(_ achievement: SecretAchievement) -> Bool {
-        unlockedSecretRawValues.contains(achievement.rawValue)
+        if Self.unlockAllIconsForQA { return true }
+        return unlockedSecretRawValues.contains(achievement.rawValue)
     }
 
     func isActive(_ tier: AppIconTier) -> Bool {
-        activeIconName == tier.iconName
+        switch tier {
+        case .original: return activeIconName == nil
+        default:        return activeIconName == tier.alternateIconName
+        }
     }
 
     func isActive(_ achievement: SecretAchievement) -> Bool {
@@ -81,8 +94,12 @@ final class AppIconManager {
             activeIconName = iconName
         } else if let legacyRaw = UserDefaults.standard.object(forKey: Self.legacyActiveKey) as? Int,
                   let tier = AppIconTier(rawValue: legacyRaw) {
-            activeIconName = tier.iconName
-            UserDefaults.standard.set(tier.iconName, forKey: Self.activeIconNameKey)
+            activeIconName = tier.alternateIconName
+            if let iconName = tier.alternateIconName {
+                UserDefaults.standard.set(iconName, forKey: Self.activeIconNameKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Self.activeIconNameKey)
+            }
             UserDefaults.standard.removeObject(forKey: Self.legacyActiveKey)
         } else {
             activeIconName = nil
@@ -92,18 +109,18 @@ final class AppIconManager {
     // MARK: - Unlock check
 
     /// Inspects listening totals and the latest finish event for newly unlocked icons.
-    /// Returns all newly unlocked icons (hour-club tiers first, then secrets).
+    /// Returns all newly unlocked icons (achievements first, then secrets).
     func checkForNewUnlocks(
         totalFinishedSeconds: TimeInterval,
         finishEvent: BookFinishEvent? = nil
     ) -> [AppIconUnlock] {
         var newlyUnlocked: [AppIconUnlock] = []
 
-        for tier in AppIconTier.allCases {
+        for tier in AppIconTier.allCases where !tier.isAlwaysUnlocked {
             guard totalFinishedSeconds >= tier.requiredSeconds else { continue }
             guard !unlockedTierRawValues.contains(tier.rawValue) else { continue }
             unlockedTierRawValues.insert(tier.rawValue)
-            newlyUnlocked.append(.hourClub(tier))
+            newlyUnlocked.append(.achievement(tier))
         }
 
         if let finishEvent {
@@ -125,18 +142,19 @@ final class AppIconManager {
     // MARK: - Apply icon
 
     func applyIcon(_ tier: AppIconTier) {
-        applyIcon(named: tier.iconName)
+        guard isUnlocked(tier), !isActive(tier) else { return }
+        applyIcon(named: tier.alternateIconName)
     }
 
     func applyIcon(_ achievement: SecretAchievement) {
+        guard isUnlocked(achievement), !isActive(achievement) else { return }
         applyIcon(named: achievement.iconName)
     }
 
     /// Switches the springboard icon. Pass `nil` to restore the default icon.
-    /// The system shows a native confirmation sheet — this cannot be suppressed.
     func applyIcon(named iconName: String?) {
-        UIApplication.shared.setAlternateIconName(iconName) { [weak self] error in
-            guard error == nil else { return }
+        AlternateIconSwitcher.setIcon(named: iconName) { [weak self] success in
+            guard success else { return }
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 activeIconName = iconName

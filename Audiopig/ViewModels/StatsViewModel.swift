@@ -4,7 +4,7 @@
 //
 //  Aggregates playback and completion statistics from SwiftData.
 //  Sources from two tables:
-//    • Audiobook — current progress for every book still in the library.
+//    • Audiobook — accumulated listening seconds for every book still in the library.
 //    • FinishedRecord — immutable snapshots for books that were finished
 //      (and possibly since deleted). Only books absent from the live library
 //      contribute their snapshot to avoid double-counting.
@@ -55,10 +55,10 @@ final class StatsViewModel {
         let libraryIDs = Set(audiobooks.map(\.id))
 
         // Total listened time
-        // • All library books contribute their current playback position.
+        // • All library books contribute their accumulated listening seconds.
         // • FinishedRecords for books no longer in the library contribute the
-        //   position that was snapshotted when the book was marked finished.
-        let libraryTime = audiobooks.reduce(0.0) { $0 + $1.currentPlaybackTime }
+        //   listening total snapshotted when the book was marked finished.
+        let libraryTime = audiobooks.reduce(0.0) { $0 + $1.accumulatedListeningSeconds }
         let deletedTime = records
             .filter { !libraryIDs.contains($0.audiobookID) }
             .reduce(0.0) { $0 + $1.listenedSeconds }
@@ -74,11 +74,19 @@ final class StatsViewModel {
         let finishedDeletedIDs = Set(records.map(\.audiobookID)).subtracting(libraryIDs)
         finishedBooksCount = finishedLibraryIDs.union(finishedDeletedIDs).count
 
-        let finishedLibraryTime = finishedBooks.reduce(0.0) { $0 + $1.currentPlaybackTime }
+        let finishedLibraryTime = finishedBooks.reduce(0.0) { $0 + $1.accumulatedListeningSeconds }
         let finishedDeletedTime = records
             .filter { !libraryIDs.contains($0.audiobookID) }
             .reduce(0.0) { $0 + $1.listenedSeconds }
         finishedListenedSeconds = finishedLibraryTime + finishedDeletedTime
+    }
+
+    /// Permanently removes all finished-book records from SwiftData.
+    func deleteAllStats() {
+        let records = (try? modelContext.fetch(FetchDescriptor<FinishedRecord>())) ?? []
+        records.forEach { modelContext.delete($0) }
+        try? modelContext.save()
+        refresh()
     }
 
     // MARK: - Private helpers

@@ -11,9 +11,8 @@
 //     50 ms windows, dynamic threshold + gap-merging hysteresis.
 //     Reliable for paragraph-level breaks (≥ 1 s pauses) in clean recordings.
 //
-//  Results are ranked by duration (longest = most structurally significant),
-//  top 3 returned, then sorted chronologically for display (left = furthest
-//  back, right = most recent).
+//  Results are ranked by duration (longest = most structurally significant);
+//  only the single longest break is returned.
 //
 
 import AVFoundation
@@ -47,10 +46,7 @@ actor LullDetector {
 
     // MARK: - Public
 
-    /// Returns up to 3 significant break points inside `[windowStart, windowEnd]`.
-    ///
-    /// Results are sorted by `endTime` ascending (chronological) so callers can
-    /// display them left-to-right with the biggest jump on the left.
+    /// Returns the longest significant break inside `[windowStart, windowEnd]`, if any.
     func findLulls(
         in allChapters: [ResolvedChapter],
         from windowStart: TimeInterval,
@@ -73,9 +69,9 @@ actor LullDetector {
         let combined = merge(chapterLulls: chapterLulls, vadLulls: vadLulls)
 
         // Rank by duration descending → chapter boundaries (10.0) float above
-        // typical paragraph breaks (1–3 s). Return top 3 sorted by time.
-        return Array(combined.sorted { $0.duration > $1.duration }.prefix(3))
-            .sorted { $0.endTime < $1.endTime }
+        // typical paragraph breaks (1–3 s). Return only the longest.
+        guard let longest = combined.max(by: { $0.duration < $1.duration }) else { return [] }
+        return [longest]
     }
 
     // MARK: - Source 1: chapter metadata

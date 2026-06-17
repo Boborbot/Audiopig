@@ -77,6 +77,12 @@ final class AudioEngine: AudioEngineProtocol {
     private var _remoteSkipForwardInterval: TimeInterval = 15
     private var _remoteSkipBackwardInterval: TimeInterval = 15
 
+    // MARK: - Now Playing Timeline Scope
+
+    private var _nowPlayingTimelineScope: NowPlayingTimelineScope = .entireBook
+    /// Tracks the chapter index last pushed to MPNowPlayingInfoCenter for boundary detection.
+    private var _lastNowPlayingChapterIndex: Int?
+
     // MARK: - Init / Deinit
 
     init() throws {
@@ -172,6 +178,8 @@ final class AudioEngine: AudioEngineProtocol {
         _nowPlayingTitle = ""
         _nowPlayingAuthor = ""
         _nowPlayingArtwork = nil
+        _nowPlayingTimelineScope = .entireBook
+        _lastNowPlayingChapterIndex = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
@@ -240,7 +248,7 @@ final class AudioEngine: AudioEngineProtocol {
     func setPlaybackSpeed(_ speed: Float) throws {
         guard _loadedAudiobookID != nil else { throw AudioEngineError.noLoadedAudiobook }
 
-        let clamped = (0.5 ... 3.0).clamp(speed)
+        let clamped = (0.25 ... 4.0).clamp(speed)
         _playbackSpeed = clamped
 
         if _playbackState.value == .playing {
@@ -332,8 +340,10 @@ final class AudioEngine: AudioEngineProtocol {
             let cmTime = CMTime(seconds: fst, preferredTimescale: 600)
             player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
                 guard let self, autoPlay else { return }
-                // Re-assert rate after seek in case AVPlayer reset it to 0.
-                self.player.rate = self._playbackSpeed
+                MainActor.assumeIsolated {
+                    // Re-assert rate after seek in case AVPlayer reset it to 0.
+                    self.player.rate = self._playbackSpeed
+                }
             }
 
         case .failed:
@@ -379,19 +389,29 @@ final class AudioEngine: AudioEngineProtocol {
             forInterval: interval,
             queue: .main
         ) { [weak self] time in
-            guard let self else { return }
-            let localSeconds = CMTimeGetSeconds(time)
-            guard localSeconds.isFinite, localSeconds >= 0 else { return }
-            // fileGlobalOffset is the global timeline position at which the PHYSICAL FILE
-            // begins. Looked up from the precomputed map — O(1) instead of O(n) per tick.
-            let fileGlobalOffset: TimeInterval = {
-                guard let chapter = self.resolvedChapters[safe: self.currentChapterIndex] else { return 0 }
-                return self.fileGlobalOffsets[chapter.fileURL] ?? 0
-            }()
-            self._currentTime.send(fileGlobalOffset + localSeconds)
-            // Now Playing elapsed time is NOT updated here; the system extrapolates position
-            // automatically from the rate set at play/pause/seek. Updates only happen at
-            // state transitions (play, pause, seek, speed change, chapter load).
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let localSeconds = CMTimeGetSeconds(time)
+                guard localSeconds.isFinite, localSeconds >= 0 else { return }
+                // fileGlobalOffset is the global timeline position at which the PHYSICAL FILE
+                // begins. Looked up from the precomputed map — O(1) instead of O(n) per tick.
+                let fileGlobalOffset: TimeInterval = {
+                    guard let chapter = self.resolvedChapters[safe: self.currentChapterIndex] else { return 0 }
+                    return self.fileGlobalOffsets[chapter.fileURL] ?? 0
+                }()
+                let globalTime = fileGlobalOffset + localSeconds
+                self._currentTime.send(globalTime)
+                // Now Playing elapsed time is NOT updated here; the system extrapolates position
+                // automatically from the rate set at play/pause/seek. Updates only happen at
+                // state transitions (play, pause, seek, speed change, chapter load), except in
+                // chapter-scoped mode where logical chapter boundaries must reset the timeline.
+                if self._nowPlayingTimelineScope == .currentChapter,
+                   let newIndex = self.chapterIndex(forGlobalTime: globalTime),
+                   newIndex != self._lastNowPlayingChapterIndex {
+                    self._lastNowPlayingChapterIndex = newIndex
+                    self.updateNowPlayingInfo(elapsedTime: globalTime)
+                }
+            }
         }
     }
 
@@ -480,7 +500,7 @@ final class AudioEngine: AudioEngineProtocol {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 self?.handleInterruption(notification)
             }
         }
@@ -490,7 +510,7 @@ final class AudioEngine: AudioEngineProtocol {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 self?.handleRouteChange(notification)
             }
         }
@@ -534,6 +554,12 @@ final class AudioEngine: AudioEngineProtocol {
         let center = MPRemoteCommandCenter.shared()
         center.skipForwardCommand.preferredIntervals = [NSNumber(value: forward)]
         center.skipBackwardCommand.preferredIntervals = [NSNumber(value: backward)]
+    }
+
+    func setNowPlayingTimelineScope(_ scope: NowPlayingTimelineScope) {
+        _nowPlayingTimelineScope = scope
+        _lastNowPlayingChapterIndex = chapterIndex(forGlobalTime: _currentTime.value)
+        updateNowPlayingInfo(elapsedTime: _currentTime.value)
     }
 
     /// Registers handlers for hardware/software transport controls (lock screen, headphones,
@@ -580,7 +606,11 @@ final class AudioEngine: AudioEngineProtocol {
             guard let posEvent = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }
-            Task { @MainActor [weak self] in try? await self?.seek(to: posEvent.positionTime) }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let globalTime = self.globalTime(forNowPlayingPosition: posEvent.positionTime)
+                try? await self.seek(to: globalTime)
+            }
             return .success
         }
 
@@ -592,6 +622,34 @@ final class AudioEngine: AudioEngineProtocol {
 
     // MARK: - Private — Now Playing Info
 
+    /// Maps a global timeline position to the elapsed/duration pair shown on the lock screen.
+    private func nowPlayingTimeline(forGlobalTime globalTime: TimeInterval) -> (elapsed: TimeInterval, duration: TimeInterval) {
+        switch _nowPlayingTimelineScope {
+        case .entireBook:
+            return (globalTime, _loadedDuration)
+        case .currentChapter:
+            guard let index = chapterIndex(forGlobalTime: globalTime),
+                  let chapter = resolvedChapters[safe: index] else {
+                return (globalTime, _loadedDuration)
+            }
+            return (max(0, globalTime - chapter.startTime), chapter.duration)
+        }
+    }
+
+    /// Converts a lock-screen scrub position into a global timeline seek target.
+    private func globalTime(forNowPlayingPosition positionTime: TimeInterval) -> TimeInterval {
+        switch _nowPlayingTimelineScope {
+        case .entireBook:
+            return positionTime
+        case .currentChapter:
+            guard let index = chapterIndex(forGlobalTime: _currentTime.value),
+                  let chapter = resolvedChapters[safe: index] else {
+                return positionTime
+            }
+            return chapter.startTime + positionTime
+        }
+    }
+
     /// Pushes a full now-playing dictionary to the system.
     ///
     /// `elapsedTime` is the current global timeline position. The system extrapolates
@@ -601,12 +659,14 @@ final class AudioEngine: AudioEngineProtocol {
         guard !_nowPlayingTitle.isEmpty else { return }
 
         let rate = _playbackState.value == .playing ? Double(_playbackSpeed) : 0.0
+        let timeline = nowPlayingTimeline(forGlobalTime: elapsedTime)
+        _lastNowPlayingChapterIndex = chapterIndex(forGlobalTime: elapsedTime)
 
         var info: [String: Any] = [
             MPMediaItemPropertyTitle:                   _nowPlayingTitle,
             MPMediaItemPropertyArtist:                  _nowPlayingAuthor,
-            MPMediaItemPropertyPlaybackDuration:        _loadedDuration,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsedTime,
+            MPMediaItemPropertyPlaybackDuration:        timeline.duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: timeline.elapsed,
             MPNowPlayingInfoPropertyPlaybackRate:        rate,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: Double(_playbackSpeed),
             MPNowPlayingInfoPropertyMediaType:           MPNowPlayingInfoMediaType.audio.rawValue,
@@ -614,6 +674,15 @@ final class AudioEngine: AudioEngineProtocol {
 
         if let artwork = _nowPlayingArtwork {
             info[MPMediaItemPropertyArtwork] = artwork
+        }
+
+        if _nowPlayingTimelineScope == .currentChapter,
+           let index = chapterIndex(forGlobalTime: elapsedTime),
+           !resolvedChapters.isEmpty {
+            let chapter = resolvedChapters[index]
+            info[MPNowPlayingInfoPropertyChapterNumber] = index + 1
+            info[MPNowPlayingInfoPropertyChapterCount] = resolvedChapters.count
+            info[MPMediaItemPropertyAlbumTitle] = chapter.title
         }
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info

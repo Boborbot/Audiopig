@@ -8,6 +8,7 @@ import SwiftUI
 struct PlayerView: View {
     @Bindable var viewModel: PlayerViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var paywallViewModel: PaywallViewModel?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -34,6 +35,19 @@ struct PlayerView: View {
         }
         .sheet(item: $viewModel.pendingNewBookmark) { bookmark in
             BookmarkEditView(viewModel: viewModel, bookmark: bookmark)
+        }
+        .sheet(isPresented: $viewModel.isSpeedSheetPresented) {
+            PlaybackSpeedSheet(viewModel: viewModel)
+        }
+        .sheet(isPresented: $viewModel.isPaywallPresented, onDismiss: { paywallViewModel = nil }) {
+            if let paywallViewModel {
+                PaywallSheet(viewModel: paywallViewModel)
+            }
+        }
+        .onChange(of: viewModel.isPaywallPresented) { _, presented in
+            if presented {
+                paywallViewModel = viewModel.makePaywallViewModel()
+            }
         }
     }
 
@@ -281,28 +295,16 @@ struct PlayerView: View {
         .padding(.horizontal, DS.Spacing.md)
     }
 
-    // MARK: - Speed Menu
+    // MARK: - Speed Button
 
     private var speedMenu: some View {
-        Menu {
-            ForEach(PlayerViewModel.availableSpeeds, id: \.self) { speed in
-                Button {
-                    viewModel.setSpeed(speed)
-                } label: {
-                    let label = speed.truncatingRemainder(dividingBy: 1) == 0
-                        ? "\(Int(speed))×"
-                        : String(format: "%.2g×", speed)
-                    if speed == viewModel.playbackSpeed {
-                        Label(label, systemImage: "checkmark")
-                    } else {
-                        Text(label)
-                    }
-                }
-            }
+        Button {
+            viewModel.isSpeedSheetPresented = true
         } label: {
             Text(viewModel.speedLabel)
                 .pillAppearance()
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Playback speed, \(viewModel.speedLabel)")
     }
 
@@ -409,27 +411,19 @@ struct PlayerView: View {
 
         case .results(let lulls):
             VStack(spacing: DS.Spacing.sm) {
-                // Primary row: lull jump buttons (biggest jump left, smallest right).
                 if lulls.isEmpty {
                     Text("No breaks found")
                         .frame(maxWidth: .infinity)
                         .pillAppearance(verticalPadding: 14)
-                } else {
-                    HStack(spacing: DS.Spacing.sm) {
-                        ForEach(lulls) { lull in
-                            Button {
-                                viewModel.seekToLull(lull)
-                            } label: {
-                                Text(viewModel.lullLabel(for: lull))
-                                    .frame(maxWidth: .infinity)
-                                    .pillAppearance(
-                                        isActive: lull.id == viewModel.longestLullID,
-                                        verticalPadding: 14
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                } else if let lull = lulls.first {
+                    Button {
+                        viewModel.seekToLull(lull)
+                    } label: {
+                        Text(viewModel.lullLabel(for: lull))
+                            .frame(maxWidth: .infinity)
+                            .pillAppearance(isActive: true, verticalPadding: 14)
                     }
+                    .buttonStyle(.plain)
                 }
 
                 // Secondary row: cancel and re-analyze.

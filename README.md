@@ -6,6 +6,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 ![Swift](https://img.shields.io/badge/Swift-5-F05138?style=flat-square&logo=swift&logoColor=white)
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-%E2%9C%93-blue?style=flat-square)
 ![SwiftData](https://img.shields.io/badge/SwiftData-%E2%9C%93-purple?style=flat-square)
+![watchOS 10+](https://img.shields.io/badge/watchOS-10%2B-black?style=flat-square)
 
 <!-- screenshots -->
 
@@ -19,14 +20,20 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Full playback engine** — speed control (0.5–3.0×), configurable skip intervals, dual scrubber mode (entire book or current chapter)
 - **Bookmarks** — save named timestamps, edit, jump, long-press browser, swipe to delete, export as table
 - **Sleep timer** — off, N minutes, or end of current chapter; persists across app restarts
-- **Lull detection** — find paragraph/chapter break points via silence analysis
+- **Lull detection** — find paragraph/chapter break points via silence analysis (Audiopig Plus; 7-day free trial)
 - **Background audio** — continues playing when the screen is off or the app is backgrounded
 - **Lock screen controls** — play/pause, skip forward/back, and scrubbing via `MPRemoteCommandCenter`
 - **Persistent playback position** — saved every 5 seconds during playback and on backgrounding
 - **Library management** — search, multi-select, bulk delete, merge books, edit title/author/cover art
 - **Stats** — total listening time and finished-book count; unlockable app icons at listening milestones
+- **App icon gallery** — browse and apply hour-tier and secret achievement alternate icons from the Stats tab
 - **Finish celebrations** — confetti and optional delete confirmation when marking a book finished
-- **Appearance** — system, light, or dark mode
+- **Appearance** — system, light, or dark mode; optional portrait orientation lock
+- **Audiopig Plus** — monthly subscription unlocks lull detection; optional "Feed a Student" consumable tips in Settings
+- **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback (recent books, controls, chapters, artwork skip gestures) or **on-Watch local playback** after transfer
+- **Send to Watch** — transfer audiobooks from iPhone via `WCSession`; manage storage and queue from Settings → Watch Library
+- **Home screen widgets** (`AudiopigWidget`) — now-playing, recent books, listening stats, and hour-club progress via App Group snapshots
+- **Volume control** — hardware volume integration through `SystemVolumeController`
 
 ---
 
@@ -37,13 +44,14 @@ Audiopig follows strict MVVM. Views contain zero business logic and have no dire
 ```
 Views (SwiftUI)
   └─▶ ViewModels (@Observable)
-        └─▶ Services (AudioEngine, LibraryManager, AppSettings)
-              └─▶ Persistence (SwiftData · UserDefaults · File System)
+        └─▶ Services (AudioEngine, LibraryManager, AppSettings, WatchConnectivity)
+              └─▶ Persistence (SwiftData · UserDefaults · File System · App Group)
 ```
 
 Key constraints:
 - All playback calls go through `AudioEngineProtocol` — the concrete `AudioEngine` is never imported by a view or view model directly
 - `DependencyContainer` constructs and wires all services at launch (`AudiopigApp.swift`)
+- `AudiopigShared` holds cross-target types (Watch connectivity payloads, widget snapshots, `ChapterProgressCalculator`)
 - Visual tokens (colors, typography, spacing, shadows) live exclusively in `DesignSystem.swift`; ad-hoc styling in views is a regression
 
 ---
@@ -52,18 +60,23 @@ Key constraints:
 
 ```
 Audiopig/
-└── Audiopig/
-    ├── Models/                 SwiftData @Model types: Audiobook, Chapter, Bookmark, Folder, FinishedRecord
-    ├── ViewModels/             LibraryViewModel, PlayerViewModel, StatsViewModel, Edit*ViewModels
-    ├── Views/                  MainTabView, LibraryView, PlayerView, SettingsView, StatsView, Edit*Views
-    │   └── Components/         MiniPlayerView, ArtworkPickerSection, celebration overlays, row views
-    ├── Services/               AudioEngine, LibraryManager, LullDetector, AppSettings, AppIconManager
-    ├── Protocols/              AudioEngineProtocol, LibraryManagerProtocol
-    ├── DependencyInjection/    DependencyContainer, AudiopigModelContainer
-    ├── Design/                 DesignSystem, GlassModifiers, ButtonStyles, ViewExtensions
-    ├── Support/                PlaybackState, errors, formatters
-    ├── docs/app-store/         QA checklist, listing copy, privacy policy, submission guide
-    └── Assets.xcassets/        App icon (+ unlockable tier variants), accent color
+├── Audiopig/                   Main iOS app target
+│   ├── Models/                 SwiftData @Model types: Audiobook, Chapter, Bookmark, Folder, FinishedRecord
+│   ├── ViewModels/             LibraryViewModel, PlayerViewModel, StatsViewModel, Edit*ViewModels
+│   ├── Views/                  MainTabView, LibraryView, PlayerView, SettingsView, StatsView, Edit*Views
+│   │   └── Components/         MiniPlayerView, AppIconGalleryThumbnail, celebration overlays, row views
+│   ├── Services/               AudioEngine, LibraryManager, WatchConnectivity, WatchTransfer, StoreKit, WidgetSnapshotWriter
+│   ├── Protocols/              AudioEngineProtocol, LibraryManagerProtocol, MonetizationServiceProtocol, WatchTransferServiceProtocol
+│   ├── DependencyInjection/    DependencyContainer, AudiopigModelContainer
+│   ├── Design/                 DesignSystem, GlassModifiers, ButtonStyles, ViewExtensions
+│   ├── Support/                PlaybackState, errors, formatters
+│   ├── docs/app-store/         QA checklist, listing copy, privacy policy, submission guide
+│   └── Assets.xcassets/        App icon (+ unlockable tier variants), gallery thumbnails
+├── AudiopigShared/             Shared Swift sources compiled into app, Watch, and Widget targets
+├── AudiopigWatch/              watchOS companion (remote + local playback, transfer ingest, player)
+├── AudiopigWidget/             WidgetKit extension (now playing, hour club)
+├── AudiopigTests/              Unit tests (ChapterProgressCalculator, export formatting, achievements)
+└── Assets for Testing/         Local QA audiobooks (gitignored; see README inside folder)
 ```
 
 ---
@@ -72,6 +85,7 @@ Audiopig/
 
 - **Xcode 16 or later** (project created with Xcode 26)
 - **iOS 17.0+** deployment target (simulator or device)
+- **watchOS 10.0+** for the Watch companion
 - **No third-party dependencies** — pure Apple frameworks only
 
 ---
@@ -82,6 +96,19 @@ Audiopig/
 2. Open `Audiopig/Audiopig.xcodeproj` in Xcode
 3. Select a simulator or device running iOS 17+
 4. `Cmd+R`
+
+### Running tests
+
+Select the **Audiopig** scheme and press `Cmd+U`, or from the command line:
+
+```bash
+xcodebuild test -project Audiopig.xcodeproj -scheme Audiopig \
+  -destination 'platform=iOS Simulator,name=iPhone 16'
+```
+
+### Debug test library
+
+Copy local `.mp3` / `.m4b` files into `Assets for Testing/` (gitignored). Debug builds bundle them automatically via the "Copy Test Assets" build phase and `DevelopmentLibrarySeeder` imports them on launch.
 
 ---
 
@@ -100,9 +127,10 @@ See `docs/app-store/` for:
 
 | Area | Status |
 |---|---|
-| Automated tests | No test target exists yet |
+| Automated tests | `AudiopigTests` covers pure logic; no UI or AVFoundation integration tests yet |
 | Per-book playback speed | Global default from Settings applies on load; not saved per book |
 | Format support | Only `.mp3` and `.m4b`; no `.aax`, `.opus`, etc. |
+| Watch local transfer | Single-file books only; merged multi-chapter timelines transfer the primary file |
 
 ---
 
@@ -114,3 +142,4 @@ See `docs/app-store/` for:
 | 9 | Stable audio engine, mini-player, multi-chapter virtual timeline |
 | 10 | Folder import, merge file cleanup, dead code removal, README |
 | 11 | Stats tab, lull detection, unlockable icons, bookmarks export, edit details, App Store prep |
+| 12 | Watch companion (remote + local transfer), widgets, AudiopigShared, StoreKit monetization, icon gallery, orientation lock, unit tests |

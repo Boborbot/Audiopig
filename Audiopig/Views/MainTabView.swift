@@ -23,9 +23,10 @@ struct MainTabView: View {
 
     @State private var viewModel: LibraryViewModel
     @State private var isPlayerPresented: Bool = false
-    private let appSettings: AppSettings
+    @Bindable var appSettings: AppSettings
     private let statsViewModel: StatsViewModel
     private let appIconManager: AppIconManager
+    @Bindable private var settingsMonetizationViewModel: SettingsMonetizationViewModel
 
     /// Standard iOS tab-bar height (does not vary by device type or screen size).
     private static let tabBarHeight: CGFloat = 49
@@ -38,12 +39,14 @@ struct MainTabView: View {
         libraryViewModel: LibraryViewModel,
         appSettings: AppSettings,
         statsViewModel: StatsViewModel,
-        appIconManager: AppIconManager
+        appIconManager: AppIconManager,
+        settingsMonetizationViewModel: SettingsMonetizationViewModel
     ) {
         _viewModel = State(initialValue: libraryViewModel)
-        self.appSettings = appSettings
+        _appSettings = Bindable(wrappedValue: appSettings)
         self.statsViewModel = statsViewModel
         self.appIconManager = appIconManager
+        _settingsMonetizationViewModel = Bindable(wrappedValue: settingsMonetizationViewModel)
     }
 
     var body: some View {
@@ -57,7 +60,14 @@ struct MainTabView: View {
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }
                     .tabItem { Label("Stats", systemImage: "chart.bar.fill") }
 
-                SettingsView(settings: appSettings)
+                SettingsView(
+                    settings: appSettings,
+                    statsViewModel: statsViewModel,
+                    monetizationViewModel: settingsMonetizationViewModel,
+                    libraryViewModel: viewModel
+                ) {
+                    viewModel.syncWatchSettings()
+                }
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerSpacer }
                     .tabItem { Label("Settings", systemImage: "gearshape") }
             }
@@ -86,6 +96,20 @@ struct MainTabView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .onChange(of: appSettings.orientationLock) { _, locked in
+            OrientationLockController.shared.setLocked(locked)
+        }
+        .onAppear {
+            syncWidgetSnapshots()
+        }
+        .onOpenURL { url in
+            handleWidgetURL(url)
+        }
+        #if DEBUG
+        .task {
+            await viewModel.seedDevelopmentLibraryIfNeeded()
+        }
+        #endif
     }
 
     /// A transparent placeholder whose height equals the MiniPlayer. Injected as a
@@ -96,5 +120,17 @@ struct MainTabView: View {
         if viewModel.playerViewModel.isActive {
             Color.clear.frame(height: Self.miniPlayerHeight)
         }
+    }
+
+    private func syncWidgetSnapshots() {
+        viewModel.syncWidgetRecentBooks()
+    }
+
+    private func handleWidgetURL(_ url: URL) {
+        guard url.scheme == "audiopig", url.host() == "play" else { return }
+        let pathComponent = url.pathComponents.filter { $0 != "/" }.last
+        guard let pathComponent, let bookID = UUID(uuidString: pathComponent) else { return }
+        guard viewModel.playAudiobook(id: bookID) else { return }
+        isPlayerPresented = true
     }
 }

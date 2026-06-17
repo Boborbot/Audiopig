@@ -82,10 +82,42 @@ Device: _______________   iOS: _______________   Date: _______________
 
 ## Lull Detection
 
-- [ ] "Find Paragraph Breaks" runs without crash on a real chapter
+- [ ] "Find Paragraph Breaks" runs without crash on a real chapter (with Plus or active trial)
+- [ ] Without Plus: tap shows paywall sheet (button looks normal — no lock icon)
+- [ ] Paywall: trial CTA when eligible; subscribe-only when not
+- [ ] Restore Purchases from paywall and Settings works on a second device / fresh install
+- [ ] After subscribing or starting trial, analysis runs on tap
 - [ ] Results list shows plausible break points
 - [ ] Tap result → seeks correctly
 - [ ] Cancel mid-analysis works
+
+---
+
+## StoreKit / Monetization
+
+Test with **Xcode StoreKit Configuration** (`Audiopig.storekit`) on Simulator, then **Sandbox** on a physical device before release.
+
+### Local StoreKit Testing (Simulator)
+
+- [ ] Scheme uses StoreKit configuration file (Edit Scheme → Run → Options)
+- [ ] Settings → Audiopig Plus shows localized price
+- [ ] Start 7-day trial from player paywall → Find Paragraph Breaks works
+- [ ] Settings status shows trial end date or Active after subscribe
+- [ ] Manage Subscription link opens Apple subscriptions page
+- [ ] Restore Purchases refreshes entitlement state
+
+### Feed a Student (consumables)
+
+- [ ] All three tip tiers show prices in Settings
+- [ ] Purchase tip → thank-you UI appears
+- [ ] Same tip can be purchased again (consumable)
+
+### Sandbox (physical device)
+
+- [ ] Create Sandbox tester in App Store Connect
+- [ ] Sign into Media & Purchases with sandbox account on device
+- [ ] Purchase Plus subscription in sandbox; feature unlocks
+- [ ] Restore on second install / device
 
 ---
 
@@ -114,7 +146,51 @@ Device: _______________   iOS: _______________   Date: _______________
 - [ ] Appearance: system / light / dark each apply correctly
 - [ ] Default speed, skip intervals persist after relaunch
 - [ ] Track reading stats toggle behaves as expected
+- [ ] Audiopig Plus section shows status, subscribe, manage, restore
+- [ ] Feed a Student tips show prices and thank-you on purchase
+- [ ] Watch Library: storage label, select books, send to Watch, remove from Watch
 - [ ] About section displays correctly
+
+---
+
+## Apple Watch
+
+Test with iPhone paired and Audiopig installed on both. Use a short book for transfer QA.
+
+### Remote playback (iPhone as source)
+
+- [ ] Watch app launches; source picker shows iPhone and Watch options
+- [ ] Recent books list loads from iPhone
+- [ ] Tap book → player; play / pause works
+- [ ] Skip forward / back; speed controls
+- [ ] Chapter list loads and seek works
+- [ ] Artwork skip gestures (if enabled in Watch settings)
+- [ ] iPhone unreachable → sensible connection message
+
+### Send to Watch (iPhone)
+
+- [ ] Library context menu → Send to Watch queues transfer
+- [ ] Settings → Watch Library → send selected books
+- [ ] Transfer progress / status updates on iPhone
+- [ ] Completed transfer appears in Watch Library on phone settings
+
+### Local playback (Watch)
+
+- [ ] Transferred book appears in Watch local library
+- [ ] Play locally without iPhone in range (after transfer completes)
+- [ ] Chapter navigation and speed on Watch
+- [ ] Position syncs back to iPhone when reachable
+- [ ] Delete book from Watch library (Settings on phone or Watch)
+- [ ] Storage budget: eviction or error when Watch storage full
+
+---
+
+## Home Screen Widgets
+
+- [ ] Add widgets from widget gallery; no crash
+- [ ] Now-playing / recent books reflect current library state
+- [ ] Listening stats widget updates after playback
+- [ ] Hour-club widget shows progress toward next icon tier
 
 ---
 

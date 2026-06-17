@@ -27,6 +27,14 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Gallery thumbnail in Assets.xcassets (matches imageset folder name).
+    var galleryImageName: String {
+        switch self {
+        case .christmasDay: return "Gallery-ChristmasDay"
+        case .newYearsEve:  return "Gallery-NewYearsEve"
+        }
+    }
+
     /// Revealed only after unlock.
     var label: String {
         switch self {

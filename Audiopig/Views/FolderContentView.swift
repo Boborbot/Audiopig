@@ -13,7 +13,7 @@ struct FolderContentView: View {
         ZStack {
             DS.Color.canvas.ignoresSafeArea()
 
-            if folder.sortedAudiobooks.isEmpty {
+            if viewModel.sortedAudiobooks(in: folder).isEmpty {
                 emptyState
             } else {
                 bookList
@@ -22,13 +22,33 @@ struct FolderContentView: View {
         .navigationTitle(folder.title)
         .navigationBarTitleDisplayMode(.large)
         .coralNavigationBanner()
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Picker(
+                        "Order Files",
+                        selection: Binding(
+                            get: { viewModel.librarySortOrder },
+                            set: { viewModel.setLibrarySortOrder($0) }
+                        )
+                    ) {
+                        ForEach(LibrarySortOrder.allCases) { order in
+                            Text(order.menuTitle).tag(order)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .accessibilityLabel("Order files")
+            }
+        }
     }
 
     // MARK: - Book List
 
     private var bookList: some View {
         List {
-            ForEach(folder.sortedAudiobooks) { audiobook in
+            ForEach(viewModel.sortedAudiobooks(in: folder)) { audiobook in
                 AudiobookRowView(
                     audiobook: audiobook,
                     isSelectionModeActive: false,

@@ -83,11 +83,17 @@ final class LibraryManager: LibraryManagerProtocol {
 
         var metadataResults: [AudiobookImportMetadata] = []
 
-        for case let fileURL as URL in enumerator {
-            guard SupportedAudioExtension.isSupported(fileURL) else {
-                continue
+        let supportedFileURLs: [URL] = {
+            var urls: [URL] = []
+            var iterator = enumerator.makeIterator()
+            while let fileURL = iterator.next() as? URL {
+                guard SupportedAudioExtension.isSupported(fileURL) else { continue }
+                urls.append(fileURL)
             }
+            return urls
+        }()
 
+        for fileURL in supportedFileURLs {
             let metadata = try await extractMetadata(from: fileURL)
             metadataResults.append(metadata)
         }
@@ -106,6 +112,7 @@ final class LibraryManager: LibraryManagerProtocol {
             coverArtwork: metadata.coverArtwork,
             fileURL: metadata.fileURL
         )
+        audiobook.addedAt = Date()
 
         let chapters = metadata.chapters
             .sorted { $0.orderIndex < $1.orderIndex }
@@ -166,6 +173,63 @@ final class LibraryManager: LibraryManagerProtocol {
         fileManager.fileExists(atPath: fileURL.path)
     }
 
+    func repairStoredFileURL(_ storedURL: URL) -> URL {
+        if fileExists(at: storedURL) {
+            return storedURL
+        }
+
+        let fileName = storedURL.lastPathComponent
+        guard !fileName.isEmpty else { return storedURL }
+
+        let candidate = libraryDirectoryURL.appendingPathComponent(fileName)
+        if fileExists(at: candidate) {
+            return candidate
+        }
+
+        return storedURL
+    }
+
+    func repairAudiobookFileReferences(in context: ModelContext) throws {
+        let descriptor = FetchDescriptor<Audiobook>()
+        let audiobooks = try context.fetch(descriptor)
+        var didChange = false
+
+        for audiobook in audiobooks {
+            if audiobook.addedAt == nil,
+               let inferredDate = fileAdditionDate(for: audiobook.fileURL) {
+                audiobook.addedAt = inferredDate
+                didChange = true
+            }
+
+            let repairedBookURL = repairStoredFileURL(audiobook.fileURL)
+            if repairedBookURL != audiobook.fileURL {
+                audiobook.fileURL = repairedBookURL
+                didChange = true
+            }
+
+            for chapter in audiobook.chapters {
+                let repairedChapterURL = repairStoredFileURL(chapter.fileURL)
+                if repairedChapterURL != chapter.fileURL {
+                    chapter.fileURL = repairedChapterURL
+                    didChange = true
+                }
+            }
+        }
+
+        if didChange {
+            try context.save()
+        }
+    }
+
+    func isAudiobookPlayable(_ audiobook: Audiobook) -> Bool {
+        guard !audiobook.chapters.isEmpty else { return false }
+
+        var fileURLs = Set(audiobook.chapters.map(\.fileURL))
+        fileURLs.insert(audiobook.fileURL)
+
+        return fileURLs.allSatisfy { fileExists(at: repairStoredFileURL($0)) }
+    }
+
     func merge(audiobooks: [Audiobook], intoTitle title: String, in context: ModelContext) throws -> Audiobook {
         guard audiobooks.count >= 2 else {
             throw LibraryManagerError.insufficientAudiobooksForMerge
@@ -215,6 +279,8 @@ final class LibraryManager: LibraryManagerProtocol {
         }
 
         masterAudiobook.duration = timelineOffset
+        masterAudiobook.accumulatedListeningSeconds = audiobooks
+            .reduce(0.0) { $0 + $1.accumulatedListeningSeconds }
 
         let sortedMasterChapters = masterAudiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
         if let primaryChapterURL = sortedMasterChapters.first?.fileURL {
@@ -252,6 +318,13 @@ final class LibraryManager: LibraryManagerProtocol {
         } catch {
             throw LibraryManagerError.fileSystemOperationFailed
         }
+    }
+
+    private func fileAdditionDate(for url: URL) -> Date? {
+        guard let values = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey]) else {
+            return nil
+        }
+        return values.creationDate ?? values.contentModificationDate
     }
 
     private func uniqueDestinationURL(for fileName: String) -> URL {

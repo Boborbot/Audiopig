@@ -1,0 +1,13 @@
+# Xcode build artifacts
+build/
+DerivedData/
+xcuserdata/
+
+# macOS
+.DS_Store
+
+# Local test audiobooks (~1 GB) — see Assets for Testing/README.md
+Assets for Testing/*.m4b
+Assets for Testing/*.mp3
+Assets for Testing/*.M4B
+Assets for Testing/*.MP3
