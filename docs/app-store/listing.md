@@ -97,32 +97,32 @@ Expect **4+** — no restricted content in the app itself. User-imported audio c
 ## Copyright
 
 ```
-2026 Nitay
+2026 Nitay Abuzaglo
 ```
-
-(Update to your legal name or entity.)
 
 ---
 
 ## Support URL
 
-Host a simple page or GitHub repo README. Example:
+Hosted on GitHub Pages:
 
 ```
-https://github.com/yourusername/audiopig/issues
+https://boborbot.github.io/Audiopig/
 ```
-
----
 
 ## Marketing URL (optional)
 
-Same as support URL or your personal site.
+Same as support URL.
 
 ---
 
 ## Privacy Policy URL
 
-**Required.** Host `privacy-policy.html` from this folder (GitHub Pages, personal site, etc.) and paste the public URL here.
+**Required.** Hosted copy (keep in sync with `docs/app-store/privacy-policy.html`):
+
+```
+https://boborbot.github.io/Audiopig/privacy-policy.html
+```
 
 ---
 

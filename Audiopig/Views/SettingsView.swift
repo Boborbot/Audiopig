@@ -120,6 +120,13 @@ struct SettingsView: View {
                 } header: {
                     Text("About")
                         .sectionTitle()
+                } footer: {
+                    Link(destination: AppSupport.privacyPolicyURL) {
+                        Text("Privacy Policy")
+                            .font(DS.Typography.caption)
+                            .foregroundStyle(DS.Color.tertiary)
+                    }
+                    .tint(DS.Color.tertiary)
                 }
             }
             .scrollContentBackground(.hidden)
