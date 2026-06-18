@@ -76,6 +76,29 @@ enum DS {
                 ? UIColor(red: 0x1E / 255.0, green: 0x20 / 255.0, blue: 0x26 / 255.0, alpha: 1) // #1E2026
                 : UIColor.secondarySystemBackground
         })
+
+        /// Locked fills for the base pig on every app icon (default + alternates).
+        /// Variant head props (hats, crowns, etc.) may use any color; these six must not drift.
+        /// Full spec: `design-assets/app-icon-spec.md`.
+        enum Icon {
+            /// Salmon background — same value as `coral` (`#F18470`).
+            static let salmon = coral
+
+            /// Pig head, torso, and limbs (`#FAC0B0`).
+            static let pigBody = SwiftUI.Color(hex: "#FAC0B0")
+
+            /// Snout oval and inner ears (`#F8BCB0`).
+            static let nose = SwiftUI.Color(hex: "#F8BCB0")
+
+            /// Open book cover and pages (`#805040`).
+            static let book = SwiftUI.Color(hex: "#805040")
+
+            /// Headphone band and ear cups (`#32201A`).
+            static let headphones = SwiftUI.Color(hex: "#32201A")
+
+            /// Outlines, eyes, and nostrils on locked elements (`#302018`).
+            static let outline = SwiftUI.Color(hex: "#302018")
+        }
     }
 
     // MARK: - Rounded System Font Helpers

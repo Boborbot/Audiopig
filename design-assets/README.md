@@ -2,6 +2,10 @@
 
 PNG sources kept in the repo but **not wired into any Xcode target**. Runtime assets live in each target's `Assets.xcassets/`.
 
+## App icon spec
+
+Locked pig palette, composition, and QA for default + unlockable icons: **[app-icon-spec.md](app-icon-spec.md)**. Six base fills are fixed on every variant; head props (hats, crowns, etc.) may use any color. Swift tokens: `DS.Color.Icon` (`Design/DesignSystem.swift`).
+
 ## Layout
 
 | Path | Meaning |
