@@ -98,6 +98,9 @@ struct MainTabView: View {
         }
         .onAppear {
             syncWidgetSnapshots()
+            WidgetPlaybackPresentation.install {
+                isPlayerPresented = true
+            }
         }
         .onOpenURL { url in
             handleWidgetURL(url)

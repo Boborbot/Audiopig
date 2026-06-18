@@ -18,6 +18,7 @@ enum WatchSnapshotBuilder {
         skipBackwardSeconds: TimeInterval,
         globalTime: TimeInterval,
         globalDuration: TimeInterval,
+        playbackTimelineScope: PlaybackTimelineScope,
         coverImage: UIImage?,
         includeArtwork: Bool,
         systemVolumeOverride: Float? = nil
@@ -62,6 +63,7 @@ enum WatchSnapshotBuilder {
             chapterProgress: progress.chapterProgress,
             globalCurrentTime: globalTime,
             globalDuration: globalDuration,
+            playbackTimelineScope: playbackTimelineScope,
             systemVolume: volume,
             source: .remote,
             artworkJPEG: artwork

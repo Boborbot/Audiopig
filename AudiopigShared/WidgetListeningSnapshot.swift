@@ -13,9 +13,12 @@ enum WidgetListeningSnapshot {
     static let appGroupID = "group.com.nitay.Audiopig"
     static let widgetKind = "ListeningStatsWidget"
     static let artworkWidgetKind = "ListeningArtworkWidget"
+    static let continueListeningWidgetKind = "ContinueListeningWidget"
+    static let continueListeningControlKind = "ContinueListeningControl"
     static let allWidgetKinds = [
         widgetKind,
         artworkWidgetKind,
+        continueListeningWidgetKind,
         WidgetWeeklyListeningSnapshot.widgetKind,
         WidgetRecentBooksSnapshot.widgetKind,
     ]
@@ -45,6 +48,7 @@ enum WidgetListeningSnapshot {
         static let lastPlayedTitle = "widget.lastPlayedTitle"
         static let lastPlayedAuthor = "widget.lastPlayedAuthor"
         static let lastPlayedAudiobookID = "widget.lastPlayedAudiobookID"
+        static let lastPlayedProgress = "widget.lastPlayedProgress"
         static let todayDate = "widget.todayDate"
         static let todayListenedSeconds = "widget.todayListenedSeconds"
         static let snapshotUpdatedAt = "widget.snapshotUpdatedAt"
@@ -66,6 +70,7 @@ enum WidgetListeningSnapshot {
         let lastPlayedTitle: String
         let lastPlayedAuthor: String
         let lastPlayedAudiobookID: String?
+        let lastPlayedProgress: Double
         let todayListenedSeconds: TimeInterval
         let snapshotUpdatedAt: Date
         let theme: Theme
@@ -85,6 +90,7 @@ enum WidgetListeningSnapshot {
             lastPlayedTitle: title,
             lastPlayedAuthor: author,
             lastPlayedAudiobookID: audiobookID,
+            lastPlayedProgress: resolvedProgress(defaults: defaults),
             todayListenedSeconds: todaySeconds,
             snapshotUpdatedAt: updatedAt,
             theme: loadTheme(defaults: defaults),
@@ -102,14 +108,26 @@ enum WidgetListeningSnapshot {
 
     // MARK: - Write (app only)
 
-    static func updateLastPlayed(title: String, author: String, audiobookID: String? = nil) {
+    static func updateLastPlayed(
+        title: String,
+        author: String,
+        audiobookID: String? = nil,
+        progress: Double = 0
+    ) {
         guard let defaults = sharedDefaults() else { return }
         defaults.set(title, forKey: Keys.lastPlayedTitle)
         defaults.set(author, forKey: Keys.lastPlayedAuthor)
         if let audiobookID {
             defaults.set(audiobookID, forKey: Keys.lastPlayedAudiobookID)
         }
+        defaults.set(min(1, max(0, progress)), forKey: Keys.lastPlayedProgress)
         touchSnapshot(defaults)
+    }
+
+    /// Progress through the book timeline, 0…1.
+    static func playbackProgress(currentTime: TimeInterval, duration: TimeInterval) -> Double {
+        guard duration > 0 else { return 0 }
+        return min(1, max(0, currentTime / duration))
     }
 
     static func saveTheme(_ theme: Theme) {
@@ -182,6 +200,11 @@ enum WidgetListeningSnapshot {
     }
 
     // MARK: - Private
+
+    private static func resolvedProgress(defaults: UserDefaults?) -> Double {
+        guard let defaults else { return 0 }
+        return min(1, max(0, defaults.double(forKey: Keys.lastPlayedProgress)))
+    }
 
     private static func sharedDefaults() -> UserDefaults? {
         UserDefaults(suiteName: appGroupID)

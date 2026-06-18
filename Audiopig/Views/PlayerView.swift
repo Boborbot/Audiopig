@@ -17,24 +17,12 @@ struct PlayerView: View {
                 .playerBackground(image: viewModel.coverImage)
 
             GeometryReader { geometry in
-                let contentWidth = geometry.size.width - (DS.Spacing.playerH * 2)
-                let artworkHeight = contentWidth
-
-                VStack(spacing: 0) {
-                    Spacer(minLength: DS.Spacing.sm)
-
-                    artworkSection(width: contentWidth, height: artworkHeight)
-
-                    titleSection
-                        .layoutPriority(1)
-
-                    controlsPanel
-                        .layoutPriority(1)
-
-                    Spacer(minLength: DS.Spacing.sm)
+                let metrics = PlayerLayoutMetrics(geometry: geometry)
+                if metrics.isLandscape {
+                    landscapeLayout(metrics: metrics, geometry: geometry)
+                } else {
+                    portraitLayout(metrics: metrics, geometry: geometry)
                 }
-                .padding(.horizontal, DS.Spacing.playerH)
-                .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
         .sheet(isPresented: $viewModel.isChaptersPresented) {
@@ -59,6 +47,75 @@ struct PlayerView: View {
                 paywallViewModel = viewModel.makePaywallViewModel()
             }
         }
+    }
+
+    // MARK: - Layout
+
+    @ViewBuilder
+    private func portraitLayout(metrics: PlayerLayoutMetrics, geometry: GeometryProxy) -> some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: DS.Spacing.sm)
+
+            artworkSection(width: metrics.artworkWidth, height: metrics.artworkHeight)
+
+            titleSection
+                .layoutPriority(1)
+
+            controlsPanel()
+                .layoutPriority(1)
+
+            Spacer(minLength: DS.Spacing.sm)
+        }
+        .padding(.horizontal, metrics.horizontalPadding)
+        .frame(width: geometry.size.width, height: geometry.size.height)
+    }
+
+    @ViewBuilder
+    private func landscapeLayout(metrics: PlayerLayoutMetrics, geometry: GeometryProxy) -> some View {
+        HStack(spacing: 0) {
+            if metrics.artworkOnLeading {
+                artworkColumn(metrics: metrics)
+                columnDivider
+                controlsColumn(metrics: metrics)
+            } else {
+                controlsColumn(metrics: metrics)
+                columnDivider
+                artworkColumn(metrics: metrics)
+            }
+        }
+        .frame(width: geometry.size.width, height: geometry.size.height)
+    }
+
+    private func artworkColumn(metrics: PlayerLayoutMetrics) -> some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: DS.Spacing.sm)
+
+            artworkSection(width: metrics.artworkWidth, height: metrics.artworkHeight)
+
+            titleSection
+
+            Spacer(minLength: DS.Spacing.sm)
+        }
+        .padding(.horizontal, metrics.horizontalPadding)
+        .frame(width: metrics.columnWidth, height: metrics.screenSize.height)
+    }
+
+    private func controlsColumn(metrics: PlayerLayoutMetrics) -> some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: DS.Spacing.sm)
+
+            controlsPanel(compact: true)
+
+            Spacer(minLength: DS.Spacing.sm)
+        }
+        .padding(.horizontal, metrics.horizontalPadding)
+        .frame(width: metrics.columnWidth, height: metrics.screenSize.height)
+    }
+
+    private var columnDivider: some View {
+        Rectangle()
+            .fill(DS.Color.separator.opacity(0.4))
+            .frame(width: 0.5)
     }
 
     // MARK: - Artwork
@@ -130,8 +187,12 @@ struct PlayerView: View {
 
     // MARK: - Controls (laid directly on the glass surface)
 
-    private var controlsPanel: some View {
-        VStack(spacing: 0) {
+    private func controlsPanel(compact: Bool = false) -> some View {
+        let sectionGap = compact ? DS.Spacing.sm : DS.Spacing.md + DS.Spacing.sm
+        let panelTop = compact ? DS.Spacing.sm : DS.Spacing.md
+        let lullBottom = compact ? DS.Spacing.sm : DS.Spacing.md
+
+        return VStack(spacing: 0) {
             // Hairline separator between title and controls
             Rectangle()
                 .fill(DS.Color.separator.opacity(0.4))
@@ -145,21 +206,21 @@ struct PlayerView: View {
             if case .failed(let message) = viewModel.playbackState {
                 failedStateBanner(message: message)
                     .padding(.horizontal, DS.Spacing.md)
-                    .padding(.top, DS.Spacing.md)
+                    .padding(.top, compact ? DS.Spacing.sm : DS.Spacing.md)
             }
 
             controlsSection
-                .padding(.top, DS.Spacing.md + DS.Spacing.sm)
+                .padding(.top, sectionGap)
 
             bottomRow
-                .padding(.top, DS.Spacing.md + DS.Spacing.sm)
+                .padding(.top, sectionGap)
 
-            lullAnalysisSection
+            lullAnalysisSection(compact: compact)
                 .padding(.top, DS.Spacing.sm)
                 .padding(.horizontal, DS.Spacing.md)
-                .padding(.bottom, DS.Spacing.md)
+                .padding(.bottom, lullBottom)
         }
-        .padding(.top, DS.Spacing.md)
+        .padding(.top, panelTop)
     }
 
     // MARK: - Failed State Banner
@@ -392,7 +453,9 @@ struct PlayerView: View {
     // MARK: - Lull Analysis Section
 
     @ViewBuilder
-    private var lullAnalysisSection: some View {
+    private func lullAnalysisSection(compact: Bool) -> some View {
+        let pillPadding: CGFloat = compact ? 10 : 14
+
         switch viewModel.lullAnalysisState {
         case .idle:
             Button {
@@ -403,7 +466,7 @@ struct PlayerView: View {
                     Text("Find Paragraph Breaks")
                 }
                 .frame(maxWidth: .infinity)
-                .pillAppearance(verticalPadding: 14)
+                .pillAppearance(verticalPadding: pillPadding)
             }
             .buttonStyle(.plain)
             .disabled(!viewModel.isActive)
@@ -415,21 +478,21 @@ struct PlayerView: View {
                 Text("Analyzing…")
             }
             .frame(maxWidth: .infinity)
-            .pillAppearance(verticalPadding: 14)
+            .pillAppearance(verticalPadding: pillPadding)
 
         case .results(let lulls):
             VStack(spacing: DS.Spacing.sm) {
                 if lulls.isEmpty {
                     Text("No breaks found")
                         .frame(maxWidth: .infinity)
-                        .pillAppearance(verticalPadding: 14)
+                        .pillAppearance(verticalPadding: pillPadding)
                 } else if let lull = lulls.first {
                     Button {
                         viewModel.seekToLull(lull)
                     } label: {
                         Text(viewModel.lullLabel(for: lull))
                             .frame(maxWidth: .infinity)
-                            .pillAppearance(isActive: true, verticalPadding: 14)
+                            .pillAppearance(isActive: true, verticalPadding: pillPadding)
                     }
                     .buttonStyle(.plain)
                 }
@@ -458,6 +521,39 @@ struct PlayerView: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Layout Metrics
+
+private struct PlayerLayoutMetrics {
+    let isLandscape: Bool
+    let artworkOnLeading: Bool
+    let artworkWidth: CGFloat
+    let artworkHeight: CGFloat
+    let columnWidth: CGFloat
+    let horizontalPadding: CGFloat
+    let screenSize: CGSize
+
+    init(geometry: GeometryProxy) {
+        let size = geometry.size
+        let padding = DS.Spacing.playerH
+        isLandscape = size.width > size.height
+        horizontalPadding = padding
+        screenSize = size
+        artworkOnLeading = geometry.safeAreaInsets.leading >= geometry.safeAreaInsets.trailing
+
+        if isLandscape {
+            columnWidth = size.width / 2
+            let columnInner = columnWidth - (padding * 2)
+            artworkWidth = columnInner
+            artworkHeight = min(columnInner, size.height * 0.62)
+        } else {
+            columnWidth = size.width
+            let contentWidth = size.width - (padding * 2)
+            artworkWidth = contentWidth
+            artworkHeight = contentWidth
         }
     }
 }

@@ -31,7 +31,8 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Appearance** — system, light, or dark mode; optional portrait orientation lock
 - **Audiopig Plus** — monthly subscription unlocks lull detection; optional "Feed a Student" consumable tips in Settings
 - **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback (recent books, controls, chapters, artwork skip gestures). On-Watch local library transfer is archived until a future release (`WatchFeatures.localPlaybackEnabled`).
-- **Home screen widgets** (`AudiopigWidget`) — now-playing, recent books, listening stats, and hour-club progress via App Group snapshots
+- **Home screen widgets** (`AudiopigWidget`) — listening stats, artwork, recent books, hour-club progress, and a lock screen **Continue Listening** circular widget (progress ring + pig glyph; tap resumes last book and opens the player)
+- **Lock screen control** (iOS 18+) — optional bottom-corner control to resume the last audiobook (`ContinueListeningControl`)
 - **Volume control** — hardware volume integration through `SystemVolumeController`
 
 ---
@@ -64,7 +65,8 @@ Audiopig/
 │   ├── ViewModels/             LibraryViewModel, PlayerViewModel, StatsViewModel, Edit*ViewModels
 │   ├── Views/                  MainTabView, LibraryView, PlayerView, SettingsView, StatsView, Edit*Views
 │   │   └── Components/         MiniPlayerView, AppIconGalleryThumbnail, celebration overlays, row views
-│   ├── Services/               AudioEngine, LibraryManager, WatchConnectivity, WatchTransfer, StoreKit, WidgetSnapshotWriter
+│   ├── Intents/                App Shortcuts (`PlayLastAudiobookIntent`)
+│   ├── Services/               AudioEngine, LibraryManager, WatchConnectivity, WatchTransfer, StoreKit, WidgetSnapshotWriter, WidgetPlaybackService
 │   ├── Protocols/              AudioEngineProtocol, LibraryManagerProtocol, MonetizationServiceProtocol, WatchTransferServiceProtocol
 │   ├── DependencyInjection/    DependencyContainer, AudiopigModelContainer
 │   ├── Design/                 DesignSystem, GlassModifiers, ButtonStyles, ViewExtensions
@@ -73,7 +75,7 @@ Audiopig/
 │   └── Assets.xcassets/        App icon (+ unlockable tier variants), gallery thumbnails
 ├── AudiopigShared/             Shared Swift sources compiled into app, Watch, and Widget targets
 ├── AudiopigWatch/              watchOS companion (remote playback; local transfer archived)
-├── AudiopigWidget/             WidgetKit extension (now playing, hour club)
+├── AudiopigWidget/             WidgetKit extension (stats, artwork, recent books, Continue Listening widget + iOS 18 control)
 └── AudiopigTests/              Unit tests (ChapterProgressCalculator, export formatting, achievements)
 ```
 
@@ -120,7 +122,7 @@ See `docs/app-store/` for:
 
 | Area | Status |
 |---|---|
-| Automated tests | `AudiopigTests` covers pure logic; no UI or AVFoundation integration tests yet |
+| Automated tests | `AudiopigTests` covers pure logic (including `WidgetListeningSnapshot`); no UI or AVFoundation integration tests yet |
 | Per-book playback speed | Global default from Settings applies on load; not saved per book |
 | Format support | Only `.mp3` and `.m4b`; no `.aax`, `.opus`, etc. |
 | Watch local transfer | Archived (`WatchFeatures.localPlaybackEnabled`); code retained for a future release |

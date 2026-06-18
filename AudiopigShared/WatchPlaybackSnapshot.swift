@@ -22,6 +22,8 @@ public struct WatchPlaybackSnapshot: Codable, Sendable, Equatable {
     public let chapterProgress: Double
     public let globalCurrentTime: TimeInterval
     public let globalDuration: TimeInterval
+    /// Mirrors iPhone player timebar scope; optional for older payloads.
+    public let playbackTimelineScope: PlaybackTimelineScope?
     public let systemVolume: Float
     public let source: WatchPlaybackSource
     /// JPEG artwork ~200×200; sent on book change only.
@@ -45,6 +47,7 @@ public struct WatchPlaybackSnapshot: Codable, Sendable, Equatable {
         chapterProgress: Double,
         globalCurrentTime: TimeInterval,
         globalDuration: TimeInterval,
+        playbackTimelineScope: PlaybackTimelineScope? = nil,
         systemVolume: Float,
         source: WatchPlaybackSource,
         artworkJPEG: Data?,
@@ -66,6 +69,7 @@ public struct WatchPlaybackSnapshot: Codable, Sendable, Equatable {
         self.chapterProgress = chapterProgress
         self.globalCurrentTime = globalCurrentTime
         self.globalDuration = globalDuration
+        self.playbackTimelineScope = playbackTimelineScope
         self.systemVolume = systemVolume
         self.source = source
         self.artworkJPEG = artworkJPEG

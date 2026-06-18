@@ -22,6 +22,7 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
     private var defaultSpeed: Float = 1.0
     private var universalSpeedEnabled: Bool = false
     private var universalSpeedValue: Float = 1.0
+    private var playbackTimelineScope: PlaybackTimelineScope = .currentChapter
     private var positionSyncTask: Task<Void, Never>?
     private var resumePersistTask: Task<Void, Never>?
     private var lastSyncedPosition: TimeInterval = -1
@@ -43,6 +44,9 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
             defaultSpeed = settings.defaultSpeed ?? defaultSpeed
             universalSpeedEnabled = settings.universalPlaybackSpeedEnabled ?? false
             universalSpeedValue = settings.universalPlaybackSpeed ?? universalSpeedValue
+            if let scope = settings.playbackTimelineScope {
+                playbackTimelineScope = scope
+            }
         }
 
         engine.onTimeUpdate = { [weak self] _ in
@@ -64,6 +68,9 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
             self?.universalSpeedEnabled = settings.universalPlaybackSpeedEnabled ?? false
             if let uni = settings.universalPlaybackSpeed {
                 self?.universalSpeedValue = uni
+            }
+            if let scope = settings.playbackTimelineScope {
+                self?.playbackTimelineScope = scope
             }
         }
     }
@@ -273,6 +280,7 @@ final class LocalWatchPlaybackCoordinator: WatchPlaybackCoordinating {
             chapterProgress: progress.chapterProgress,
             globalCurrentTime: engine.currentTime,
             globalDuration: manifest.duration,
+            playbackTimelineScope: playbackTimelineScope,
             systemVolume: engine.systemVolume,
             source: .local,
             artworkJPEG: artwork

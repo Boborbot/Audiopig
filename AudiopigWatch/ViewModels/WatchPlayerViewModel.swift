@@ -66,14 +66,14 @@ final class WatchPlayerViewModel: ObservableObject {
         }
 
         isReachable = coordinator.isReachable
+        if let cachedSettings = client.latestSettings {
+            applySettings(cachedSettings)
+        }
         if let existing = coordinator.snapshot {
             applyAuthoritativeSnapshot(existing)
         }
         if let cachedChapters = client.latestChapters {
             applyChapters(cachedChapters)
-        }
-        if let cachedSettings = client.latestSettings {
-            applySettings(cachedSettings)
         }
 
         if let router = coordinator as? WatchPlaybackRouter {
@@ -167,45 +167,37 @@ final class WatchPlayerViewModel: ObservableObject {
     }
 
     var chapterElapsedDisplay: TimeInterval {
-        interpolatedElapsed
+        resolvedChapterProgress.chapterElapsed
     }
 
     var chapterRemainingDisplay: TimeInterval {
-        max(0, snapshot.chapterDuration - interpolatedElapsed)
+        max(0, resolvedChapterProgress.chapterDuration - resolvedChapterProgress.chapterElapsed)
     }
 
     var chapterProgressDisplay: Double {
-        guard snapshot.chapterDuration > 0 else { return 0 }
-        return min(1, interpolatedElapsed / snapshot.chapterDuration)
+        resolvedChapterProgress.chapterProgress
     }
 
     var timebarElapsedDisplay: TimeInterval {
-        switch playbackTimelineScope {
-        case .entireBook:
-            return interpolatedGlobalTime
-        case .currentChapter:
-            return interpolatedElapsed
-        }
+        usesChapterTimebar
+            ? resolvedChapterProgress.chapterElapsed
+            : interpolatedGlobalTime
     }
 
     var timebarRemainingDisplay: TimeInterval {
-        switch playbackTimelineScope {
-        case .entireBook:
-            return max(0, snapshot.globalDuration - interpolatedGlobalTime)
-        case .currentChapter:
-            return max(0, snapshot.chapterDuration - interpolatedElapsed)
+        if usesChapterTimebar {
+            let progress = resolvedChapterProgress
+            return max(0, progress.chapterDuration - progress.chapterElapsed)
         }
+        return max(0, snapshot.globalDuration - interpolatedGlobalTime)
     }
 
     var timebarProgressDisplay: Double {
-        switch playbackTimelineScope {
-        case .entireBook:
-            guard snapshot.globalDuration > 0 else { return 0 }
-            return min(1, interpolatedGlobalTime / snapshot.globalDuration)
-        case .currentChapter:
-            guard snapshot.chapterDuration > 0 else { return 0 }
-            return min(1, interpolatedElapsed / snapshot.chapterDuration)
+        if usesChapterTimebar {
+            return resolvedChapterProgress.chapterProgress
         }
+        guard snapshot.globalDuration > 0 else { return 0 }
+        return min(1, interpolatedGlobalTime / snapshot.globalDuration)
     }
 
     var artworkImage: UIImage? {
@@ -245,7 +237,7 @@ final class WatchPlayerViewModel: ObservableObject {
 
     func skipForward() {
         WatchHaptics.directionUp()
-        bumpInterpolatedElapsed(by: snapshot.skipForwardSeconds)
+        bumpInterpolatedGlobal(by: snapshot.skipForwardSeconds)
         Task {
             let result = await coordinator.send(.skipForward)
             await handleCommandResult(result)
@@ -254,7 +246,7 @@ final class WatchPlayerViewModel: ObservableObject {
 
     func skipBackward() {
         WatchHaptics.directionDown()
-        bumpInterpolatedElapsed(by: -snapshot.skipBackwardSeconds)
+        bumpInterpolatedGlobal(by: -snapshot.skipBackwardSeconds)
         Task {
             let result = await coordinator.send(.skipBackward)
             await handleCommandResult(result)
@@ -353,9 +345,12 @@ final class WatchPlayerViewModel: ObservableObject {
         snapshot = incoming
         optimisticState = nil
         connectionMessage = nil
-        interpolatedElapsed = incoming.chapterElapsed
         interpolatedGlobalTime = incoming.globalCurrentTime
         isReachable = coordinator.isReachable
+
+        if let scope = incoming.playbackTimelineScope {
+            applyTimelineScope(scope)
+        }
 
         if bookChanged {
             lullState = .idle
@@ -456,9 +451,9 @@ final class WatchPlayerViewModel: ObservableObject {
         } else {
             speedPresets = WatchSpeedRange.presets
         }
-        if let scope = settings.playbackTimelineScope {
-            playbackTimelineScope = scope
-            Self.persistTimelineScope(scope)
+        if let scope = settings.playbackTimelineScope, snapshot.bookID == nil {
+            // Only adopt settings scope before playback snapshots arrive; snapshots are authoritative.
+            applyTimelineScope(scope)
         }
     }
 
@@ -512,15 +507,52 @@ final class WatchPlayerViewModel: ObservableObject {
 
     // MARK: - Local interpolation
 
-    private var interpolatedElapsed: TimeInterval = 0
     private var interpolatedGlobalTime: TimeInterval = 0
 
-    private func bumpInterpolatedElapsed(by delta: TimeInterval) {
-        interpolatedElapsed = max(0, min(snapshot.chapterDuration, interpolatedElapsed + delta))
+    /// Whether the timebar shows chapter-scoped elapsed/remaining.
+    private var usesChapterTimebar: Bool {
+        if snapshot.playbackTimelineScope == .currentChapter { return true }
+        if playbackTimelineScope == .currentChapter { return true }
+        return effectiveChapterCount > 1
+    }
+
+    private var effectiveChapterCount: Int {
+        max(chapters.count, snapshot.chapterCount)
+    }
+
+    private var chapterTimings: [WatchChapterTiming] {
+        if !chapters.isEmpty {
+            return chapters.map { WatchChapterTiming(startTime: $0.startTime, duration: $0.duration) }
+        }
+        return []
+    }
+
+    private var resolvedChapterProgress: WatchChapterProgress {
+        let timings = chapterTimings
+        if !timings.isEmpty {
+            return ChapterProgressCalculator.progress(
+                globalTime: interpolatedGlobalTime,
+                chapters: timings
+            )
+        }
+
+        return WatchChapterProgress(
+            chapterIndex: snapshot.chapterIndex,
+            chapterElapsed: snapshot.chapterElapsed,
+            chapterDuration: snapshot.chapterDuration,
+            chapterProgress: snapshot.chapterProgress
+        )
+    }
+
+    private func applyTimelineScope(_ scope: PlaybackTimelineScope) {
+        guard playbackTimelineScope != scope else { return }
+        playbackTimelineScope = scope
+        Self.persistTimelineScope(scope)
     }
 
     private func bumpInterpolatedGlobal(by delta: TimeInterval) {
         interpolatedGlobalTime = max(0, min(snapshot.globalDuration, interpolatedGlobalTime + delta))
+        objectWillChange.send()
     }
 
     private func restartInterpolationIfNeeded() {
@@ -531,7 +563,6 @@ final class WatchPlayerViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.snapshot.playbackState == .playing else { return }
                 let delta = 0.25 * Double(self.snapshot.playbackSpeed)
-                self.bumpInterpolatedElapsed(by: delta)
                 self.bumpInterpolatedGlobal(by: delta)
             }
         }

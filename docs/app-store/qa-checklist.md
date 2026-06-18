@@ -181,6 +181,14 @@ Local library and Send to Watch are disabled (`WatchFeatures.localPlaybackEnable
 - [ ] Listening stats widget updates after playback
 - [ ] Hour-club widget shows progress toward next icon tier
 
+## Lock Screen — Continue Listening
+
+- [ ] Add **Continue Listening** circular widget (above/below clock); pig glyph and progress ring visible
+- [ ] Progress ring matches last book position after playback
+- [ ] Tap widget: last book plays, app opens to **Player** sheet
+- [ ] iOS 18+: replace flashlight/camera corner with **Continue Listening** control; tap plays last book and opens player
+- [ ] Works after force-quit (play a book once, quit app, tap widget/control)
+
 ---
 
 ## Regression / Edge Cases

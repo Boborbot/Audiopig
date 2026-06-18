@@ -57,6 +57,7 @@ struct AudiopigApp: App {
             )
             self.container = dc
             self.libraryViewModel = libraryVM
+            WidgetPlaybackService.bind(libraryViewModel: libraryVM)
             libraryVM.syncWatchSettings()
             libraryVM.syncWatchRecentBooks()
             Task {

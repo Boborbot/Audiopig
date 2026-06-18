@@ -18,12 +18,14 @@ enum WidgetSnapshotWriter {
         title: String,
         author: String,
         audiobookID: UUID? = nil,
+        progress: Double = 0,
         coverImage: UIImage? = nil
     ) {
         WidgetListeningSnapshot.updateLastPlayed(
             title: title,
             author: author,
-            audiobookID: audiobookID?.uuidString
+            audiobookID: audiobookID?.uuidString,
+            progress: progress
         )
         if audiobookID != nil, let coverImage {
             WidgetArtworkExporter.exportCover(image: coverImage)

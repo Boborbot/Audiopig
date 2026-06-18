@@ -204,6 +204,7 @@ final class PlayerViewModel {
         )
         guard !isScrubbing else { return }
         applyEngineTime(audioEngine.currentTime)
+        publishWatchSnapshot(immediate: true, includeArtwork: false)
     }
 
     /// Summary label shown below the time row; acts as the toggle tap target.
@@ -340,6 +341,7 @@ final class PlayerViewModel {
             title: audiobook.title,
             author: audiobook.author,
             audiobookID: audiobook.id,
+            progress: widgetProgress(for: audiobook),
             coverImage: self.coverImage
         )
         publishWatchSnapshot(immediate: true, includeArtwork: true)
@@ -806,6 +808,7 @@ final class PlayerViewModel {
             skipBackwardSeconds: settings.skipBackwardInterval,
             globalTime: audioEngine.currentTime,
             globalDuration: audioEngine.duration,
+            playbackTimelineScope: playbackDisplayMode.timelineScope,
             coverImage: coverImage,
             includeArtwork: includeArtwork,
             systemVolumeOverride: systemVolumeOverride
@@ -916,6 +919,13 @@ final class PlayerViewModel {
 
     // MARK: - Private — Persistence
 
+    private func widgetProgress(for audiobook: Audiobook, at time: TimeInterval? = nil) -> Double {
+        WidgetListeningSnapshot.playbackProgress(
+            currentTime: time ?? audiobook.currentPlaybackTime,
+            duration: audiobook.duration
+        )
+    }
+
     private func savePlaybackPosition() {
         guard let audiobook else { return }
         audiobook.currentPlaybackTime = audioEngine.currentTime
@@ -924,7 +934,8 @@ final class PlayerViewModel {
         WidgetSnapshotWriter.updateLastPlayed(
             title: audiobook.title,
             author: audiobook.author,
-            audiobookID: audiobook.id
+            audiobookID: audiobook.id,
+            progress: widgetProgress(for: audiobook, at: audioEngine.currentTime)
         )
         onPlaybackPositionSaved?()
     }

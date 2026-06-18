@@ -25,6 +25,7 @@ struct ListeningArtworkProvider: TimelineProvider {
                 lastPlayedTitle: "The Great Gatsby",
                 lastPlayedAuthor: "F. Scott Fitzgerald",
                 lastPlayedAudiobookID: nil,
+                lastPlayedProgress: 0,
                 todayListenedSeconds: 7_200,
                 snapshotUpdatedAt: .now,
                 theme: .fallback,
@@ -166,6 +167,7 @@ struct ListeningArtworkWidget_Previews: PreviewProvider {
                     lastPlayedTitle: "Project Hail Mary",
                     lastPlayedAuthor: "Andy Weir",
                     lastPlayedAudiobookID: nil,
+                    lastPlayedProgress: 0.72,
                     todayListenedSeconds: 8_640,
                     snapshotUpdatedAt: .now,
                     theme: WidgetListeningSnapshot.Theme(

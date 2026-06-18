@@ -276,6 +276,43 @@ final class LibraryViewModel {
         return true
     }
 
+    /// Starts or resumes playback from a lock screen widget / control, then presents the player.
+    func playAudiobookFromWidget(id: UUID) async throws {
+        guard let audiobook = resolveAudiobook(id: id) else {
+            throw WidgetPlaybackError.bookNotFound
+        }
+        try? libraryManager.repairAudiobookFileReferences(in: modelContext)
+
+        if playerViewModel.audiobook?.id == id {
+            switch playerViewModel.playbackState {
+            case .playing:
+                return
+            case .paused, .finished, .idle:
+                playerViewModel.play()
+                syncWidgetRecentBooks()
+                syncWatchRecentBooks()
+                return
+            case .loading:
+                return
+            case .failed:
+                break
+            }
+        }
+
+        await playerViewModel.loadAudiobook(audiobook, autoPlay: true)
+        syncWidgetRecentBooks()
+        syncWatchRecentBooks()
+    }
+
+    func playLastAudiobookFromWidget() async throws {
+        let snapshot = WidgetListeningSnapshot.load()
+        guard let idString = snapshot.lastPlayedAudiobookID,
+              let bookID = UUID(uuidString: idString) else {
+            throw WidgetPlaybackError.noLastPlayedBook
+        }
+        try await playAudiobookFromWidget(id: bookID)
+    }
+
     // MARK: - Watch Commands
 
     func handleWatchCommand(_ command: WatchCommand) async -> WatchCommandResult {

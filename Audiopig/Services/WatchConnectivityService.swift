@@ -77,6 +77,7 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
                 chapterProgress: snapshot.chapterProgress,
                 globalCurrentTime: snapshot.globalCurrentTime,
                 globalDuration: snapshot.globalDuration,
+                playbackTimelineScope: snapshot.playbackTimelineScope,
                 systemVolume: snapshot.systemVolume,
                 source: snapshot.source,
                 artworkJPEG: nil,
