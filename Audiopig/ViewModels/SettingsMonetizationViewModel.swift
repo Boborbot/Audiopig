@@ -39,6 +39,10 @@ final class SettingsMonetizationViewModel {
         monetization.plusDisplayPrice
     }
 
+    func hasAccess(to feature: PremiumFeature) -> Bool {
+        monetization.hasAccess(to: feature)
+    }
+
     func onAppear() async {
         await monetization.loadProducts()
         await monetization.refreshEntitlements()

@@ -96,7 +96,8 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
 
         case .requestRecentBooks, .requestSnapshot, .togglePlayPause, .play, .pause,
              .skipForward, .skipBackward, .setSpeed, .setVolume,
-             .seekToChapterIndex, .seekToChapter, .setArtworkSkipGesturesEnabled:
+             .seekToChapterIndex, .seekToChapter, .setArtworkSkipGesturesEnabled,
+             .setWatchArtworkViewMode:
             return await activeCoordinator.send(command)
 
         case .analyzeLulls, .seekToLull:

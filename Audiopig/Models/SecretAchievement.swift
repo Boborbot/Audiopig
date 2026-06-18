@@ -16,6 +16,9 @@ import Foundation
 enum SecretAchievement: String, CaseIterable, Identifiable {
     case christmasDay
     case newYearsEve
+    case pigaladriel
+    case sirPigNosalot
+    case thePigWhoLived
 
     var id: String { rawValue }
 
@@ -24,6 +27,9 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
         switch self {
         case .christmasDay: return "AppIcon-ChristmasDay"
         case .newYearsEve:  return "AppIcon-NewYearsEve"
+        case .pigaladriel:     return "AppIcon-Pigaladriel"
+        case .sirPigNosalot:     return "AppIcon-SirPigNosalot"
+        case .thePigWhoLived:    return "AppIcon-ThePigWhoLived"
         }
     }
 
@@ -32,6 +38,9 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
         switch self {
         case .christmasDay: return "Gallery-ChristmasDay"
         case .newYearsEve:  return "Gallery-NewYearsEve"
+        case .pigaladriel:     return "Gallery-Pigaladriel"
+        case .sirPigNosalot:     return "Gallery-SirPigNosalot"
+        case .thePigWhoLived:    return "Gallery-ThePigWhoLived"
         }
     }
 
@@ -40,6 +49,9 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
         switch self {
         case .christmasDay: return "Christmas Day"
         case .newYearsEve:  return "New Year's Ten Hours"
+        case .pigaladriel:     return "Pigaladriel"
+        case .sirPigNosalot:     return "Sir Pig Nosalot"
+        case .thePigWhoLived:    return "The Pig Who Lived"
         }
     }
 
@@ -49,6 +61,12 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
             return "The best gift is a finished book."
         case .newYearsEve:
             return "What year is it?"
+        case .pigaladriel:
+            return "All Shall Love Me And Despair!"
+        case .sirPigNosalot:
+            return "A pig has no name."
+        case .thePigWhoLived:
+            return "Yer a listener, Harry."
         }
     }
 
@@ -60,6 +78,27 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
             return ChristmasDayFinishCondition.isSatisfied(by: event, calendar: calendar)
         case .newYearsEve:
             return NewYearsEveFinishCondition.isSatisfied(by: event, calendar: calendar)
+        case .pigaladriel:
+            return MiddleEarthFinishCondition.isSatisfied(
+                title: event.title,
+                author: event.author,
+                listenedSeconds: event.listenedSeconds,
+                totalSeconds: event.totalSeconds
+            )
+        case .sirPigNosalot:
+            return WesterosFinishCondition.isSatisfied(
+                title: event.title,
+                author: event.author,
+                listenedSeconds: event.listenedSeconds,
+                totalSeconds: event.totalSeconds
+            )
+        case .thePigWhoLived:
+            return HogwartsFinishCondition.isSatisfied(
+                title: event.title,
+                author: event.author,
+                listenedSeconds: event.listenedSeconds,
+                totalSeconds: event.totalSeconds
+            )
         }
     }
 }

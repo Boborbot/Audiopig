@@ -349,6 +349,14 @@ final class LibraryViewModel {
             syncWatchSettings()
             return .ok()
 
+        case .setWatchArtworkViewMode(let mode):
+            guard mode == .off || monetization.hasAccess(to: .watchArtworkView) else {
+                return .failure("Audiopig Plus required on iPhone.")
+            }
+            appSettings.watchArtworkViewMode = mode
+            syncWatchSettings()
+            return .ok()
+
         case .analyzeLulls:
             guard monetization.hasAccess(to: .paragraphBreaks) else {
                 return .failure("Audiopig Plus required on iPhone.")
@@ -433,7 +441,8 @@ final class LibraryViewModel {
     func syncWatchSettings() {
         watchBridge?.publishSettings(
             appSettings.watchSettingsSnapshot(
-                hasParagraphBreaksAccess: monetization.hasAccess(to: .paragraphBreaks)
+                hasParagraphBreaksAccess: monetization.hasAccess(to: .paragraphBreaks),
+                hasWatchArtworkViewAccess: monetization.hasAccess(to: .watchArtworkView)
             )
         )
     }

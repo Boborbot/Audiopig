@@ -19,16 +19,36 @@ struct WatchPlayerPagerView: View {
             SpeedControlsView(viewModel: viewModel, isActive: selectedPage == 0)
                 .tag(0)
 
-            MediaControlsView(viewModel: viewModel, isActive: selectedPage == 1)
-                .tag(1)
+            if viewModel.effectiveArtworkViewMode == .add {
+                ArtworkControlsView(viewModel: viewModel, isActive: selectedPage == 1)
+                    .tag(1)
+            }
+
+            if viewModel.effectiveArtworkViewMode == .replaceStandardControls {
+                ArtworkControlsView(viewModel: viewModel, isActive: selectedPage == 1)
+                    .tag(1)
+            } else if viewModel.effectiveArtworkViewMode != .replaceStandardControls {
+                MediaControlsView(
+                    viewModel: viewModel,
+                    isActive: selectedPage == mediaControlsPageIndex
+                )
+                .tag(mediaControlsPageIndex)
+            }
 
             ChapterListView(
                 viewModel: viewModel,
-                isActive: selectedPage == 2,
-                onChapterSelected: { selectedPage = 1 }
+                isActive: selectedPage == viewModel.chaptersPageIndex,
+                onChapterSelected: { selectedPage = viewModel.mainControlsPageIndex }
             )
-            .tag(2)
+            .tag(viewModel.chaptersPageIndex)
         }
         .tabViewStyle(.verticalPage)
+        .onChange(of: viewModel.effectiveArtworkViewMode) { _, _ in
+            selectedPage = viewModel.mainControlsPageIndex
+        }
+    }
+
+    private var mediaControlsPageIndex: Int {
+        viewModel.effectiveArtworkViewMode == .add ? 2 : 1
     }
 }

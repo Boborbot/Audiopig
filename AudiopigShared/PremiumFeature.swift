@@ -8,12 +8,13 @@ import Foundation
 /// Premium capabilities gated behind Audiopig Plus (subscription or free trial).
 public enum PremiumFeature: String, CaseIterable, Sendable {
     case paragraphBreaks
+    case watchArtworkView
 }
 
 public extension PremiumFeature {
 
     /// Features that require an active Plus subscription or introductory trial.
-    static let plusGated: Set<PremiumFeature> = [.paragraphBreaks]
+    static let plusGated: Set<PremiumFeature> = [.paragraphBreaks, .watchArtworkView]
 
     /// Whether this feature is unlocked only with Audiopig Plus.
     var requiresPlusAccess: Bool {

@@ -15,6 +15,13 @@ struct WatchSettingsView: View {
     var body: some View {
         List {
             Section {
+                artworkViewModePicker
+            } footer: {
+                Text("Show cover art with transport controls on the Watch player. Audiopig Plus required.")
+                    .font(.caption2)
+            }
+
+            Section {
                 Toggle(isOn: gesturesBinding) {
                     Text("Artwork skip gestures")
                         .font(.caption)
@@ -26,6 +33,28 @@ struct WatchSettingsView: View {
             }
         }
         .navigationTitle("Settings")
+    }
+
+    private var artworkViewModePicker: some View {
+        Picker("Artwork view", selection: artworkViewModeBinding) {
+            ForEach(WatchArtworkViewMode.allCases, id: \.self) { mode in
+                Text(mode.watchSettingsLabel).tag(mode)
+            }
+        }
+        .disabled(!playerViewModel.hasWatchArtworkViewAccess)
+        .opacity(playerViewModel.hasWatchArtworkViewAccess ? 1 : 0.45)
+    }
+
+    private var artworkViewModeBinding: Binding<WatchArtworkViewMode> {
+        Binding(
+            get: { playerViewModel.watchArtworkViewMode },
+            set: { newValue in
+                playerViewModel.watchArtworkViewMode = newValue
+                Task {
+                    _ = await playerViewModel.sendWatchArtworkViewModeSetting(newValue)
+                }
+            }
+        )
     }
 
     private var gesturesBinding: Binding<Bool> {

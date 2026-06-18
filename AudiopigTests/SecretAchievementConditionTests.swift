@@ -57,4 +57,88 @@ final class SecretAchievementConditionTests: XCTestCase {
         let afternoon = finishEvent(at: date(month: 12, day: 31, hour: 15))
         XCTAssertFalse(SecretAchievement.newYearsEve.isUnlocked(by: afternoon, calendar: calendar))
     }
+
+    func testPigaladrielUnlocksForTolkienFinishWithEnoughListening() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "The Fellowship of the Ring",
+            author: "J.R.R. Tolkien",
+            totalSeconds: 10_000,
+            listenedSeconds: 8_000,
+            chapterCount: 24,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertTrue(SecretAchievement.pigaladriel.isUnlocked(by: event, calendar: calendar))
+    }
+
+    func testPigaladrielDoesNotUnlockForUnrelatedBook() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "Dune",
+            author: "Frank Herbert",
+            totalSeconds: 10_000,
+            listenedSeconds: 9_000,
+            chapterCount: 40,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertFalse(SecretAchievement.pigaladriel.isUnlocked(by: event, calendar: calendar))
+    }
+
+    func testSirPigNosalotUnlocksForASOIAFFinishWithEnoughListening() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "A Storm of Swords",
+            author: "George R.R. Martin",
+            totalSeconds: 10_000,
+            listenedSeconds: 8_000,
+            chapterCount: 82,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertTrue(SecretAchievement.sirPigNosalot.isUnlocked(by: event, calendar: calendar))
+    }
+
+    func testSirPigNosalotDoesNotUnlockForUnrelatedBook() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "The Way of Kings",
+            author: "Brandon Sanderson",
+            totalSeconds: 10_000,
+            listenedSeconds: 9_000,
+            chapterCount: 75,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertFalse(SecretAchievement.sirPigNosalot.isUnlocked(by: event, calendar: calendar))
+    }
+
+    func testThePigWhoLivedUnlocksForHarryPotterFinishWithEnoughListening() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "Harry Potter and the Prisoner of Azkaban",
+            author: "J.K. Rowling",
+            totalSeconds: 10_000,
+            listenedSeconds: 8_000,
+            chapterCount: 22,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertTrue(SecretAchievement.thePigWhoLived.isUnlocked(by: event, calendar: calendar))
+    }
+
+    func testThePigWhoLivedDoesNotUnlockForFantasticBeasts() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "Fantastic Beasts and Where to Find Them",
+            author: "J.K. Rowling",
+            totalSeconds: 10_000,
+            listenedSeconds: 9_000,
+            chapterCount: 12,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertFalse(SecretAchievement.thePigWhoLived.isUnlocked(by: event, calendar: calendar))
+    }
 }

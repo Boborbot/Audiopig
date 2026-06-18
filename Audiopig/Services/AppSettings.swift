@@ -47,14 +47,8 @@ enum AppAppearance: String, CaseIterable {
 @MainActor
 @Observable
 final class AppSettings {
-    private static let minPlaybackSpeed: Float = 0.25
-    private static let maxPlaybackSpeed: Float = 4.0
-    private static let playbackSpeedStep: Float = 0.05
-
     private static func normalizedSpeed(_ speed: Float) -> Float {
-        let clamped = min(max(speed, minPlaybackSpeed), maxPlaybackSpeed)
-        let stepped = (clamped / playbackSpeedStep).rounded() * playbackSpeedStep
-        return (stepped * 100).rounded() / 100
+        WatchSpeedRange.normalized(speed)
     }
 
     // MARK: - UserDefaults Keys
@@ -79,6 +73,7 @@ final class AppSettings {
         static let sleepTimerOption     = "settings.sleepTimerOption"
         static let sleepTimerExpiry     = "settings.sleepTimerExpiry"
         static let watchArtworkSkipGestures = "settings.watchArtworkSkipGestures"
+        static let watchArtworkViewMode = "settings.watchArtworkViewMode"
         static let librarySortOrder         = "settings.librarySortOrder"
         static let libraryBookFilter        = "settings.libraryBookFilter"
         static let librarySortDirection     = "settings.librarySortDirection"
@@ -193,6 +188,15 @@ final class AppSettings {
     private var _watchArtworkSkipGesturesEnabled: Bool = {
         guard UserDefaults.standard.object(forKey: Keys.watchArtworkSkipGestures) != nil else { return false }
         return UserDefaults.standard.bool(forKey: Keys.watchArtworkSkipGestures)
+    }()
+
+    @ObservationIgnored
+    private var _watchArtworkViewMode: WatchArtworkViewMode = {
+        guard let raw = UserDefaults.standard.string(forKey: Keys.watchArtworkViewMode),
+              let mode = WatchArtworkViewMode(rawValue: raw) else {
+            return .off
+        }
+        return mode
     }()
 
     @ObservationIgnored
@@ -499,6 +503,20 @@ final class AppSettings {
         }
     }
 
+    /// How the Watch player shows a dedicated artwork screen. Default: `.off`.
+    var watchArtworkViewMode: WatchArtworkViewMode {
+        get {
+            access(keyPath: \.watchArtworkViewMode)
+            return _watchArtworkViewMode
+        }
+        set {
+            withMutation(keyPath: \.watchArtworkViewMode) {
+                _watchArtworkViewMode = newValue
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.watchArtworkViewMode)
+            }
+        }
+    }
+
     /// How root-level library audiobooks are ordered. Default: recently listened.
     var librarySortOrder: LibrarySortOrder {
         get {
@@ -556,7 +574,10 @@ final class AppSettings {
         }
     }
 
-    func watchSettingsSnapshot(hasParagraphBreaksAccess: Bool) -> WatchSettingsSnapshot {
+    func watchSettingsSnapshot(
+        hasParagraphBreaksAccess: Bool,
+        hasWatchArtworkViewAccess: Bool
+    ) -> WatchSettingsSnapshot {
         WatchSettingsSnapshot(
             artworkSkipGesturesEnabled: watchArtworkSkipGesturesEnabled,
             skipForwardSeconds: skipForwardInterval,
@@ -566,7 +587,9 @@ final class AppSettings {
             defaultSpeed: defaultSpeed,
             universalPlaybackSpeedEnabled: universalPlaybackSpeedEnabled,
             universalPlaybackSpeed: universalPlaybackSpeedEnabled ? universalPlaybackSpeed : nil,
-            hasParagraphBreaksAccess: hasParagraphBreaksAccess
+            hasParagraphBreaksAccess: hasParagraphBreaksAccess,
+            watchArtworkViewMode: watchArtworkViewMode,
+            hasWatchArtworkViewAccess: hasWatchArtworkViewAccess
         )
     }
 

@@ -153,11 +153,6 @@ final class PlayerViewModel {
     /// Default preset buttons (customizable in Settings).
     static let defaultSpeedPresets: [Float] = [1.0, 1.2, 1.5]
 
-    /// Curated speeds for the Settings default-speed picker.
-    static let availableSpeeds: [Float] = [
-        0.25, 0.5, 0.75, 1.0, 1.2, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0
-    ]
-
     var speedLabel: String {
         Self.formatSpeedLabel(playbackSpeed)
     }
@@ -167,17 +162,11 @@ final class PlayerViewModel {
     }
 
     static func formatSpeedLabel(_ speed: Float) -> String {
-        let normalized = normalizedSpeed(speed)
-        if normalized.truncatingRemainder(dividingBy: 1) == 0 {
-            return "\(Int(normalized))×"
-        }
-        return String(format: "%.2g×", normalized)
+        WatchSpeedRange.formatLabel(speed)
     }
 
     static func normalizedSpeed(_ speed: Float) -> Float {
-        let clamped = min(max(speed, minPlaybackSpeed), maxPlaybackSpeed)
-        let stepped = (clamped / playbackSpeedStep).rounded() * playbackSpeedStep
-        return (stepped * 100).rounded() / 100
+        WatchSpeedRange.normalized(speed)
     }
 
     func isSpeedPresetActive(_ preset: Float) -> Bool {
@@ -209,7 +198,8 @@ final class PlayerViewModel {
         audioEngine.setNowPlayingTimelineScope(newScope.nowPlayingScope)
         watchBridge?.publishSettings(
             settings.watchSettingsSnapshot(
-                hasParagraphBreaksAccess: monetization.hasAccess(to: .paragraphBreaks)
+                hasParagraphBreaksAccess: monetization.hasAccess(to: .paragraphBreaks),
+                hasWatchArtworkViewAccess: monetization.hasAccess(to: .watchArtworkView)
             )
         )
         guard !isScrubbing else { return }
@@ -415,7 +405,9 @@ final class PlayerViewModel {
     }
 
     func adjustSpeed(by delta: Float) {
-        setSpeed(playbackSpeed + delta)
+        let stepCount = Int((delta / Self.playbackSpeedStep).rounded())
+        guard stepCount != 0 else { return }
+        setSpeed(WatchSpeedRange.adjusted(playbackSpeed, byStepCount: stepCount))
     }
 
     func seekToChapter(_ chapter: Chapter) {

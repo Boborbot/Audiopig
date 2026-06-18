@@ -16,7 +16,7 @@ struct WatchRootView: View {
     @ObservedObject var libraryViewModel: WatchLibraryViewModel
 
     @State private var screen: WatchScreen
-    @State private var selectedPage = 1
+    @State private var selectedPage: Int
     @State private var userDismissedPlayer = false
 
     init(
@@ -27,6 +27,7 @@ struct WatchRootView: View {
         _libraryViewModel = ObservedObject(wrappedValue: libraryViewModel)
         let initial: WatchScreen = playerViewModel.shouldLaunchToPlayer ? .player : .sourcePicker
         _screen = State(initialValue: initial)
+        _selectedPage = State(initialValue: playerViewModel.mainControlsPageIndex)
     }
 
     var body: some View {
@@ -72,7 +73,7 @@ struct WatchRootView: View {
             let becameActive = !oldState.isActive && newState.isActive
             if becameActive, playerViewModel.snapshot.bookID != nil {
                 screen = .player
-                selectedPage = 1
+                selectedPage = playerViewModel.mainControlsPageIndex
             }
         }
     }
@@ -104,7 +105,7 @@ struct WatchRootView: View {
         userDismissedPlayer = false
         playerViewModel.preferLocalPlayback(false)
         screen = .player
-        selectedPage = 1
+        selectedPage = playerViewModel.mainControlsPageIndex
     }
 
     private func dismissPlayer() {
@@ -116,6 +117,6 @@ struct WatchRootView: View {
         guard playerViewModel.shouldLaunchToPlayer, !userDismissedPlayer else { return }
         guard allowsRemoteAutoLaunch else { return }
         screen = .player
-        selectedPage = 1
+        selectedPage = playerViewModel.mainControlsPageIndex
     }
 }

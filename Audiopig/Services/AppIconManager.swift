@@ -19,8 +19,13 @@ final class AppIconManager {
     // MARK: - QA
 
     #if DEBUG
-    /// When `true`, every icon appears unlocked in the gallery without meeting requirements.
-    static let unlockAllIconsForQA = true
+    private static let qaUnlockAllKey = "appicons.qa.unlockAll"
+
+    /// Opt-in via `UserDefaults` (`appicons.qa.unlockAll`). Off by default.
+    /// Gallery preview only — `applyIcon` still requires a persisted unlock.
+    static var unlockAllIconsForQA: Bool {
+        UserDefaults.standard.bool(forKey: qaUnlockAllKey)
+    }
     #else
     static let unlockAllIconsForQA = false
     #endif
@@ -61,13 +66,22 @@ final class AppIconManager {
     }
 
     func isUnlocked(_ tier: AppIconTier) -> Bool {
-        if Self.unlockAllIconsForQA || tier.isAlwaysUnlocked { return true }
-        return unlockedTierRawValues.contains(tier.rawValue)
+        if Self.unlockAllIconsForQA { return true }
+        return hasEarnedUnlock(tier)
     }
 
     func isUnlocked(_ achievement: SecretAchievement) -> Bool {
         if Self.unlockAllIconsForQA { return true }
-        return unlockedSecretRawValues.contains(achievement.rawValue)
+        return hasEarnedUnlock(achievement)
+    }
+
+    private func hasEarnedUnlock(_ tier: AppIconTier) -> Bool {
+        if tier.isAlwaysUnlocked { return true }
+        return unlockedTierRawValues.contains(tier.rawValue)
+    }
+
+    private func hasEarnedUnlock(_ achievement: SecretAchievement) -> Bool {
+        unlockedSecretRawValues.contains(achievement.rawValue)
     }
 
     func isActive(_ tier: AppIconTier) -> Bool {
@@ -142,12 +156,12 @@ final class AppIconManager {
     // MARK: - Apply icon
 
     func applyIcon(_ tier: AppIconTier) {
-        guard isUnlocked(tier), !isActive(tier) else { return }
+        guard hasEarnedUnlock(tier), !isActive(tier) else { return }
         applyIcon(named: tier.alternateIconName)
     }
 
     func applyIcon(_ achievement: SecretAchievement) {
-        guard isUnlocked(achievement), !isActive(achievement) else { return }
+        guard hasEarnedUnlock(achievement), !isActive(achievement) else { return }
         applyIcon(named: achievement.iconName)
     }
 

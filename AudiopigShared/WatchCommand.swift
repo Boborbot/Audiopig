@@ -21,6 +21,7 @@ public enum WatchCommand: Codable, Sendable, Equatable {
     case seekToChapterIndex(Int)
     case seekToChapter(id: UUID)
     case setArtworkSkipGesturesEnabled(Bool)
+    case setWatchArtworkViewMode(WatchArtworkViewMode)
     case analyzeLulls
     case seekToLull(endTime: TimeInterval)
     case deleteLocalBook(bookID: UUID)
@@ -37,6 +38,7 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case chapterIndex
         case chapterID
         case enabled
+        case artworkViewMode
         case time
         case localBooks
         case errorMessage
@@ -58,6 +60,7 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case seekToChapterIndex
         case seekToChapter
         case setArtworkSkipGesturesEnabled
+        case setWatchArtworkViewMode
         case analyzeLulls
         case seekToLull
         case deleteLocalBook
@@ -96,6 +99,8 @@ public enum WatchCommand: Codable, Sendable, Equatable {
             self = .seekToChapter(id: try container.decode(UUID.self, forKey: .chapterID))
         case .setArtworkSkipGesturesEnabled:
             self = .setArtworkSkipGesturesEnabled(try container.decode(Bool.self, forKey: .enabled))
+        case .setWatchArtworkViewMode:
+            self = .setWatchArtworkViewMode(try container.decode(WatchArtworkViewMode.self, forKey: .artworkViewMode))
         case .analyzeLulls:
             self = .analyzeLulls
         case .seekToLull:
@@ -157,6 +162,9 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case .setArtworkSkipGesturesEnabled(let enabled):
             try container.encode(Kind.setArtworkSkipGesturesEnabled, forKey: .kind)
             try container.encode(enabled, forKey: .enabled)
+        case .setWatchArtworkViewMode(let mode):
+            try container.encode(Kind.setWatchArtworkViewMode, forKey: .kind)
+            try container.encode(mode, forKey: .artworkViewMode)
         case .analyzeLulls:
             try container.encode(Kind.analyzeLulls, forKey: .kind)
         case .seekToLull(let endTime):

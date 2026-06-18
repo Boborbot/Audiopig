@@ -12,8 +12,15 @@ final class MonetizationTests: XCTestCase {
         XCTAssertTrue(PremiumFeature.paragraphBreaks.requiresPlusAccess)
     }
 
-    func test_plusGated_containsParagraphBreaksOnly() {
-        XCTAssertEqual(PremiumFeature.plusGated, [.paragraphBreaks])
+    func test_watchArtworkView_requiresPlusAccess() {
+        XCTAssertTrue(PremiumFeature.watchArtworkView.requiresPlusAccess)
+    }
+
+    func test_plusGated_containsPremiumFeatures() {
+        XCTAssertEqual(
+            PremiumFeature.plusGated,
+            [.paragraphBreaks, .watchArtworkView]
+        )
     }
 
     func test_hasPremiumAccess_grantsParagraphBreaksWhenEntitled() {
@@ -22,6 +29,14 @@ final class MonetizationTests: XCTestCase {
 
     func test_hasPremiumAccess_deniesParagraphBreaksWithoutEntitlement() {
         XCTAssertFalse(hasPremiumAccess(to: .paragraphBreaks, hasPlusEntitlement: false))
+    }
+
+    func test_hasPremiumAccess_grantsWatchArtworkViewWhenEntitled() {
+        XCTAssertTrue(hasPremiumAccess(to: .watchArtworkView, hasPlusEntitlement: true))
+    }
+
+    func test_hasPremiumAccess_deniesWatchArtworkViewWithoutEntitlement() {
+        XCTAssertFalse(hasPremiumAccess(to: .watchArtworkView, hasPlusEntitlement: false))
     }
 
     func test_productIdentifiers_plusMonthly() {

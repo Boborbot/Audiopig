@@ -34,6 +34,47 @@ public enum WatchSpeedRange {
     public static let crownStep: Float = step * 9
     /// Default preset buttons shown on the Watch player (and mirrored on iPhone).
     public static let presets: [Float] = [1.0, 1.2, 1.5]
+
+    private static let minStepIndex = 5
+    private static let maxStepIndex = 80
+    private static let centiPerStep = 5
+
+    /// Snaps `speed` to the nearest 0.05× step within `[min, max]`.
+    public static func normalized(_ speed: Float) -> Float {
+        speedAtStepIndex(stepIndex(for: speed))
+    }
+
+    /// Moves `speed` by `delta` steps of 0.05× each (negative to decrease).
+    public static func adjusted(_ speed: Float, byStepCount delta: Int) -> Float {
+        speedAtStepIndex(stepIndex(for: speed) + delta)
+    }
+
+    /// Display label: up to two decimals, trailing zeros omitted (e.g. `1×`, `1.1×`, `1.15×`).
+    public static func formatLabel(_ speed: Float) -> String {
+        let centi = stepIndex(for: speed) * centiPerStep
+        let whole = centi / 100
+        let fraction = centi % 100
+        if fraction == 0 {
+            return "\(whole)×"
+        }
+        if fraction % 10 == 0 {
+            return "\(whole).\(fraction / 10)×"
+        }
+        let tenths = fraction / 10
+        let hundredths = fraction % 10
+        return "\(whole).\(tenths)\(hundredths)×"
+    }
+
+    private static func stepIndex(for speed: Float) -> Int {
+        let clamped = Swift.min(Swift.max(speed, min), max)
+        let index = Int((Double(clamped) / Double(step)).rounded())
+        return Swift.min(Swift.max(index, minStepIndex), maxStepIndex)
+    }
+
+    private static func speedAtStepIndex(_ index: Int) -> Float {
+        let clamped = Swift.min(Swift.max(index, minStepIndex), maxStepIndex)
+        return Float(clamped * centiPerStep) / 100
+    }
 }
 
 public enum WatchTimeFormat {

@@ -18,10 +18,6 @@ struct SettingsView: View {
     @State private var shareAllExportedItems: [Any] = []
     @State private var exportedNoteCount = 0
 
-    private static let skipIntervalOptions: [TimeInterval] = [5, 10, 15, 30, 45, 60]
-    private static let lullLookbackOptions: [TimeInterval] = stride(from: 1, through: 15, by: 1).map { TimeInterval($0 * 60) }
-    private static let lullSkipRecentOptions: [TimeInterval] = [0, 10, 20, 30, 45, 60, 90, 120]
-
     init(
         settings: AppSettings,
         statsViewModel: StatsViewModel,
@@ -61,88 +57,14 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Picker("Default Speed", selection: $settings.defaultSpeed) {
-                        ForEach(PlayerViewModel.availableSpeeds, id: \.self) { speed in
-                            Text(speedLabel(speed)).tag(speed)
-                        }
+                    NavigationLink {
+                        PlaybackControlsSettingsView(
+                            settings: settings,
+                            onWatchSettingsChanged: onWatchSettingsChanged
+                        )
+                    } label: {
+                        Label("Playback Controls", systemImage: "playpause")
                     }
-                    .tint(DS.Color.coral)
-
-                    Toggle(isOn: $settings.universalPlaybackSpeedEnabled) {
-                        Label("Universal playback speed", systemImage: "globe")
-                    }
-                    .tint(DS.Color.coral)
-                    .onChange(of: settings.universalPlaybackSpeedEnabled) { _, _ in onWatchSettingsChanged?() }
-
-                    Picker("Speed Button 1", selection: $settings.speedPreset1) {
-                        ForEach(PlayerViewModel.availableSpeeds, id: \.self) { speed in
-                            Text(speedLabel(speed)).tag(speed)
-                        }
-                    }
-                    .tint(DS.Color.coral)
-                    .onChange(of: settings.speedPreset1) { _, _ in onWatchSettingsChanged?() }
-
-                    Picker("Speed Button 2", selection: $settings.speedPreset2) {
-                        ForEach(PlayerViewModel.availableSpeeds, id: \.self) { speed in
-                            Text(speedLabel(speed)).tag(speed)
-                        }
-                    }
-                    .tint(DS.Color.coral)
-                    .onChange(of: settings.speedPreset2) { _, _ in onWatchSettingsChanged?() }
-
-                    Picker("Speed Button 3", selection: $settings.speedPreset3) {
-                        ForEach(PlayerViewModel.availableSpeeds, id: \.self) { speed in
-                            Text(speedLabel(speed)).tag(speed)
-                        }
-                    }
-                    .tint(DS.Color.coral)
-                    .onChange(of: settings.speedPreset3) { _, _ in onWatchSettingsChanged?() }
-
-                    Picker("Skip Forward", selection: $settings.skipForwardInterval) {
-                        ForEach(Self.skipIntervalOptions, id: \.self) { seconds in
-                            Text("\(Int(seconds))s").tag(seconds)
-                        }
-                    }
-                    .tint(DS.Color.coral)
-                    .onChange(of: settings.skipForwardInterval) { _, _ in onWatchSettingsChanged?() }
-
-                    Picker("Skip Backward", selection: $settings.skipBackwardInterval) {
-                        ForEach(Self.skipIntervalOptions, id: \.self) { seconds in
-                            Text("\(Int(seconds))s").tag(seconds)
-                        }
-                    }
-                    .tint(DS.Color.coral)
-                    .onChange(of: settings.skipBackwardInterval) { _, _ in onWatchSettingsChanged?() }
-                } header: {
-                    Text("Playback")
-                        .sectionTitle()
-                }
-
-                Section {
-                    Picker("Look back", selection: $settings.lullLookbackWindow) {
-                        ForEach(Self.lullLookbackOptions, id: \.self) { seconds in
-                            Text("\(Int(seconds / 60)) min").tag(seconds)
-                        }
-                    }
-                    .tint(DS.Color.coral)
-
-                    Picker("Skip recent", selection: $settings.lullSkipRecentWindow) {
-                        ForEach(Self.lullSkipRecentOptions, id: \.self) { seconds in
-                            if seconds == 0 {
-                                Text("Off").tag(seconds)
-                            } else {
-                                Text("\(Int(seconds))s").tag(seconds)
-                            }
-                        }
-                    }
-                    .tint(DS.Color.coral)
-                } header: {
-                    Text("Paragraph Breaks")
-                        .sectionTitle()
-                } footer: {
-                    Text("Controls how far back Find Paragraph Breaks analyzes, and how much recent audio is ignored.")
-                        .font(DS.Typography.caption)
-                        .foregroundStyle(DS.Color.tertiary)
                 }
 
                 Section {
@@ -200,8 +122,19 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Picker("Artwork view", selection: $settings.watchArtworkViewMode) {
+                        ForEach(WatchArtworkViewMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .disabled(!monetizationViewModel.hasAccess(to: .watchArtworkView))
+                    .opacity(monetizationViewModel.hasAccess(to: .watchArtworkView) ? 1 : 0.45)
+                    .onChange(of: settings.watchArtworkViewMode) { _, _ in
+                        onWatchSettingsChanged?()
+                    }
+
                     Toggle(isOn: $settings.watchArtworkSkipGesturesEnabled) {
-                        Label("Artwork skip gestures", systemImage: "applewatch")
+                        Label("Artwork skip gestures", systemImage: "hand.tap")
                     }
                     .tint(DS.Color.coral)
                     .onChange(of: settings.watchArtworkSkipGesturesEnabled) { _, _ in
@@ -211,7 +144,7 @@ struct SettingsView: View {
                     Text("Apple Watch")
                         .sectionTitle()
                 } footer: {
-                    Text("When enabled, double-tap on the Watch player artwork zone skips forward; triple-tap skips back.")
+                    Text("Artwork view shows cover art with play and skip controls on the Watch player. Off leaves controls unchanged. Replace swaps the main controls screen; Add inserts an extra screen between controls and speed.")
                         .font(DS.Typography.caption)
                         .foregroundStyle(DS.Color.tertiary)
                 }
@@ -337,9 +270,4 @@ struct SettingsView: View {
         isShareAllExportedPresented = true
     }
 
-    private func speedLabel(_ speed: Float) -> String {
-        speed.truncatingRemainder(dividingBy: 1) == 0
-            ? "\(Int(speed))×"
-            : String(format: "%.2g×", speed)
-    }
 }

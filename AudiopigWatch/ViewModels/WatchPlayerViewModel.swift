@@ -22,6 +22,7 @@ final class WatchPlayerViewModel: ObservableObject {
     @Published private(set) var connectionMessage: String?
     @Published private(set) var chapters: [WatchChapterSummary] = []
     @Published var artworkSkipGesturesEnabled = false
+    @Published var watchArtworkViewMode: WatchArtworkViewMode = .off
     @Published private(set) var speedPresets: [Float] = WatchSpeedRange.presets
     @Published private(set) var playbackTimelineScope: PlaybackTimelineScope = WatchPlayerViewModel.loadPersistedTimelineScope()
 
@@ -33,6 +34,7 @@ final class WatchPlayerViewModel: ObservableObject {
     @Published var showVolumeOverlay = false
     @Published private(set) var lullState: WatchLullState = .idle
     @Published private(set) var hasParagraphBreaksAccess = false
+    @Published private(set) var hasWatchArtworkViewAccess = false
 
     private let coordinator: any WatchPlaybackCoordinating
     private let client: WatchConnectivityClient
@@ -95,6 +97,30 @@ final class WatchPlayerViewModel: ObservableObject {
         snapshot.bookID != nil
             && snapshot.source == .remote
             && hasParagraphBreaksAccess
+    }
+
+    var effectiveArtworkViewMode: WatchArtworkViewMode {
+        guard hasWatchArtworkViewAccess else { return .off }
+        return watchArtworkViewMode
+    }
+
+    /// Default pager page for the main transport controls (media or artwork-replace).
+    var mainControlsPageIndex: Int {
+        switch effectiveArtworkViewMode {
+        case .off, .replaceStandardControls:
+            return 1
+        case .add:
+            return 2
+        }
+    }
+
+    var chaptersPageIndex: Int {
+        switch effectiveArtworkViewMode {
+        case .off, .replaceStandardControls:
+            return 2
+        case .add:
+            return 3
+        }
     }
 
     func lullLabel(for lull: WatchLullResult) -> String {
@@ -191,10 +217,7 @@ final class WatchPlayerViewModel: ObservableObject {
     var skipBackwardInterval: Int { Int(snapshot.skipBackwardSeconds) }
 
     var speedLabel: String {
-        let speed = speedDraft
-        return speed.truncatingRemainder(dividingBy: 1) == 0
-            ? String(format: "%.0f×", speed)
-            : String(format: "%.2g×", speed)
+        WatchSpeedRange.formatLabel(speedDraft)
     }
 
     func refresh() async {
@@ -311,6 +334,10 @@ final class WatchPlayerViewModel: ObservableObject {
         await coordinator.send(.setArtworkSkipGesturesEnabled(enabled))
     }
 
+    func sendWatchArtworkViewModeSetting(_ mode: WatchArtworkViewMode) async -> WatchCommandResult {
+        await coordinator.send(.setWatchArtworkViewMode(mode))
+    }
+
     func preferLocalPlayback(_ preferred: Bool) {
         (coordinator as? WatchPlaybackRouter)?.preferLocalPlayback(preferred)
     }
@@ -415,8 +442,14 @@ final class WatchPlayerViewModel: ObservableObject {
     private func applySettings(_ settings: WatchSettingsSnapshot) {
         artworkSkipGesturesEnabled = settings.artworkSkipGesturesEnabled
         hasParagraphBreaksAccess = settings.hasParagraphBreaksAccess ?? false
+        hasWatchArtworkViewAccess = settings.hasWatchArtworkViewAccess ?? false
         if !hasParagraphBreaksAccess {
             lullState = .idle
+        }
+        if let mode = settings.watchArtworkViewMode {
+            watchArtworkViewMode = hasWatchArtworkViewAccess ? mode : .off
+        } else if !hasWatchArtworkViewAccess {
+            watchArtworkViewMode = .off
         }
         if let incomingPresets = settings.speedPresets, !incomingPresets.isEmpty {
             speedPresets = incomingPresets.sorted()
@@ -474,8 +507,7 @@ final class WatchPlayerViewModel: ObservableObject {
     }
 
     private static func normalizedSpeed(_ speed: Float) -> Float {
-        let stepped = (speed / WatchSpeedRange.step).rounded() * WatchSpeedRange.step
-        return min(WatchSpeedRange.max, max(WatchSpeedRange.min, stepped))
+        WatchSpeedRange.normalized(speed)
     }
 
     // MARK: - Local interpolation

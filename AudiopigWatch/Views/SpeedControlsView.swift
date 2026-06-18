@@ -91,13 +91,10 @@ struct SpeedControlsView: View {
     }
 
     private func presetLabel(_ speed: Float) -> String {
-        speed.truncatingRemainder(dividingBy: 1) == 0
-            ? "\(Int(speed))"
-            : String(format: "%.2g", speed)
+        String(WatchSpeedRange.formatLabel(speed).dropLast())
     }
 
     private func normalizedSpeed(_ speed: Float) -> Float {
-        let stepped = (speed / WatchSpeedRange.step).rounded() * WatchSpeedRange.step
-        return min(WatchSpeedRange.max, max(WatchSpeedRange.min, stepped))
+        WatchSpeedRange.normalized(speed)
     }
 }
