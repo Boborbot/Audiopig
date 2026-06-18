@@ -57,6 +57,10 @@ Device: _______________   iOS: _______________   Date: _______________
 - [ ] Lock screen controls: play/pause, skip, scrub
 - [ ] Switch to another app; audio continues; return and UI state matches
 - [ ] Kill app mid-play; relaunch → position restored near where you left off
+- [ ] With orientation lock **off**, rotate to landscape: artwork+title on notch side, controls on opposite side; no scroll needed
+- [ ] Landscape left and landscape right: artwork column follows the camera/notch edge
+- [ ] Non-square cover art in landscape (tall and wide) looks correct in the artwork column
+- [ ] All player controls reachable in landscape (scrubber, transport, speed, chapters, bookmarks, sleep timer, lull section)
 
 ---
 

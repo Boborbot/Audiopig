@@ -29,6 +29,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **App icon gallery** — browse and apply hour-tier and secret achievement alternate icons from the Stats tab
 - **Finish celebrations** — confetti and optional delete confirmation when marking a book finished
 - **Appearance** — system, light, or dark mode; optional portrait orientation lock
+- **Landscape player** — when orientation lock is off, the full player splits into artwork+title and controls columns (cover art on the notch side); no scrolling required
 - **Audiopig Plus** — monthly subscription unlocks lull detection; optional "Feed a Student" consumable tips in Settings
 - **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback (recent books, controls, chapters, artwork skip gestures). On-Watch local library transfer is archived until a future release (`WatchFeatures.localPlaybackEnabled`).
 - **Home screen widgets** (`AudiopigWidget`) — listening stats, artwork, recent books, hour-club progress, and a lock screen **Continue Listening** circular widget (progress ring + pig glyph; tap resumes last book and opens the player)
