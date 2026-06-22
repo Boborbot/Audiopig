@@ -42,7 +42,6 @@ final class StatsViewModel {
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
-        refresh()
     }
 
     // MARK: - Refresh
@@ -52,33 +51,14 @@ final class StatsViewModel {
         let records    = (try? modelContext.fetch(FetchDescriptor<FinishedRecord>())) ?? []
         let audiobooks = (try? modelContext.fetch(FetchDescriptor<Audiobook>()))      ?? []
 
-        let libraryIDs = Set(audiobooks.map(\.id))
+        let totals = ListeningStatsAggregator.compute(
+            books: audiobooks.map(Self.bookInput(from:)),
+            records: records.map(Self.recordInput(from:))
+        )
 
-        // Total listened time
-        // • All library books contribute their accumulated listening seconds.
-        // • FinishedRecords for books no longer in the library contribute the
-        //   listening total snapshotted when the book was marked finished.
-        let libraryTime = audiobooks.reduce(0.0) { $0 + $1.accumulatedListeningSeconds }
-        let deletedTime = records
-            .filter { !libraryIDs.contains($0.audiobookID) }
-            .reduce(0.0) { $0 + $1.listenedSeconds }
-        totalListenedSeconds = libraryTime + deletedTime
-
-        // Finished books count + finished-only listened time (for icon unlock progress)
-        // • Books currently in the library that are finished.
-        // • Books that were finished then deleted (present in FinishedRecord but
-        //   absent from the live library). Union avoids double-counting books that
-        //   are finished and still in the library with a FinishedRecord.
-        let finishedBooks      = audiobooks.filter(\.isFinished)
-        let finishedLibraryIDs = Set(finishedBooks.map(\.id))
-        let finishedDeletedIDs = Set(records.map(\.audiobookID)).subtracting(libraryIDs)
-        finishedBooksCount = finishedLibraryIDs.union(finishedDeletedIDs).count
-
-        let finishedLibraryTime = finishedBooks.reduce(0.0) { $0 + $1.accumulatedListeningSeconds }
-        let finishedDeletedTime = records
-            .filter { !libraryIDs.contains($0.audiobookID) }
-            .reduce(0.0) { $0 + $1.listenedSeconds }
-        finishedListenedSeconds = finishedLibraryTime + finishedDeletedTime
+        totalListenedSeconds = totals.totalListenedSeconds
+        finishedBooksCount = totals.finishedBooksCount
+        finishedListenedSeconds = totals.finishedListenedSeconds
     }
 
     /// Permanently removes all reading stats from SwiftData.
@@ -94,6 +74,22 @@ final class StatsViewModel {
     }
 
     // MARK: - Private helpers
+
+    private static func bookInput(from audiobook: Audiobook) -> ListeningStatsBookInput {
+        ListeningStatsBookInput(
+            id: audiobook.id,
+            accumulatedListeningSeconds: audiobook.accumulatedListeningSeconds,
+            isFinished: audiobook.isFinished
+        )
+    }
+
+    private static func recordInput(from record: FinishedRecord) -> ListeningStatsFinishRecordInput {
+        ListeningStatsFinishRecordInput(
+            audiobookID: record.audiobookID,
+            listenedSeconds: record.listenedSeconds,
+            finishedAt: record.finishedAt
+        )
+    }
 
     private func formatDuration(_ seconds: TimeInterval) -> String {
         let total = Int(seconds)

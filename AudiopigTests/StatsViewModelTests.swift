@@ -45,6 +45,7 @@ final class StatsViewModelTests: XCTestCase {
 
         let viewModel = StatsViewModel(modelContext: context)
         StatsViewModelTestRetention.viewModels.append(viewModel)
+        viewModel.refresh()
         XCTAssertEqual(viewModel.finishedBooksCount, 1)
 
         viewModel.deleteAllStats()
@@ -52,6 +53,39 @@ final class StatsViewModelTests: XCTestCase {
         let remaining = try context.fetch(FetchDescriptor<FinishedRecord>())
         XCTAssertTrue(remaining.isEmpty)
         XCTAssertEqual(viewModel.finishedBooksCount, 0)
+    }
+
+    func testFinishedInLibraryBookDoesNotDoubleCountListeningTime() throws {
+        let audiobook = Audiobook(
+            title: "Done",
+            author: "Author",
+            duration: 7_200,
+            currentPlaybackTime: 7_200,
+            isManuallyFinished: true,
+            fileURL: URL(fileURLWithPath: "/tmp/book.m4b")
+        )
+        audiobook.accumulatedListeningSeconds = 3_600
+        context.insert(audiobook)
+
+        let record = FinishedRecord(
+            audiobookID: audiobook.id,
+            title: "Done",
+            author: "Author",
+            totalSeconds: 7_200,
+            listenedSeconds: 3_600,
+            finishedAt: .now,
+            chapterCount: 1,
+            wasManuallyMarked: false
+        )
+        context.insert(record)
+        try context.save()
+
+        let viewModel = StatsViewModel(modelContext: context)
+        StatsViewModelTestRetention.viewModels.append(viewModel)
+        viewModel.refresh()
+
+        XCTAssertEqual(viewModel.totalListenedSeconds, 3_600, accuracy: 0.01)
+        XCTAssertEqual(viewModel.finishedListenedSeconds, 3_600, accuracy: 0.01)
     }
 
     func testDeleteAllStatsClearsAccumulatedListeningTime() throws {
@@ -73,6 +107,7 @@ final class StatsViewModelTests: XCTestCase {
 
         let viewModel = StatsViewModel(modelContext: context)
         StatsViewModelTestRetention.viewModels.append(viewModel)
+        viewModel.refresh()
         XCTAssertEqual(viewModel.totalListenedSeconds, 5400, accuracy: 0.01)
 
         viewModel.deleteAllStats()

@@ -16,8 +16,6 @@ struct MediaControlsView: View {
 
     @State private var tapCount = 0
     @State private var tapTask: Task<Void, Never>?
-    @State private var crownVolume: Float = 0.5
-    @State private var lastDetentVolume: Float = 0.5
 
     var body: some View {
         ZStack {
@@ -40,58 +38,8 @@ struct MediaControlsView: View {
                 .allowsHitTesting(false)
                 .transition(.opacity)
             }
-
-            if viewModel.showVolumeOverlay {
-                volumeOverlay
-            }
         }
-        .focusable(isActive)
-        .digitalCrownRotation(
-            $crownVolume,
-            from: 0,
-            through: 1,
-            by: WatchVolumeRange.crownStep,
-            sensitivity: .medium,
-            isContinuous: false,
-            isHapticFeedbackEnabled: false
-        )
-        .onChange(of: crownVolume) { _, newValue in
-            guard isActive else {
-                lastDetentVolume = WatchVolumeRange.normalized(newValue)
-                return
-            }
-            let normalized = WatchVolumeRange.normalized(newValue)
-            if normalized != crownVolume {
-                crownVolume = normalized
-            }
-            guard normalized != lastDetentVolume else { return }
-            lastDetentVolume = normalized
-            viewModel.volumeDraft = normalized
-            viewModel.applyVolumeDraft()
-        }
-        .onChange(of: viewModel.volumeDraft) { _, newValue in
-            guard !viewModel.isVolumeAdjustmentActive else { return }
-            let normalized = WatchVolumeRange.normalized(newValue)
-            lastDetentVolume = normalized
-            if abs(crownVolume - normalized) > WatchVolumeRange.tolerance {
-                crownVolume = normalized
-            }
-        }
-        .onChange(of: isActive) { _, active in
-            if active {
-                let normalized = WatchVolumeRange.normalized(viewModel.volumeDraft)
-                crownVolume = normalized
-                lastDetentVolume = normalized
-            }
-        }
-        .onAppear {
-            let normalized = WatchVolumeRange.normalized(viewModel.volumeDraft)
-            crownVolume = normalized
-            lastDetentVolume = normalized
-        }
-        .task {
-            await viewModel.refresh()
-        }
+        .watchVolumeCrown(viewModel: viewModel, isActive: isActive)
         .animation(.easeInOut(duration: 0.2), value: viewModel.connectionMessage)
     }
 
@@ -225,6 +173,7 @@ struct MediaControlsView: View {
             }
             .foregroundStyle(.secondary)
         }
+        .animation(.linear(duration: 0.25), value: viewModel.playbackTick)
     }
 
     private var transportRow: some View {
@@ -262,23 +211,6 @@ struct MediaControlsView: View {
             }
             .buttonStyle(.plain)
         }
-    }
-
-    private var volumeOverlay: some View {
-        Image(systemName: volumeSymbol)
-            .font(.title)
-            .foregroundStyle(.white)
-            .padding()
-            .background(.black.opacity(0.55), in: Circle())
-            .transition(.opacity)
-    }
-
-    private var volumeSymbol: String {
-        let level = crownVolume
-        if level <= 0.01 { return "speaker.slash.fill" }
-        if level < 0.34 { return "speaker.wave.1.fill" }
-        if level < 0.67 { return "speaker.wave.2.fill" }
-        return "speaker.wave.3.fill"
     }
 
     private var playPauseSymbol: String {

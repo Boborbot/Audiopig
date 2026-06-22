@@ -11,8 +11,8 @@
 //     50 ms windows, dynamic threshold + gap-merging hysteresis.
 //     Reliable for paragraph-level breaks (≥ 1 s pauses) in clean recordings.
 //
-//  Results are ranked by duration (longest = most structurally significant);
-//  only the single longest break is returned.
+//  Results are ranked by duration (longest = most structurally significant).
+//  Callers pass `maxResults` (iPhone Smart Rewind uses 3; Watch uses 1).
 //
 
 import AVFoundation
@@ -21,7 +21,7 @@ import Foundation
 
 // MARK: - LullResult
 
-struct LullResult: Sendable, Identifiable {
+struct LullResult: Sendable, Identifiable, Equatable {
     /// Stable identity for use in ForEach.
     let id: UUID
     /// Absolute position on the global book timeline where speech resumes.
@@ -34,10 +34,15 @@ struct LullResult: Sendable, Identifiable {
 
 // MARK: - LullAnalysisState
 
-enum LullAnalysisState {
+enum SmartRewindRange: Sendable, Equatable {
+    case far
+    case near
+}
+
+enum LullAnalysisState: Equatable {
     case idle
-    case analyzing
-    case results([LullResult])
+    case analyzing(SmartRewindRange)
+    case results(SmartRewindRange, [LullResult])
 }
 
 // MARK: - LullDetector
@@ -46,11 +51,12 @@ actor LullDetector {
 
     // MARK: - Public
 
-    /// Returns the longest significant break inside `[windowStart, windowEnd]`, if any.
+    /// Returns up to `maxResults` significant breaks inside `[windowStart, windowEnd]`, ranked by duration.
     func findLulls(
         in allChapters: [ResolvedChapter],
         from windowStart: TimeInterval,
-        to windowEnd: TimeInterval
+        to windowEnd: TimeInterval,
+        maxResults: Int = 1
     ) async throws -> [LullResult] {
         guard windowEnd > windowStart + 1 else { return [] }
 
@@ -69,9 +75,12 @@ actor LullDetector {
         let combined = merge(chapterLulls: chapterLulls, vadLulls: vadLulls)
 
         // Rank by duration descending → chapter boundaries (10.0) float above
-        // typical paragraph breaks (1–3 s). Return only the longest.
-        guard let longest = combined.max(by: { $0.duration < $1.duration }) else { return [] }
-        return [longest]
+        // typical paragraph breaks (1–3 s).
+        let limit = max(1, maxResults)
+        return combined
+            .sorted { $0.duration > $1.duration }
+            .prefix(limit)
+            .map { $0 }
     }
 
     // MARK: - Source 1: chapter metadata

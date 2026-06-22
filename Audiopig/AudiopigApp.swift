@@ -58,21 +58,13 @@ struct AudiopigApp: App {
             self.container = dc
             self.libraryViewModel = libraryVM
             WidgetPlaybackService.bind(libraryViewModel: libraryVM)
-            libraryVM.syncWatchSettings()
-            libraryVM.syncWatchRecentBooks()
-            Task {
-                if WatchFeatures.localPlaybackEnabled {
-                    await libraryVM.syncWatchLocalBooks()
-                }
-                await monetizationService.refreshEntitlements()
-                await monetizationService.loadProducts()
-                await MainActor.run {
-                    libraryVM.syncWatchSettings()
-                }
-            }
-            self.statsViewModel = StatsViewModel(
+            let statsVM = StatsViewModel(
                 modelContext: dc.modelContainer.mainContext
             )
+            self.statsViewModel = statsVM
+            libraryVM.onReadingStatsChanged = {
+                statsVM.refresh()
+            }
             self.settingsMonetizationViewModel = SettingsMonetizationViewModel(
                 monetization: dc.monetization
             )

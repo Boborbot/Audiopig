@@ -57,8 +57,7 @@ struct MainTabView: View {
                 SettingsView(
                     settings: appSettings,
                     statsViewModel: statsViewModel,
-                    monetizationViewModel: settingsMonetizationViewModel,
-                    libraryViewModel: viewModel
+                    monetizationViewModel: settingsMonetizationViewModel
                 ) {
                     viewModel.syncWatchSettings()
                 }
@@ -81,6 +80,7 @@ struct MainTabView: View {
                 .padding(.horizontal, DS.Spacing.sm)
                 .padding(.bottom, Self.tabBarHeight + 6)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .snapLayoutOnBackgroundTransition()
             }
         }
         .finishCelebrationOverlay(viewModel: viewModel)
@@ -95,6 +95,9 @@ struct MainTabView: View {
         }
         .onChange(of: appSettings.orientationLock) { _, locked in
             OrientationLockController.shared.setLocked(locked)
+        }
+        .task {
+            await viewModel.performDeferredStartup()
         }
         .onAppear {
             syncWidgetSnapshots()

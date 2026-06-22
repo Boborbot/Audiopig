@@ -611,6 +611,25 @@ final class AudioEngine: AudioEngineProtocol {
             return .success
         }
 
+        // AirPods stem double/triple-press defaults to next/previous track, not interval skip.
+        center.nextTrackCommand.isEnabled = true
+        center.nextTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                try? await self.skipForward(by: self._remoteSkipForwardInterval)
+            }
+            return .success
+        }
+
+        center.previousTrackCommand.isEnabled = true
+        center.previousTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                try? await self.skipBackward(by: self._remoteSkipBackwardInterval)
+            }
+            return .success
+        }
+
         // Lock-screen scrubber — maps the timeline slider directly to seek().
         center.changePlaybackPositionCommand.isEnabled = true
         center.changePlaybackPositionCommand.addTarget { [weak self] event in
@@ -626,8 +645,6 @@ final class AudioEngine: AudioEngineProtocol {
         }
 
         // Disable commands we don't expose so the lock screen stays uncluttered.
-        center.nextTrackCommand.isEnabled = false
-        center.previousTrackCommand.isEnabled = false
         center.changePlaybackRateCommand.isEnabled = false
     }
 

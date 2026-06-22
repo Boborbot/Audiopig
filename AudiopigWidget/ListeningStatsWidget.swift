@@ -83,7 +83,7 @@ private struct ListeningStatsWidgetView: View {
                 Spacer(minLength: 0)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(WidgetListeningSnapshot.formatTodayListening(entry.snapshot.todayListenedSeconds))
+                    Text(WidgetListeningSnapshot.formatTodayListeningHoursMinutes(entry.snapshot.todayListenedSeconds))
                         .font(.title2.weight(.bold))
                         .foregroundStyle(WidgetPalette.primary)
                         .minimumScaleFactor(0.8)

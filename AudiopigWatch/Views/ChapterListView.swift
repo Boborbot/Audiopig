@@ -17,6 +17,7 @@ struct ChapterListView: View {
     }
 
     @State private var scrollPosition: Int?
+    @FocusState private var crownFocused: Bool
 
     var body: some View {
         Group {
@@ -64,6 +65,7 @@ struct ChapterListView: View {
                 .listStyle(.plain)
                 .scrollPosition(id: $scrollPosition)
                 .focusable(isActive)
+                .focused($crownFocused)
                 .digitalCrownRotation(
                     Binding(
                         get: { Float(scrollPosition ?? viewModel.snapshot.chapterIndex) },
@@ -80,9 +82,27 @@ struct ChapterListView: View {
         }
         .onAppear {
             scrollPosition = viewModel.snapshot.chapterIndex
+            if isActive {
+                claimCrownFocus()
+            }
+        }
+        .onChange(of: isActive) { _, active in
+            if active {
+                claimCrownFocus()
+            } else {
+                crownFocused = false
+            }
         }
         .onChange(of: viewModel.snapshot.chapterIndex) { _, newIndex in
             scrollPosition = newIndex
+        }
+    }
+
+    private func claimCrownFocus() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            guard isActive else { return }
+            crownFocused = true
         }
     }
 }

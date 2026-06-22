@@ -191,6 +191,10 @@ final class LibraryViewModel {
     private let volumeController: SystemVolumeController
     private let monetization: any MonetizationServiceProtocol
 
+    /// Called after listening stats change (book finish, merge cleanup, etc.).
+    @ObservationIgnored
+    var onReadingStatsChanged: (() -> Void)?
+
     // MARK: - Init
 
     init(
@@ -228,6 +232,9 @@ final class LibraryViewModel {
         self.playerViewModel.onPlaybackPositionSaved = { [weak self] in
             self?.syncWatchRecentBooks()
         }
+        self.playerViewModel.onAudiobookLoaded = { [weak self] in
+            self?.syncWatchRecentBooks()
+        }
         watchBridge?.commandHandler = { [weak self] command in
             await self?.handleWatchCommand(command) ?? .failure("Library unavailable.")
         }
@@ -235,16 +242,39 @@ final class LibraryViewModel {
             self?.watchTransferStateRevision &+= 1
         }
         watchBridge?.reachabilityHandler = { [weak self] isReachable in
-            guard isReachable, WatchFeatures.localPlaybackEnabled else { return }
-            Task { await self?.syncWatchLocalBooks() }
+            guard let self, isReachable else { return }
+            self.playerViewModel.syncWatchState(includeArtwork: self.shouldIncludeWatchArtwork)
+            self.syncWatchSettings()
+            self.syncWatchRecentBooks()
+            if WatchFeatures.localPlaybackEnabled {
+                Task { await self.syncWatchLocalBooks() }
+            }
         }
-        fetchAudiobooks()
+        fetchAudiobooks(repairFileReferences: false)
+    }
+
+    // MARK: - Startup
+
+    /// Repairs library paths, syncs companion surfaces, and refreshes entitlements after the
+    /// root UI is on screen so launch is not blocked by file I/O or cover-art decoding.
+    func performDeferredStartup() async {
+        try? libraryManager.repairAudiobookFileReferences(in: modelContext)
+        fetchAudiobooks(repairFileReferences: false)
+        syncWatchSettings()
+        syncWatchRecentBooks()
+        if WatchFeatures.localPlaybackEnabled {
+            await syncWatchLocalBooks()
+        }
+        await monetization.refreshEntitlements()
+        syncWatchSettings()
     }
 
     // MARK: - Fetch
 
-    func fetchAudiobooks() {
-        try? libraryManager.repairAudiobookFileReferences(in: modelContext)
+    func fetchAudiobooks(repairFileReferences: Bool = true) {
+        if repairFileReferences {
+            try? libraryManager.repairAudiobookFileReferences(in: modelContext)
+        }
 
         let descriptor = FetchDescriptor<Audiobook>(
             sortBy: [SortDescriptor(\.title, comparator: .localizedStandard)]
@@ -264,8 +294,6 @@ final class LibraryViewModel {
         Task {
             try? libraryManager.repairAudiobookFileReferences(in: modelContext)
             await playerViewModel.loadAudiobook(audiobook, autoPlay: true)
-            syncWidgetRecentBooks()
-            syncWatchRecentBooks()
         }
     }
 
@@ -289,8 +317,6 @@ final class LibraryViewModel {
                 return
             case .paused, .finished, .idle:
                 playerViewModel.play()
-                syncWidgetRecentBooks()
-                syncWatchRecentBooks()
                 return
             case .loading:
                 return
@@ -300,8 +326,6 @@ final class LibraryViewModel {
         }
 
         await playerViewModel.loadAudiobook(audiobook, autoPlay: true)
-        syncWidgetRecentBooks()
-        syncWatchRecentBooks()
     }
 
     func playLastAudiobookFromWidget() async throws {
@@ -318,13 +342,16 @@ final class LibraryViewModel {
     func handleWatchCommand(_ command: WatchCommand) async -> WatchCommandResult {
         switch command {
         case .requestRecentBooks:
-            let books = recentBooksForWatch(limit: 10)
-            watchBridge?.publishRecentBooks(WatchRecentBooksPayload(books: books))
-            return .ok()
+            let payload = WatchRecentBooksPayload(books: recentBooksForWatch(limit: 10))
+            watchBridge?.publishRecentBooks(payload)
+            return .ok(recentBooks: payload)
 
         case .requestSnapshot:
-            playerViewModel.syncWatchState()
-            return .ok(snapshot: playerViewModel.watchSnapshotForReply())
+            let includeArtwork = shouldIncludeWatchArtwork
+            playerViewModel.syncWatchState(includeArtwork: includeArtwork)
+            return .ok(
+                snapshot: playerViewModel.watchSnapshotForReply(includeArtwork: includeArtwork)
+            )
 
         case .loadBook(let bookID, let autoPlay):
             guard let audiobook = audiobook(withID: bookID) else {
@@ -392,6 +419,10 @@ final class LibraryViewModel {
             }
             appSettings.watchArtworkViewMode = mode
             syncWatchSettings()
+            if mode != .off {
+                playerViewModel.syncWatchState(includeArtwork: true)
+                return .ok(snapshot: playerViewModel.watchSnapshotForReply(includeArtwork: true))
+            }
             return .ok()
 
         case .analyzeLulls:
@@ -513,6 +544,11 @@ final class LibraryViewModel {
         audiobooks.first { $0.id == id }
     }
 
+    private var shouldIncludeWatchArtwork: Bool {
+        appSettings.watchArtworkViewMode != .off
+            && monetization.hasAccess(to: .watchArtworkView)
+    }
+
     private func resolveAudiobook(id: UUID) -> Audiobook? {
         if let cached = audiobook(withID: id) { return cached }
         var descriptor = FetchDescriptor<Audiobook>(
@@ -545,6 +581,12 @@ final class LibraryViewModel {
     func markFinished(_ audiobook: Audiobook) {
         guard !audiobook.isManuallyFinished else { return }
         audiobook.isManuallyFinished = true
+
+        guard !hasFinishedRecord(for: audiobook.id) else {
+            saveContext(errorContext: "mark finished")
+            return
+        }
+
         processBookFinish(for: audiobook, wasManuallyMarked: true)
     }
 
@@ -555,6 +597,9 @@ final class LibraryViewModel {
         guard !processedNaturalFinishIDs.contains(audiobook.id) else { return }
 
         processedNaturalFinishIDs.insert(audiobook.id)
+
+        guard !hasFinishedRecord(for: audiobook.id) else { return }
+
         processBookFinish(for: audiobook, wasManuallyMarked: false)
     }
 
@@ -570,7 +615,7 @@ final class LibraryViewModel {
             wasManuallyMarked: wasManuallyMarked
         )
 
-        if appSettings.trackReadingStats {
+        if appSettings.trackReadingStats, !hasFinishedRecord(for: audiobook.id) {
             let record = FinishedRecord(
                 audiobookID: finishEvent.audiobookID,
                 title: finishEvent.title,
@@ -596,6 +641,7 @@ final class LibraryViewModel {
         }
 
         celebratedBook = audiobook
+        onReadingStatsChanged?()
     }
 
     /// Computes total finished-book listening time and asks `AppIconManager`
@@ -603,18 +649,26 @@ final class LibraryViewModel {
     private func enqueueIconUnlocks(finishEvent: BookFinishEvent) {
         let records    = (try? modelContext.fetch(FetchDescriptor<FinishedRecord>())) ?? []
         let allBooks   = (try? modelContext.fetch(FetchDescriptor<Audiobook>()))      ?? []
-        let libraryIDs = Set(allBooks.map(\.id))
 
-        let finishedLibraryTime = allBooks
-            .filter(\.isFinished)
-            .reduce(0.0) { $0 + $1.accumulatedListeningSeconds }
-        let finishedDeletedTime = records
-            .filter { !libraryIDs.contains($0.audiobookID) }
-            .reduce(0.0) { $0 + $1.listenedSeconds }
+        let totals = ListeningStatsAggregator.compute(
+            books: allBooks.map {
+                ListeningStatsBookInput(
+                    id: $0.id,
+                    accumulatedListeningSeconds: $0.accumulatedListeningSeconds,
+                    isFinished: $0.isFinished
+                )
+            },
+            records: records.map {
+                ListeningStatsFinishRecordInput(
+                    audiobookID: $0.audiobookID,
+                    listenedSeconds: $0.listenedSeconds,
+                    finishedAt: $0.finishedAt
+                )
+            }
+        )
 
-        let total = finishedLibraryTime + finishedDeletedTime
         let unlocks = appIconManager.checkForNewUnlocks(
-            totalFinishedSeconds: total,
+            totalFinishedSeconds: totals.finishedListenedSeconds,
             finishEvent: finishEvent
         )
 
@@ -640,6 +694,7 @@ final class LibraryViewModel {
         audiobook.isManuallyFinished = false
         removeFinishedRecords(for: audiobook.id)
         saveContext(errorContext: "mark unfinished")
+        onReadingStatsChanged?()
     }
 
     /// Clears the celebration overlay; prompts to delete when auto-delete is pending.
@@ -669,6 +724,15 @@ final class LibraryViewModel {
         )
         let records = (try? modelContext.fetch(descriptor)) ?? []
         records.forEach { modelContext.delete($0) }
+    }
+
+    private func hasFinishedRecord(for audiobookID: UUID) -> Bool {
+        let id = audiobookID
+        let descriptor = FetchDescriptor<FinishedRecord>(
+            predicate: #Predicate { $0.audiobookID == id }
+        )
+        let records = (try? modelContext.fetch(descriptor)) ?? []
+        return !records.isEmpty
     }
 
     // MARK: - Delete
@@ -729,6 +793,7 @@ final class LibraryViewModel {
         modelContext.delete(audiobook)
         saveContext(errorContext: "delete audiobook")
         fetchAudiobooks()
+        syncWatchRecentBooks()
     }
 
     // MARK: - Import
@@ -753,39 +818,6 @@ final class LibraryViewModel {
 
         isImporting = false
         fetchAudiobooks()
-
-        if !failedNames.isEmpty {
-            errorMessage = "Could not import: \(failedNames.joined(separator: ", "))"
-        }
-    }
-
-    /// Scans a security-scoped folder URL for supported audio files and imports each one.
-    func importFolder(_ url: URL) async {
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-
-        isImporting = true
-        defer {
-            isImporting = false
-            fetchAudiobooks()
-        }
-
-        let discoveredMetadata: [AudiobookImportMetadata]
-        do {
-            discoveredMetadata = try await libraryManager.scanDirectory(at: url)
-        } catch {
-            errorMessage = "Could not read the selected folder."
-            return
-        }
-
-        var failedNames: [String] = []
-        for metadata in discoveredMetadata {
-            do {
-                _ = try await libraryManager.importAndPersist(from: metadata.fileURL, in: modelContext)
-            } catch {
-                failedNames.append(metadata.title)
-            }
-        }
 
         if !failedNames.isEmpty {
             errorMessage = "Could not import: \(failedNames.joined(separator: ", "))"
@@ -832,14 +864,18 @@ final class LibraryViewModel {
         }
 
         do {
+            let absorbedIDs = mergeOrder.dropFirst().map(\.id)
             _ = try libraryManager.merge(
                 audiobooks: mergeOrder,
                 intoTitle: title,
                 in: modelContext
             )
+            absorbedIDs.forEach { removeFinishedRecords(for: $0) }
+            saveContext(errorContext: "merge audiobooks")
             isSelectionModeActive = false
             selectedIDs.removeAll()
             fetchAudiobooks()
+            onReadingStatsChanged?()
         } catch {
             errorMessage = "Merge failed. Please try again."
         }

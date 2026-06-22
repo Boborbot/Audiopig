@@ -15,48 +15,48 @@
   ],
   "products" : [
     {
-      "displayPrice" : "1.99",
+      "displayPrice" : "2.99",
       "familyShareable" : false,
       "internalID" : "A1B2C3D4",
       "localizations" : [
         {
           "description" : "Buy the developer a coffee",
-          "displayName" : "Coffee Tip",
+          "displayName" : "Coffee",
           "locale" : "en_US"
         }
       ],
       "productID" : "com.nitay.Audiopig.tip.coffee",
-      "referenceName" : "Coffee Tip",
+      "referenceName" : "Coffee",
       "type" : "Consumable"
     },
     {
-      "displayPrice" : "4.99",
+      "displayPrice" : "6.99",
       "familyShareable" : false,
       "internalID" : "A1B2C3D5",
       "localizations" : [
         {
           "description" : "Buy the developer lunch",
-          "displayName" : "Lunch Tip",
+          "displayName" : "Lunch",
           "locale" : "en_US"
         }
       ],
       "productID" : "com.nitay.Audiopig.tip.lunch",
-      "referenceName" : "Lunch Tip",
+      "referenceName" : "Lunch",
       "type" : "Consumable"
     },
     {
-      "displayPrice" : "9.99",
+      "displayPrice" : "14.99",
       "familyShareable" : false,
       "internalID" : "A1B2C3D6",
       "localizations" : [
         {
-          "description" : "Sponsor development",
-          "displayName" : "Sponsor Tip",
+          "description" : "Helps keep the lights on",
+          "displayName" : "Today's Rent",
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.nitay.Audiopig.tip.sponsor",
-      "referenceName" : "Sponsor Tip",
+      "productID" : "com.nitay.Audiopig.tip.rent",
+      "referenceName" : "Today's Rent",
       "type" : "Consumable"
     }
   ],

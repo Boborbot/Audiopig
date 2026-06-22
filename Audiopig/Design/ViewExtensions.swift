@@ -119,6 +119,44 @@ extension View {
     }
 }
 
+// MARK: - Background Layout Snap
+
+/// Rebuilds this subtree without animation when the app backgrounds or returns
+/// from background so in-flight SwiftUI springs cannot freeze mid-transition.
+private struct SnapLayoutOnBackgroundModifier: ViewModifier {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var layoutToken = 0
+    @State private var wasBackgrounded = false
+
+    func body(content: Content) -> some View {
+        content
+            .id(layoutToken)
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background {
+                    wasBackgrounded = true
+                    snapLayout()
+                } else if phase == .active, wasBackgrounded {
+                    wasBackgrounded = false
+                    snapLayout()
+                }
+            }
+    }
+
+    private func snapLayout() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            layoutToken += 1
+        }
+    }
+}
+
+extension View {
+    func snapLayoutOnBackgroundTransition() -> some View {
+        modifier(SnapLayoutOnBackgroundModifier())
+    }
+}
+
 // MARK: - Mini Player Scroll Clearance
 
 private struct MiniPlayerClearanceKey: EnvironmentKey {
@@ -152,6 +190,7 @@ private struct MiniPlayerScrollClearanceModifier: ViewModifier {
                         .spring(response: 0.38, dampingFraction: 0.80),
                         value: clearance
                     )
+                    .snapLayoutOnBackgroundTransition()
             }
         }
     }

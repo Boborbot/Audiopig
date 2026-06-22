@@ -43,6 +43,9 @@ struct WatchPlayerPagerView: View {
             .tag(viewModel.chaptersPageIndex)
         }
         .tabViewStyle(.verticalPage)
+        .task {
+            await viewModel.refresh()
+        }
         .onChange(of: viewModel.effectiveArtworkViewMode) { _, _ in
             selectedPage = viewModel.mainControlsPageIndex
         }

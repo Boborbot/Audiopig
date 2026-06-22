@@ -64,6 +64,10 @@ final class AppSettings {
         static let skipBackwardInterval = "settings.skipBackwardInterval"
         static let lullLookbackWindow   = "settings.lullLookbackWindow"
         static let lullSkipRecentWindow = "settings.lullSkipRecentWindow"
+        static let smartRewindFarStartOffset  = "settings.smartRewindFarStartOffset"
+        static let smartRewindFarEndOffset    = "settings.smartRewindFarEndOffset"
+        static let smartRewindNearStartOffset = "settings.smartRewindNearStartOffset"
+        static let smartRewindNearEndOffset   = "settings.smartRewindNearEndOffset"
         static let appearance           = "settings.appearance"
         static let orientationLock      = "settings.orientationLock"
         static let autoDeleteOnFinish   = "settings.autoDeleteOnFinish"
@@ -78,6 +82,7 @@ final class AppSettings {
         static let libraryBookFilter        = "settings.libraryBookFilter"
         static let librarySortDirection     = "settings.librarySortDirection"
         static let playbackTimelineScope    = "settings.playbackTimelineScope"
+        static let leftTimeShowsRemaining   = "settings.leftTimeShowsRemaining"
     }
 
     // MARK: - Backing Stores (not observed individually)
@@ -144,6 +149,43 @@ final class AppSettings {
         // Default: 30 seconds. Clamp to [0s, 5m].
         let value = stored >= 0 ? stored : 30.0
         return min(max(value, 0.0), 5.0 * 60.0)
+    }()
+
+    @ObservationIgnored
+    private var _smartRewindFarStartOffset: TimeInterval = {
+        let stored = UserDefaults.standard.double(forKey: Keys.smartRewindFarStartOffset)
+        let value = stored > 0 ? stored : 20.0 * 60.0
+        return min(max(value, 5.0 * 60.0), 60.0 * 60.0)
+    }()
+
+    @ObservationIgnored
+    private var _smartRewindFarEndOffset: TimeInterval = {
+        let stored = UserDefaults.standard.double(forKey: Keys.smartRewindFarEndOffset)
+        let value = stored > 0 ? stored : 5.0 * 60.0
+        return min(max(value, 60.0), 30.0 * 60.0)
+    }()
+
+    @ObservationIgnored
+    private var _smartRewindNearStartOffset: TimeInterval = {
+        if UserDefaults.standard.object(forKey: Keys.smartRewindNearStartOffset) != nil {
+            let stored = UserDefaults.standard.double(forKey: Keys.smartRewindNearStartOffset)
+            return min(max(stored, 30.0), 15.0 * 60.0)
+        }
+        let lookback = UserDefaults.standard.double(forKey: Keys.lullLookbackWindow)
+        let migrated = lookback > 0 ? lookback : 5.0 * 60.0
+        return min(max(migrated, 30.0), 15.0 * 60.0)
+    }()
+
+    @ObservationIgnored
+    private var _smartRewindNearEndOffset: TimeInterval = {
+        if UserDefaults.standard.object(forKey: Keys.smartRewindNearEndOffset) != nil {
+            let stored = UserDefaults.standard.double(forKey: Keys.smartRewindNearEndOffset)
+            return min(max(stored, 0.0), 5.0 * 60.0)
+        }
+        let skipRecent = UserDefaults.standard.object(forKey: Keys.lullSkipRecentWindow) != nil
+            ? UserDefaults.standard.double(forKey: Keys.lullSkipRecentWindow)
+            : 30.0
+        return min(max(skipRecent, 0.0), 5.0 * 60.0)
     }()
 
     @ObservationIgnored
@@ -234,6 +276,11 @@ final class AppSettings {
         }
         return scope
     }()
+
+    @ObservationIgnored
+    private var _leftTimeShowsRemaining: Bool = UserDefaults.standard.bool(
+        forKey: Keys.leftTimeShowsRemaining
+    )
 
     // MARK: - Observable Properties
 
@@ -368,6 +415,7 @@ final class AppSettings {
     /// How far back lull detection searches for breaks (paragraph breaks feature).
     ///
     /// Clamped to [30 s, 15 min]. Default: 5 min.
+    /// Used by Apple Watch remote lull detection only.
     var lullLookbackWindow: TimeInterval {
         get {
             access(keyPath: \.lullLookbackWindow)
@@ -385,6 +433,7 @@ final class AppSettings {
     /// How much recent audio to exclude from lull detection.
     ///
     /// Clamped to [0 s, 5 min]. Default: 30 s.
+    /// Used by Apple Watch remote lull detection only.
     var lullSkipRecentWindow: TimeInterval {
         get {
             access(keyPath: \.lullSkipRecentWindow)
@@ -395,6 +444,66 @@ final class AppSettings {
             withMutation(keyPath: \.lullSkipRecentWindow) {
                 _lullSkipRecentWindow = clamped
                 UserDefaults.standard.set(clamped, forKey: Keys.lullSkipRecentWindow)
+            }
+        }
+    }
+
+    /// How far before the current position the Look Far window begins. Default: 20 min.
+    var smartRewindFarStartOffset: TimeInterval {
+        get {
+            access(keyPath: \.smartRewindFarStartOffset)
+            return _smartRewindFarStartOffset
+        }
+        set {
+            let clamped = min(max(newValue, 5.0 * 60.0), 60.0 * 60.0)
+            withMutation(keyPath: \.smartRewindFarStartOffset) {
+                _smartRewindFarStartOffset = max(clamped, _smartRewindFarEndOffset + 30.0)
+                UserDefaults.standard.set(_smartRewindFarStartOffset, forKey: Keys.smartRewindFarStartOffset)
+            }
+        }
+    }
+
+    /// How far before the current position the Look Far window ends. Default: 5 min.
+    var smartRewindFarEndOffset: TimeInterval {
+        get {
+            access(keyPath: \.smartRewindFarEndOffset)
+            return _smartRewindFarEndOffset
+        }
+        set {
+            let clamped = min(max(newValue, 60.0), 30.0 * 60.0)
+            withMutation(keyPath: \.smartRewindFarEndOffset) {
+                _smartRewindFarEndOffset = min(clamped, _smartRewindFarStartOffset - 30.0)
+                UserDefaults.standard.set(_smartRewindFarEndOffset, forKey: Keys.smartRewindFarEndOffset)
+            }
+        }
+    }
+
+    /// How far before the current position the Look Near window begins. Default: 5 min.
+    var smartRewindNearStartOffset: TimeInterval {
+        get {
+            access(keyPath: \.smartRewindNearStartOffset)
+            return _smartRewindNearStartOffset
+        }
+        set {
+            let clamped = min(max(newValue, 30.0), 15.0 * 60.0)
+            withMutation(keyPath: \.smartRewindNearStartOffset) {
+                _smartRewindNearStartOffset = max(clamped, _smartRewindNearEndOffset + 5.0)
+                UserDefaults.standard.set(_smartRewindNearStartOffset, forKey: Keys.smartRewindNearStartOffset)
+            }
+        }
+    }
+
+    /// How far before the current position the Look Near window ends. Default: 30 s.
+    var smartRewindNearEndOffset: TimeInterval {
+        get {
+            access(keyPath: \.smartRewindNearEndOffset)
+            return _smartRewindNearEndOffset
+        }
+        set {
+            let clamped = min(max(newValue, 0.0), 5.0 * 60.0)
+            withMutation(keyPath: \.smartRewindNearEndOffset) {
+                _smartRewindNearEndOffset = min(clamped, _smartRewindNearStartOffset - 5.0)
+                UserDefaults.standard.set(_smartRewindNearEndOffset, forKey: Keys.smartRewindNearEndOffset)
             }
         }
     }
@@ -570,6 +679,20 @@ final class AppSettings {
             withMutation(keyPath: \.playbackTimelineScope) {
                 _playbackTimelineScope = newValue
                 UserDefaults.standard.set(newValue.rawValue, forKey: Keys.playbackTimelineScope)
+            }
+        }
+    }
+
+    /// When true, the left player timestamp shows speed-adjusted time remaining instead of elapsed.
+    var leftTimeShowsRemaining: Bool {
+        get {
+            access(keyPath: \.leftTimeShowsRemaining)
+            return _leftTimeShowsRemaining
+        }
+        set {
+            withMutation(keyPath: \.leftTimeShowsRemaining) {
+                _leftTimeShowsRemaining = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.leftTimeShowsRemaining)
             }
         }
     }

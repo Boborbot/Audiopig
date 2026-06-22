@@ -15,4 +15,12 @@ final class WidgetListeningSnapshotTests: XCTestCase {
         XCTAssertEqual(WidgetListeningSnapshot.playbackProgress(currentTime: 150, duration: 100), 1)
         XCTAssertEqual(WidgetListeningSnapshot.playbackProgress(currentTime: 10, duration: 0), 0)
     }
+
+    func test_formatTodayListeningHoursMinutes_omitsNeedlessZeros() {
+        XCTAssertEqual(WidgetListeningSnapshot.formatTodayListeningHoursMinutes(0), "0m")
+        XCTAssertEqual(WidgetListeningSnapshot.formatTodayListeningHoursMinutes(600), "10m")
+        XCTAssertEqual(WidgetListeningSnapshot.formatTodayListeningHoursMinutes(3_600), "1h")
+        XCTAssertEqual(WidgetListeningSnapshot.formatTodayListeningHoursMinutes(5_400), "1h30m")
+        XCTAssertEqual(WidgetListeningSnapshot.formatTodayListeningHoursMinutes(30), "1m")
+    }
 }

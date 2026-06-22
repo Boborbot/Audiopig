@@ -17,7 +17,8 @@ public protocol WatchPlaybackCoordinating: AnyObject {
 public enum WatchVolumeRange {
     /// Matches iOS system output volume granularity (~16 steps).
     public static let step: Float = 1.0 / 16.0
-    public static let crownStep: Float = step
+    /// Crown detent size for media controls — 6× finer than `step` so volume changes slowly.
+    public static let crownStep: Float = step / 6
     public static let tolerance: Float = step / 2
 
     public static func normalized(_ volume: Float) -> Float {

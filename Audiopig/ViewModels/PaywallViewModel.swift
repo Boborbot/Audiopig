@@ -19,10 +19,10 @@ final class PaywallViewModel {
         self.monetization = monetization
     }
 
-    var headline: String { "Find Paragraph Breaks" }
+    var headline: String { "Smart Rewind" }
 
     var bodyCopy: String {
-        "Detects silence in the last few minutes so you can jump back to where you drifted off."
+        "Look Far and Look Near scan silence in the minutes before you drifted off so you can jump back to a natural break."
     }
 
     var primaryCTATitle: String {

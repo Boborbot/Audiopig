@@ -93,9 +93,9 @@ Source of truth: `AudiopigShared/ProductIdentifiers.swift`
 | Type | Product ID | Suggested price | Notes |
 |---|---|---|---|
 | Auto-renewable subscription | `com.nitay.Audiopig.plus.monthly` | $3.99/month | Add **7-day free trial** introductory offer |
-| Consumable | `com.nitay.Audiopig.tip.coffee` | $1.99 | Display name: Coffee Tip |
-| Consumable | `com.nitay.Audiopig.tip.lunch` | $4.99 | Display name: Lunch Tip |
-| Consumable | `com.nitay.Audiopig.tip.sponsor` | $9.99 | Display name: Sponsor Tip |
+| Consumable | `com.nitay.Audiopig.tip.coffee` | $2.99 | Display name: Coffee |
+| Consumable | `com.nitay.Audiopig.tip.lunch` | $6.99 | Display name: Lunch |
+| Consumable | `com.nitay.Audiopig.tip.rent` | $14.99 | Display name: Today's Rent |
 
 Copy for display names and descriptions is in `Audiopig/Audiopig.storekit` localizations.
 

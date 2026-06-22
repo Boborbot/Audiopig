@@ -66,7 +66,7 @@ struct TipJarSection: View {
                 .font(DS.Typography.listTitle)
                 .foregroundStyle(DS.Color.coral)
 
-            Text("Your \(tier.title.lowercased()) tip means a lot. Happy listening!")
+            Text("Your \(tier.thankYouPhrase) tip means a lot. Happy listening!")
                 .font(DS.Typography.listBody)
                 .foregroundStyle(DS.Color.secondary)
 

@@ -14,7 +14,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 
 ## Features
 
-- **Local file import** — import `.mp3` and `.m4b` files from the Files app, or pick an entire folder
+- **Local file import** — import `.mp3` and `.m4b` files from the Files app (toolbar + button)
 - **Folders** — group audiobooks into folders with optional custom cover art
 - **Multi-chapter virtual timeline** — merge multiple audio files into one continuous book with per-chapter seeking
 - **Full playback engine** — speed control (0.5–3.0×), configurable skip intervals, dual scrubber mode (entire book or current chapter)
@@ -30,7 +30,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Finish celebrations** — confetti and optional delete confirmation when marking a book finished
 - **Appearance** — system, light, or dark mode; optional portrait orientation lock
 - **Landscape player** — when orientation lock is off, the full player splits into artwork+title and controls columns (cover art on the notch side); no scrolling required
-- **Audiopig Plus** — monthly subscription unlocks lull detection; optional "Feed a Student" consumable tips in Settings
+- **Audiopig Plus** — monthly subscription unlocks lull detection; optional "Feed a Student" consumable tips ($2.99 / $6.99 / $14.99) in Settings
 - **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback (recent books, controls, chapters, artwork skip gestures). On-Watch local library transfer is archived until a future release (`WatchFeatures.localPlaybackEnabled`).
 - **Home screen widgets** (`AudiopigWidget`) — listening stats, artwork, recent books, hour-club progress, and a lock screen **Continue Listening** circular widget (progress ring + pig glyph; tap resumes last book and opens the player)
 - **Lock screen control** (iOS 18+) — optional bottom-corner control to resume the last audiobook (`ContinueListeningControl`)
@@ -127,6 +127,7 @@ See `docs/app-store/` for:
 | Per-book playback speed | Global default from Settings applies on load; not saved per book |
 | Format support | Only `.mp3` and `.m4b`; no `.aax`, `.opus`, etc. |
 | Watch local transfer | Archived (`WatchFeatures.localPlaybackEnabled`); code retained for a future release |
+| Bulk folder import + library backup/restore | Archived in `docs/archive/library-migration/` (not compiled); single-file import only |
 
 ---
 

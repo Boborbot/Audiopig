@@ -47,20 +47,26 @@ final class MonetizationTests: XCTestCase {
         XCTAssertTrue(ProductIdentifiers.all.contains(ProductIdentifiers.plusMonthly))
         XCTAssertTrue(ProductIdentifiers.all.contains(ProductIdentifiers.tipCoffee))
         XCTAssertTrue(ProductIdentifiers.all.contains(ProductIdentifiers.tipLunch))
-        XCTAssertTrue(ProductIdentifiers.all.contains(ProductIdentifiers.tipSponsor))
+        XCTAssertTrue(ProductIdentifiers.all.contains(ProductIdentifiers.tipRent))
         XCTAssertEqual(ProductIdentifiers.all.count, 4)
     }
 
     func test_tipTier_productIDs() {
         XCTAssertEqual(TipTier.coffee.productID, ProductIdentifiers.tipCoffee)
         XCTAssertEqual(TipTier.lunch.productID, ProductIdentifiers.tipLunch)
-        XCTAssertEqual(TipTier.sponsor.productID, ProductIdentifiers.tipSponsor)
+        XCTAssertEqual(TipTier.rent.productID, ProductIdentifiers.tipRent)
     }
 
     func test_tipTier_initFromProductID() {
         XCTAssertEqual(TipTier(productID: ProductIdentifiers.tipCoffee), .coffee)
         XCTAssertEqual(TipTier(productID: ProductIdentifiers.tipLunch), .lunch)
-        XCTAssertEqual(TipTier(productID: ProductIdentifiers.tipSponsor), .sponsor)
+        XCTAssertEqual(TipTier(productID: ProductIdentifiers.tipRent), .rent)
         XCTAssertNil(TipTier(productID: "com.example.unknown"))
+    }
+
+    func test_tipTier_rentDisplayNameAndThankYouPhrase() {
+        XCTAssertEqual(TipTier.rent.title, "Today's Rent")
+        XCTAssertEqual(TipTier.rent.systemImage, "house.fill")
+        XCTAssertEqual(TipTier.rent.thankYouPhrase, "today's rent")
     }
 }

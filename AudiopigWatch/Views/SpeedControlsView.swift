@@ -15,6 +15,7 @@ struct SpeedControlsView: View {
     }
 
     @State private var lastDetentSpeed: Float = 1.0
+    @FocusState private var crownFocused: Bool
 
     var body: some View {
         VStack(spacing: WDS.Spacing.md) {
@@ -36,6 +37,7 @@ struct SpeedControlsView: View {
         }
         .padding(.horizontal, WDS.Spacing.sm)
         .focusable(isActive)
+        .focused($crownFocused)
         .digitalCrownRotation(
             $viewModel.speedDraft,
             from: WatchSpeedRange.min,
@@ -60,10 +62,24 @@ struct SpeedControlsView: View {
         .onChange(of: isActive) { _, active in
             if active {
                 lastDetentSpeed = viewModel.speedDraft
+                claimCrownFocus()
+            } else {
+                crownFocused = false
             }
         }
         .onAppear {
             lastDetentSpeed = viewModel.speedDraft
+            if isActive {
+                claimCrownFocus()
+            }
+        }
+    }
+
+    private func claimCrownFocus() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            guard isActive else { return }
+            crownFocused = true
         }
     }
 

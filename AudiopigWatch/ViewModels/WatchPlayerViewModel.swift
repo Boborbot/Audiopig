@@ -24,10 +24,16 @@ final class WatchPlayerViewModel: ObservableObject {
     @Published var artworkSkipGesturesEnabled = false
     @Published var watchArtworkViewMode: WatchArtworkViewMode = .off
     @Published private(set) var speedPresets: [Float] = WatchSpeedRange.presets
-    @Published private(set) var playbackTimelineScope: PlaybackTimelineScope = WatchPlayerViewModel.loadPersistedTimelineScope()
 
     /// Optimistic transport state for instant button feedback.
     @Published private(set) var optimisticState: WatchPlaybackState?
+
+    private enum PendingTransportState: Equatable {
+        case playing
+        case paused
+    }
+
+    private var pendingTransportState: PendingTransportState?
 
     @Published var speedDraft: Float = 1.0
     @Published var volumeDraft: Float = 0.5
@@ -36,9 +42,12 @@ final class WatchPlayerViewModel: ObservableObject {
     @Published private(set) var hasParagraphBreaksAccess = false
     @Published private(set) var hasWatchArtworkViewAccess = false
 
+    /// Bumps on each interpolation step so SwiftUI re-reads timebar computed values.
+    @Published private(set) var playbackTick: UInt = 0
+
     private let coordinator: any WatchPlaybackCoordinating
     private let client: WatchConnectivityClient
-    private var interpolationTimer: Timer?
+    private var interpolationCancellable: AnyCancellable?
     private var lastAuthoritativeSnapshot: WatchPlaybackSnapshot = .idle
     private var lastSentSpeed: Float?
     private var lastSentVolume: Float?
@@ -66,14 +75,14 @@ final class WatchPlayerViewModel: ObservableObject {
         }
 
         isReachable = coordinator.isReachable
-        if let cachedSettings = client.latestSettings {
-            applySettings(cachedSettings)
-        }
         if let existing = coordinator.snapshot {
             applyAuthoritativeSnapshot(existing)
         }
         if let cachedChapters = client.latestChapters {
             applyChapters(cachedChapters)
+        }
+        if let cachedSettings = client.latestSettings {
+            applySettings(cachedSettings)
         }
 
         if let router = coordinator as? WatchPlaybackRouter {
@@ -167,37 +176,40 @@ final class WatchPlayerViewModel: ObservableObject {
     }
 
     var chapterElapsedDisplay: TimeInterval {
-        resolvedChapterProgress.chapterElapsed
+        interpolatedChapterElapsed
     }
 
     var chapterRemainingDisplay: TimeInterval {
-        max(0, resolvedChapterProgress.chapterDuration - resolvedChapterProgress.chapterElapsed)
+        max(0, snapshot.chapterDuration - interpolatedChapterElapsed)
     }
 
     var chapterProgressDisplay: Double {
-        resolvedChapterProgress.chapterProgress
+        guard snapshot.chapterDuration > 0 else { return 0 }
+        return min(1, interpolatedChapterElapsed / snapshot.chapterDuration)
     }
 
     var timebarElapsedDisplay: TimeInterval {
-        usesChapterTimebar
-            ? resolvedChapterProgress.chapterElapsed
-            : interpolatedGlobalTime
+        timebarUsesChapterScope ? interpolatedChapterElapsed : interpolatedGlobalTime
     }
 
     var timebarRemainingDisplay: TimeInterval {
-        if usesChapterTimebar {
-            let progress = resolvedChapterProgress
-            return max(0, progress.chapterDuration - progress.chapterElapsed)
+        if timebarUsesChapterScope {
+            return max(0, snapshot.chapterDuration - interpolatedChapterElapsed)
         }
         return max(0, snapshot.globalDuration - interpolatedGlobalTime)
     }
 
     var timebarProgressDisplay: Double {
-        if usesChapterTimebar {
-            return resolvedChapterProgress.chapterProgress
+        if timebarUsesChapterScope {
+            return chapterProgressDisplay
         }
         guard snapshot.globalDuration > 0 else { return 0 }
         return min(1, interpolatedGlobalTime / snapshot.globalDuration)
+    }
+
+    /// Chapter-scoped timebar when iPhone is in chapter mode, or for multi-chapter books.
+    private var timebarUsesChapterScope: Bool {
+        snapshot.playbackTimelineScope == .currentChapter || snapshot.chapterCount > 1
     }
 
     var artworkImage: UIImage? {
@@ -217,18 +229,35 @@ final class WatchPlayerViewModel: ObservableObject {
         if let snap = result.snapshot {
             applyAuthoritativeSnapshot(snap)
         }
+        if let cachedChapters = client.latestChapters {
+            applyChapters(cachedChapters)
+        }
         isReachable = coordinator.isReachable
     }
 
+    /// Fetches cover art from iPhone when artwork view is enabled but the cached JPEG was stripped.
+    func ensureArtworkLoaded() async {
+        guard effectiveArtworkViewMode != .off, artworkImage == nil, snapshot.bookID != nil else { return }
+        let result = await coordinator.send(.requestSnapshot)
+        if let snap = result.snapshot {
+            applyAuthoritativeSnapshot(snap)
+        }
+    }
+
     func togglePlayPause() {
+        let target: WatchPlaybackState
         switch displayState {
         case .playing:
-            optimisticState = .paused
+            target = .paused
+            pendingTransportState = .paused
             WatchHaptics.pause()
         default:
-            optimisticState = .playing
+            target = .playing
+            pendingTransportState = .playing
             WatchHaptics.play()
         }
+        optimisticState = target
+        restartInterpolationIfNeeded()
         Task {
             let result = await coordinator.send(.togglePlayPause)
             await handleCommandResult(result)
@@ -237,7 +266,7 @@ final class WatchPlayerViewModel: ObservableObject {
 
     func skipForward() {
         WatchHaptics.directionUp()
-        bumpInterpolatedGlobal(by: snapshot.skipForwardSeconds)
+        bumpInterpolatedTimes(by: snapshot.skipForwardSeconds)
         Task {
             let result = await coordinator.send(.skipForward)
             await handleCommandResult(result)
@@ -246,7 +275,7 @@ final class WatchPlayerViewModel: ObservableObject {
 
     func skipBackward() {
         WatchHaptics.directionDown()
-        bumpInterpolatedGlobal(by: -snapshot.skipBackwardSeconds)
+        bumpInterpolatedTimes(by: -snapshot.skipBackwardSeconds)
         Task {
             let result = await coordinator.send(.skipBackward)
             await handleCommandResult(result)
@@ -341,16 +370,36 @@ final class WatchPlayerViewModel: ObservableObject {
 
         let bookChanged = incoming.bookID != lastAuthoritativeSnapshot.bookID
             || incoming.source != lastAuthoritativeSnapshot.source
-        lastAuthoritativeSnapshot = incoming
-        snapshot = incoming
-        optimisticState = nil
+
+        var resolvedSnapshot = incoming
+        if let pending = pendingTransportState {
+            if transportStateMatches(pending, incoming.playbackState) {
+                pendingTransportState = nil
+                optimisticState = nil
+            } else {
+                let optimistic = watchState(for: pending)
+                resolvedSnapshot = incoming.withPlaybackState(optimistic)
+                optimisticState = optimistic
+            }
+        } else {
+            optimisticState = nil
+        }
+
+        if !bookChanged,
+           resolvedSnapshot.artworkJPEG == nil,
+           resolvedSnapshot.bookID != nil {
+            let cachedArtwork = snapshot.artworkJPEG ?? lastAuthoritativeSnapshot.artworkJPEG
+            if let cachedArtwork {
+                resolvedSnapshot = resolvedSnapshot.withArtworkJPEG(cachedArtwork)
+            }
+        }
+
+        lastAuthoritativeSnapshot = resolvedSnapshot
+        snapshot = resolvedSnapshot
         connectionMessage = nil
         interpolatedGlobalTime = incoming.globalCurrentTime
+        interpolatedChapterElapsed = incoming.chapterElapsed
         isReachable = coordinator.isReachable
-
-        if let scope = incoming.playbackTimelineScope {
-            applyTimelineScope(scope)
-        }
 
         if bookChanged {
             lullState = .idle
@@ -446,14 +495,13 @@ final class WatchPlayerViewModel: ObservableObject {
         } else if !hasWatchArtworkViewAccess {
             watchArtworkViewMode = .off
         }
+        if effectiveArtworkViewMode != .off, artworkImage == nil, snapshot.bookID != nil {
+            Task { await ensureArtworkLoaded() }
+        }
         if let incomingPresets = settings.speedPresets, !incomingPresets.isEmpty {
             speedPresets = incomingPresets.sorted()
         } else {
             speedPresets = WatchSpeedRange.presets
-        }
-        if let scope = settings.playbackTimelineScope, snapshot.bookID == nil {
-            // Only adopt settings scope before playback snapshots arrive; snapshots are authoritative.
-            applyTimelineScope(scope)
         }
     }
 
@@ -462,12 +510,32 @@ final class WatchPlayerViewModel: ObservableObject {
         if let snap = result.snapshot {
             applyAuthoritativeSnapshot(snap)
         } else if !result.success {
+            pendingTransportState = nil
             optimisticState = nil
             lastSentSpeed = nil
             lastSentVolume = nil
             reconcileSpeed(from: snapshot.playbackSpeed)
             connectionMessage = result.errorMessage ?? client.connectionErrorMessage
             WatchHaptics.error()
+        }
+    }
+
+    private func transportStateMatches(
+        _ pending: PendingTransportState,
+        _ state: WatchPlaybackState
+    ) -> Bool {
+        switch pending {
+        case .playing:
+            state == .playing
+        case .paused:
+            state == .paused || state == .idle
+        }
+    }
+
+    private func watchState(for pending: PendingTransportState) -> WatchPlaybackState {
+        switch pending {
+        case .playing: .playing
+        case .paused: .paused
         }
     }
 
@@ -508,79 +576,29 @@ final class WatchPlayerViewModel: ObservableObject {
     // MARK: - Local interpolation
 
     private var interpolatedGlobalTime: TimeInterval = 0
+    private var interpolatedChapterElapsed: TimeInterval = 0
 
-    /// Whether the timebar shows chapter-scoped elapsed/remaining.
-    private var usesChapterTimebar: Bool {
-        if snapshot.playbackTimelineScope == .currentChapter { return true }
-        if playbackTimelineScope == .currentChapter { return true }
-        return effectiveChapterCount > 1
-    }
-
-    private var effectiveChapterCount: Int {
-        max(chapters.count, snapshot.chapterCount)
-    }
-
-    private var chapterTimings: [WatchChapterTiming] {
-        if !chapters.isEmpty {
-            return chapters.map { WatchChapterTiming(startTime: $0.startTime, duration: $0.duration) }
-        }
-        return []
-    }
-
-    private var resolvedChapterProgress: WatchChapterProgress {
-        let timings = chapterTimings
-        if !timings.isEmpty {
-            return ChapterProgressCalculator.progress(
-                globalTime: interpolatedGlobalTime,
-                chapters: timings
+    private func bumpInterpolatedTimes(by delta: TimeInterval) {
+        interpolatedGlobalTime = max(0, min(snapshot.globalDuration, interpolatedGlobalTime + delta))
+        if timebarUsesChapterScope {
+            interpolatedChapterElapsed = max(
+                0,
+                min(snapshot.chapterDuration, interpolatedChapterElapsed + delta)
             )
         }
-
-        return WatchChapterProgress(
-            chapterIndex: snapshot.chapterIndex,
-            chapterElapsed: snapshot.chapterElapsed,
-            chapterDuration: snapshot.chapterDuration,
-            chapterProgress: snapshot.chapterProgress
-        )
-    }
-
-    private func applyTimelineScope(_ scope: PlaybackTimelineScope) {
-        guard playbackTimelineScope != scope else { return }
-        playbackTimelineScope = scope
-        Self.persistTimelineScope(scope)
-    }
-
-    private func bumpInterpolatedGlobal(by delta: TimeInterval) {
-        interpolatedGlobalTime = max(0, min(snapshot.globalDuration, interpolatedGlobalTime + delta))
-        objectWillChange.send()
+        playbackTick &+= 1
     }
 
     private func restartInterpolationIfNeeded() {
-        interpolationTimer?.invalidate()
-        interpolationTimer = nil
-        guard snapshot.playbackState == .playing else { return }
-        interpolationTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self, self.snapshot.playbackState == .playing else { return }
+        interpolationCancellable?.cancel()
+        interpolationCancellable = nil
+        guard displayState == .playing else { return }
+        interpolationCancellable = Timer.publish(every: 0.25, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self, self.displayState == .playing else { return }
                 let delta = 0.25 * Double(self.snapshot.playbackSpeed)
-                self.bumpInterpolatedGlobal(by: delta)
+                self.bumpInterpolatedTimes(by: delta)
             }
-        }
-    }
-}
-
-private extension WatchPlayerViewModel {
-    static let timelineScopeDefaultsKey = "watch.playbackTimelineScope"
-
-    static func loadPersistedTimelineScope() -> PlaybackTimelineScope {
-        guard let raw = UserDefaults.standard.string(forKey: timelineScopeDefaultsKey),
-              let scope = PlaybackTimelineScope(rawValue: raw) else {
-            return .currentChapter
-        }
-        return scope
-    }
-
-    static func persistTimelineScope(_ scope: PlaybackTimelineScope) {
-        UserDefaults.standard.set(scope.rawValue, forKey: timelineScopeDefaultsKey)
     }
 }

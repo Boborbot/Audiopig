@@ -134,6 +134,11 @@ final class WatchConnectivityClient: NSObject {
         snapshotHandler?(snapshot)
     }
 
+    private func applyRecentBooks(_ payload: WatchRecentBooksPayload) {
+        latestRecentBooks = payload
+        recentBooksHandler?(payload)
+    }
+
     private func deliverCommandToPhone(_ command: WatchCommand) async -> WatchCommandResult {
         guard session.activationState == .activated else {
             return .failure(connectionErrorMessage)
@@ -167,6 +172,9 @@ final class WatchConnectivityClient: NSObject {
                             if let snapshot = result.snapshot {
                                 self.applySnapshot(snapshot)
                             }
+                            if let recentBooks = result.recentBooks {
+                                self.applyRecentBooks(recentBooks)
+                            }
                             continuation.resume(returning: result)
                         } else {
                             continuation.resume(returning: .failure("No response from iPhone"))
@@ -193,8 +201,7 @@ final class WatchConnectivityClient: NSObject {
 
         if let data = context[WatchMessageKeys.recentBooks] as? Data,
            let payload = try? WatchMessageCodec.decode(WatchRecentBooksPayload.self, from: data) {
-            latestRecentBooks = payload
-            recentBooksHandler?(payload)
+            applyRecentBooks(payload)
         }
 
         if let data = context[WatchMessageKeys.localBooks] as? Data,

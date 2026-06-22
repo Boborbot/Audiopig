@@ -32,7 +32,12 @@ final class WatchLibraryViewModel: ObservableObject {
         connectionState = client.connectionState
 
         client.setConnectionStateHandler { [weak self] state in
-            self?.connectionState = state
+            guard let self else { return }
+            let wasReachable = self.connectionState == .reachable
+            self.connectionState = state
+            if !wasReachable, state == .reachable {
+                Task { await self.refresh() }
+            }
         }
     }
 
@@ -48,6 +53,11 @@ final class WatchLibraryViewModel: ObservableObject {
 
         let result = await coordinator.send(.requestRecentBooks)
         connectionState = client.connectionState
+
+        if let payload = result.recentBooks {
+            books = payload.books
+        }
+
         isLoading = false
 
         if !result.success {

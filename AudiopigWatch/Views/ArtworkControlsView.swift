@@ -20,9 +20,9 @@ struct ArtworkControlsView: View {
             transportRow
         }
         .padding(.horizontal, WDS.Spacing.sm)
-        .focusable(isActive)
-        .task {
-            await viewModel.refresh()
+        .watchVolumeCrown(viewModel: viewModel, isActive: isActive)
+        .task(id: viewModel.snapshot.bookID) {
+            await viewModel.ensureArtworkLoaded()
         }
     }
 

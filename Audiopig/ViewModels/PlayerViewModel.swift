@@ -189,6 +189,13 @@ final class PlayerViewModel {
 
     // MARK: - Display Mode Toggle
 
+    /// True when the left timestamp shows speed-adjusted remaining time instead of elapsed.
+    var showsRemainingOnLeft: Bool { settings.leftTimeShowsRemaining }
+
+    func toggleLeftTimeDisplay() {
+        settings.leftTimeShowsRemaining.toggle()
+    }
+
     func togglePlaybackDisplayMode() {
         playbackDisplayMode = playbackDisplayMode == .entireBook ? .currentChapter : .entireBook
         let newScope: PlaybackTimelineScope = (playbackDisplayMode == .entireBook)
@@ -225,6 +232,15 @@ final class PlayerViewModel {
 
     // MARK: - Computed display during scrub
 
+    /// Left timestamp: elapsed by default; tap toggles to speed-adjusted remaining.
+    var scrubDisplayLeftTime: String {
+        if showsRemainingOnLeft {
+            let adjusted = contentRemainingInterval() / Double(max(playbackSpeed, Self.minPlaybackSpeed))
+            return "-\(Self.formatTime(adjusted))"
+        }
+        return scrubDisplayCurrentTime
+    }
+
     var scrubDisplayCurrentTime: String {
         guard isScrubbing else { return displayCurrentTime }
         switch playbackDisplayMode {
@@ -260,6 +276,7 @@ final class PlayerViewModel {
     @ObservationIgnored
     var onNaturalFinish: ((Audiobook) -> Void)?
     var onPlaybackPositionSaved: (() -> Void)?
+    var onAudiobookLoaded: (() -> Void)?
 
     @ObservationIgnored
     private var didReportNaturalFinish = false
@@ -345,9 +362,8 @@ final class PlayerViewModel {
             coverImage: self.coverImage
         )
         publishWatchSnapshot(immediate: true, includeArtwork: true)
-        watchBridge?.publishChapters(
-            WatchSnapshotBuilder.makeChaptersPayload(bookID: audiobook.id, chapters: self.chapters)
-        )
+        publishWatchChaptersIfNeeded()
+        onAudiobookLoaded?()
     }
 
     // MARK: - Transport
@@ -375,20 +391,32 @@ final class PlayerViewModel {
 
     func syncWatchState(immediate: Bool = true, includeArtwork: Bool = false) {
         publishWatchSnapshot(immediate: immediate, includeArtwork: includeArtwork)
+        publishWatchChaptersIfNeeded()
+    }
+
+    private func publishWatchChaptersIfNeeded() {
+        guard let audiobook, let watchBridge else { return }
+        watchBridge.publishChapters(
+            WatchSnapshotBuilder.makeChaptersPayload(bookID: audiobook.id, chapters: chapters)
+        )
     }
 
     func skipForward() {
+        endScrubbingForTransport()
         resetListeningSample()
         Task {
             try? await audioEngine.skipForward(by: settings.skipForwardInterval)
+            syncDisplayFromEngine()
             publishWatchSnapshot(immediate: true, includeArtwork: false)
         }
     }
 
     func skipBackward() {
+        endScrubbingForTransport()
         resetListeningSample()
         Task {
             try? await audioEngine.skipBackward(by: settings.skipBackwardInterval)
+            syncDisplayFromEngine()
             publishWatchSnapshot(immediate: true, includeArtwork: false)
         }
     }
@@ -414,9 +442,11 @@ final class PlayerViewModel {
 
     func seekToChapter(_ chapter: Chapter) {
         isChaptersPresented = false
+        endScrubbingForTransport()
         resetListeningSample()
         Task {
             try? await audioEngine.seek(to: chapter.startTime)
+            syncDisplayFromEngine()
             publishWatchSnapshot(immediate: true, includeArtwork: false)
         }
     }
@@ -427,22 +457,23 @@ final class PlayerViewModel {
         PaywallViewModel(monetization: monetization)
     }
 
-    func analyzeLulls() {
+    func analyzeSmartRewind(_ range: SmartRewindRange) {
         guard case .idle = lullAnalysisState, audiobook != nil else { return }
         guard monetization.hasAccess(to: .paragraphBreaks) else {
             isPaywallPresented = true
             return
         }
-        startLullAnalysis()
+        startSmartRewindAnalysis(range)
     }
 
-    func lookAgainLulls() {
+    func lookAgainSmartRewind() {
         guard audiobook != nil else { return }
         guard monetization.hasAccess(to: .paragraphBreaks) else {
             isPaywallPresented = true
             return
         }
-        startLullAnalysis()
+        guard case .results(let range, _) = lullAnalysisState else { return }
+        startSmartRewindAnalysis(range)
     }
 
     func cancelLullAnalysis() {
@@ -451,8 +482,12 @@ final class PlayerViewModel {
 
     func seekToLull(_ lull: LullResult) {
         lullAnalysisState = .idle
+        endScrubbingForTransport()
         resetListeningSample()
-        Task { try? await audioEngine.seek(to: max(0, lull.endTime - 0.5)) }
+        Task {
+            try? await audioEngine.seek(to: max(0, lull.endTime - 0.5))
+            syncDisplayFromEngine()
+        }
     }
 
     /// Runs lull detection on iPhone for Watch remote commands.
@@ -467,20 +502,45 @@ final class PlayerViewModel {
     }
 
     func seekToLullEndTime(_ endTime: TimeInterval) {
+        endScrubbingForTransport()
         resetListeningSample()
         Task {
             try? await audioEngine.seek(to: max(0, endTime - 0.5))
+            syncDisplayFromEngine()
             publishWatchSnapshot(immediate: true, includeArtwork: false)
         }
     }
 
-    private func startLullAnalysis() {
-        lullAnalysisState = .analyzing
-        let (from, to) = lullAnalysisWindow()
+    private func startSmartRewindAnalysis(_ range: SmartRewindRange) {
+        lullAnalysisState = .analyzing(range)
+        let (from, to) = smartRewindWindow(for: range)
         let chapters = audioEngine.resolvedChapters
         Task {
-            let lulls = (try? await lullDetector.findLulls(in: chapters, from: from, to: to)) ?? []
-            lullAnalysisState = .results(lulls)
+            let lulls = (try? await lullDetector.findLulls(
+                in: chapters,
+                from: from,
+                to: to,
+                maxResults: 3
+            )) ?? []
+            lullAnalysisState = .results(range, lulls)
+        }
+    }
+
+    private func smartRewindWindow(for range: SmartRewindRange) -> (from: TimeInterval, to: TimeInterval) {
+        let now = audioEngine.currentTime
+        switch range {
+        case .far:
+            let startOffset = settings.smartRewindFarStartOffset
+            let endOffset = settings.smartRewindFarEndOffset
+            let from = max(0, now - startOffset)
+            let to = max(from + 1, now - endOffset)
+            return (from, to)
+        case .near:
+            let startOffset = settings.smartRewindNearStartOffset
+            let endOffset = settings.smartRewindNearEndOffset
+            let from = max(0, now - startOffset)
+            let to = max(from + 1, now - endOffset)
+            return (from, to)
         }
     }
 
@@ -529,8 +589,12 @@ final class PlayerViewModel {
 
     func seekToBookmark(_ bookmark: Bookmark) {
         isBookmarksPresented = false
+        endScrubbingForTransport()
         resetListeningSample()
-        Task { try? await audioEngine.seek(to: bookmark.timestamp) }
+        Task {
+            try? await audioEngine.seek(to: bookmark.timestamp)
+            syncDisplayFromEngine()
+        }
     }
 
     // MARK: - Bookmark Export
@@ -688,22 +752,58 @@ final class PlayerViewModel {
     }
 
     func commitScrub() async {
-        let targetTime: TimeInterval
-        switch playbackDisplayMode {
-        case .entireBook:
-            targetTime = scrubPosition * audioEngine.duration
-        case .currentChapter:
-            let chaps = chapters
-            if chaps.isEmpty {
-                targetTime = scrubPosition * audioEngine.duration
-            } else {
-                let chapter = chaps[currentChapterIndex]
-                targetTime = chapter.startTime + scrubPosition * chapter.duration
-            }
+        guard isScrubbing else {
+            syncDisplayFromEngine()
+            return
         }
+
+        let targetTime = scrubTargetTime(for: scrubPosition)
         isScrubbing = false
         resetListeningSample()
         try? await audioEngine.seek(to: targetTime)
+        syncDisplayFromEngine()
+    }
+
+    /// Realigns the scrubber and time labels with the engine after a seek or stuck scrub.
+    private func syncDisplayFromEngine() {
+        applyEngineTime(audioEngine.currentTime)
+    }
+
+    private func contentRemainingInterval() -> TimeInterval {
+        switch playbackDisplayMode {
+        case .entireBook:
+            let duration = audioEngine.duration
+            let elapsed = isScrubbing ? scrubPosition * duration : audioEngine.currentTime
+            return max(0, duration - elapsed)
+        case .currentChapter:
+            let chaps = chapters
+            guard !chaps.isEmpty else {
+                let duration = audioEngine.duration
+                let elapsed = isScrubbing ? scrubPosition * duration : audioEngine.currentTime
+                return max(0, duration - elapsed)
+            }
+            let chapterDuration = chaps[currentChapterIndex].duration
+            let chapterElapsed = isScrubbing
+                ? scrubPosition * chapterDuration
+                : max(0, audioEngine.currentTime - chaps[currentChapterIndex].startTime)
+            return max(0, chapterDuration - chapterElapsed)
+        }
+    }
+
+    private func scrubTargetTime(for position: Double) -> TimeInterval {
+        switch playbackDisplayMode {
+        case .entireBook:
+            return position * audioEngine.duration
+        case .currentChapter:
+            let chaps = chapters
+            guard !chaps.isEmpty else { return position * audioEngine.duration }
+            let chapter = chaps[currentChapterIndex]
+            return chapter.startTime + position * chapter.duration
+        }
+    }
+
+    private func endScrubbingForTransport() {
+        isScrubbing = false
     }
 
     // MARK: - Private — Engine Observation

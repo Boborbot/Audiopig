@@ -167,25 +167,7 @@ enum WidgetListeningSnapshot {
 
     // MARK: - Formatting
 
-    /// E.g. "2.4h", "42m", "1m", "0m".
-    static func formatTodayListening(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds))
-        let hours = total / 3600
-        let minutes = (total % 3600) / 60
-
-        if hours > 0 {
-            let fractionalHours = seconds / 3600
-            if minutes == 0 {
-                return "\(hours)h"
-            }
-            return String(format: "%.1fh", fractionalHours)
-        }
-        if minutes > 0 { return "\(minutes)m" }
-        if total > 0 { return "1m" }
-        return "0m"
-    }
-
-    /// E.g. "2h24m", "42m", "1m", "0m".
+    /// E.g. "2h24m", "2h", "42m", "1m", "0m".
     static func formatTodayListeningHoursMinutes(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds))
         let hours = total / 3600
@@ -194,7 +176,10 @@ enum WidgetListeningSnapshot {
             minutes = 1
         }
         if hours > 0 {
-            return "\(hours)h\(minutes)m"
+            if minutes > 0 {
+                return "\(hours)h\(minutes)m"
+            }
+            return "\(hours)h"
         }
         return "\(minutes)m"
     }

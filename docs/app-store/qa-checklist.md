@@ -112,6 +112,8 @@ Test with **Xcode StoreKit Configuration** (`Audiopig.storekit`) on Simulator, t
 
 ### Feed a Student (consumables)
 
+Coffee ($2.99), Lunch ($6.99), and Today's Rent ($14.99).
+
 - [ ] All three tip tiers show prices in Settings
 - [ ] Purchase tip → thank-you UI appears
 - [ ] Same tip can be purchased again (consumable)

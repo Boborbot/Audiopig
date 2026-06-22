@@ -64,7 +64,7 @@ MOTIVATION WITHOUT THE NOISE
 • Celebrate finished books — optionally remove them when you're done
 
 FREE TO START. PLUS WHEN YOU NEED IT.
-Core playback, library, bookmarks, stats, and Apple Watch remote control are free. Audiopig Plus unlocks Find Paragraph Breaks (~$3.99/mo after a 7-day trial). Optional "Feed a Student" tips support indie development.
+Core playback, library, bookmarks, stats, and Apple Watch remote control are free. Audiopig Plus unlocks Find Paragraph Breaks (~$3.99/mo after a 7-day trial). Optional "Feed a Student" tips ($2.99 / $6.99 / $14.99) support indie development.
 
 NO ACCOUNT. NO CLOUD.
 Audiopig does not collect your data. Your audiobooks and listening history stay on your iPhone. Purchases are processed by Apple.

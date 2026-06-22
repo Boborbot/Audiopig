@@ -21,4 +21,8 @@ final class WatchVolumeRangeTests: XCTestCase {
             XCTAssertEqual(WatchVolumeRange.normalized(value), value, accuracy: 0.0001)
         }
     }
+
+    func test_crownStepIsSixTimesFinerThanVolumeStep() {
+        XCTAssertEqual(WatchVolumeRange.crownStep, WatchVolumeRange.step / 6, accuracy: 0.000001)
+    }
 }

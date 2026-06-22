@@ -194,27 +194,37 @@ public struct WatchCommandResult: Codable, Sendable, Equatable {
     public let snapshot: WatchPlaybackSnapshot?
     public let lullResult: WatchLullResult?
     public let localBooks: WatchLocalBooksPayload?
+    public let recentBooks: WatchRecentBooksPayload?
 
     public init(
         success: Bool,
         errorMessage: String? = nil,
         snapshot: WatchPlaybackSnapshot? = nil,
         lullResult: WatchLullResult? = nil,
-        localBooks: WatchLocalBooksPayload? = nil
+        localBooks: WatchLocalBooksPayload? = nil,
+        recentBooks: WatchRecentBooksPayload? = nil
     ) {
         self.success = success
         self.errorMessage = errorMessage
         self.snapshot = snapshot
         self.lullResult = lullResult
         self.localBooks = localBooks
+        self.recentBooks = recentBooks
     }
 
     public static func ok(
         snapshot: WatchPlaybackSnapshot? = nil,
         lullResult: WatchLullResult? = nil,
-        localBooks: WatchLocalBooksPayload? = nil
+        localBooks: WatchLocalBooksPayload? = nil,
+        recentBooks: WatchRecentBooksPayload? = nil
     ) -> WatchCommandResult {
-        WatchCommandResult(success: true, snapshot: snapshot, lullResult: lullResult, localBooks: localBooks)
+        WatchCommandResult(
+            success: true,
+            snapshot: snapshot,
+            lullResult: lullResult,
+            localBooks: localBooks,
+            recentBooks: recentBooks
+        )
     }
 
     public static func failure(_ message: String) -> WatchCommandResult {

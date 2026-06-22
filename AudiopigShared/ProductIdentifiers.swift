@@ -10,9 +10,9 @@ public enum ProductIdentifiers {
     public static let plusMonthly = "com.nitay.Audiopig.plus.monthly"
     public static let tipCoffee = "com.nitay.Audiopig.tip.coffee"
     public static let tipLunch = "com.nitay.Audiopig.tip.lunch"
-    public static let tipSponsor = "com.nitay.Audiopig.tip.sponsor"
+    public static let tipRent = "com.nitay.Audiopig.tip.rent"
 
-    public static let allTips: [String] = [tipCoffee, tipLunch, tipSponsor]
+    public static let allTips: [String] = [tipCoffee, tipLunch, tipRent]
 
     public static let all: [String] = [plusMonthly] + allTips
 }
@@ -21,7 +21,7 @@ public enum ProductIdentifiers {
 public enum TipTier: String, CaseIterable, Identifiable, Sendable {
     case coffee
     case lunch
-    case sponsor
+    case rent
 
     public var id: String { rawValue }
 
@@ -29,7 +29,7 @@ public enum TipTier: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .coffee: ProductIdentifiers.tipCoffee
         case .lunch: ProductIdentifiers.tipLunch
-        case .sponsor: ProductIdentifiers.tipSponsor
+        case .rent: ProductIdentifiers.tipRent
         }
     }
 
@@ -37,7 +37,7 @@ public enum TipTier: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .coffee: "Coffee"
         case .lunch: "Lunch"
-        case .sponsor: "Sponsor"
+        case .rent: "Today's Rent"
         }
     }
 
@@ -45,7 +45,7 @@ public enum TipTier: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .coffee: "A small thank-you"
         case .lunch: "Fuel for a coding session"
-        case .sponsor: "Generous support"
+        case .rent: "Helps keep the lights on"
         }
     }
 
@@ -53,7 +53,16 @@ public enum TipTier: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .coffee: "cup.and.saucer.fill"
         case .lunch: "takeoutbag.and.cup.and.straw.fill"
-        case .sponsor: "heart.fill"
+        case .rent: "house.fill"
+        }
+    }
+
+    /// Lowercased phrase for thank-you copy (e.g. "your coffee tip").
+    public var thankYouPhrase: String {
+        switch self {
+        case .coffee: "coffee"
+        case .lunch: "lunch"
+        case .rent: "today's rent"
         }
     }
 
@@ -61,7 +70,7 @@ public enum TipTier: String, CaseIterable, Identifiable, Sendable {
         switch productID {
         case ProductIdentifiers.tipCoffee: self = .coffee
         case ProductIdentifiers.tipLunch: self = .lunch
-        case ProductIdentifiers.tipSponsor: self = .sponsor
+        case ProductIdentifiers.tipRent: self = .rent
         default: return nil
         }
     }

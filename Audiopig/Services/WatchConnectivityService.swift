@@ -10,6 +10,9 @@ import WatchConnectivity
 final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol {
     private let session: WCSession
     private var lastSnapshot: WatchPlaybackSnapshot?
+    private var lastChapters: WatchChaptersPayload?
+    private var lastRecentBooks: WatchRecentBooksPayload?
+    private var lastSettings: WatchSettingsSnapshot?
     private var lastArtworkBookID: UUID?
     private var outboundContext: [String: Any] = [:]
     private var pendingTransfers: [UUID: WatchTransferManifest] = [:]
@@ -89,10 +92,12 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
     }
 
     func publishChapters(_ payload: WatchChaptersPayload) {
+        lastChapters = payload
         pushToContext(key: WatchMessageKeys.chapters, encodable: payload)
     }
 
     func publishRecentBooks(_ payload: WatchRecentBooksPayload) {
+        lastRecentBooks = payload
         pushToContext(key: WatchMessageKeys.recentBooks, encodable: payload)
     }
 
@@ -107,6 +112,7 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
     }
 
     func publishSettings(_ settings: WatchSettingsSnapshot) {
+        lastSettings = settings
         pushToContext(key: WatchMessageKeys.settings, encodable: settings)
     }
 
@@ -320,10 +326,23 @@ extension WatchConnectivityService: WCSessionDelegate {
         error: Error?
     ) {
         Task { @MainActor in
-            if let snapshot = lastSnapshot {
-                publishSnapshot(snapshot, includeArtwork: true)
-            }
+            republishCachedWatchContext(includeArtwork: true)
             reachabilityHandler?(session.isReachable)
+        }
+    }
+
+    private func republishCachedWatchContext(includeArtwork: Bool) {
+        if let settings = lastSettings {
+            publishSettings(settings)
+        }
+        if let recentBooks = lastRecentBooks {
+            publishRecentBooks(recentBooks)
+        }
+        if let chapters = lastChapters {
+            publishChapters(chapters)
+        }
+        if let snapshot = lastSnapshot {
+            publishSnapshot(snapshot, includeArtwork: includeArtwork)
         }
     }
 

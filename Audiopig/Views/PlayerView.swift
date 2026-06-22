@@ -18,11 +18,14 @@ struct PlayerView: View {
 
             GeometryReader { geometry in
                 let metrics = PlayerLayoutMetrics(geometry: geometry)
-                if metrics.isLandscape {
-                    landscapeLayout(metrics: metrics, geometry: geometry)
-                } else {
-                    portraitLayout(metrics: metrics, geometry: geometry)
+                Group {
+                    if metrics.isLandscape {
+                        landscapeLayout(metrics: metrics, geometry: geometry)
+                    } else {
+                        portraitLayout(metrics: metrics, geometry: geometry)
+                    }
                 }
+                .snapLayoutOnBackgroundTransition()
             }
         }
         .sheet(isPresented: $viewModel.isChaptersPresented) {
@@ -215,7 +218,7 @@ struct PlayerView: View {
             bottomRow
                 .padding(.top, sectionGap)
 
-            lullAnalysisSection(compact: compact)
+            smartRewindSection(compact: compact)
                 .padding(.top, DS.Spacing.sm)
                 .padding(.horizontal, DS.Spacing.md)
                 .padding(.bottom, lullBottom)
@@ -267,13 +270,33 @@ struct PlayerView: View {
                     }
                 }
             )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onEnded { _ in
+                        // Slider sometimes omits onEditingChanged(false) at the 0:00 endpoint.
+                        Task { await viewModel.commitScrub() }
+                    }
+            )
             .tint(DS.Color.coral)
             .accessibilityLabel("Playback position")
             .accessibilityValue(viewModel.scrubDisplayCurrentTime)
 
             HStack {
-                Text(viewModel.scrubDisplayCurrentTime)
-                    .timestampStyle()
+                Button {
+                    viewModel.toggleLeftTimeDisplay()
+                } label: {
+                    Text(viewModel.scrubDisplayLeftTime)
+                        .timestampStyle()
+                        .contentTransition(.numericText())
+                        .animation(DS.Animation.fade, value: viewModel.showsRemainingOnLeft)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    viewModel.showsRemainingOnLeft
+                        ? "Time remaining at current speed"
+                        : "Elapsed time"
+                )
+                .accessibilityHint("Double tap to toggle between elapsed and remaining time")
 
                 Spacer()
 
@@ -450,26 +473,26 @@ struct PlayerView: View {
         )
     }
 
-    // MARK: - Lull Analysis Section
+    // MARK: - Smart Rewind Section
 
     @ViewBuilder
-    private func lullAnalysisSection(compact: Bool) -> some View {
+    private func smartRewindSection(compact: Bool) -> some View {
         let pillPadding: CGFloat = compact ? 10 : 14
 
         switch viewModel.lullAnalysisState {
         case .idle:
-            Button {
-                viewModel.analyzeLulls()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "waveform.and.magnifyingglass")
-                    Text("Find Paragraph Breaks")
-                }
-                .frame(maxWidth: .infinity)
-                .pillAppearance(verticalPadding: pillPadding)
+            HStack(spacing: DS.Spacing.sm) {
+                smartRewindTriggerButton(
+                    title: "Look Far",
+                    range: .far,
+                    pillPadding: pillPadding
+                )
+                smartRewindTriggerButton(
+                    title: "Look Near",
+                    range: .near,
+                    pillPadding: pillPadding
+                )
             }
-            .buttonStyle(.plain)
-            .disabled(!viewModel.isActive)
 
         case .analyzing:
             HStack(spacing: 8) {
@@ -480,24 +503,30 @@ struct PlayerView: View {
             .frame(maxWidth: .infinity)
             .pillAppearance(verticalPadding: pillPadding)
 
-        case .results(let lulls):
+        case .results(_, let lulls):
             VStack(spacing: DS.Spacing.sm) {
                 if lulls.isEmpty {
                     Text("No breaks found")
                         .frame(maxWidth: .infinity)
                         .pillAppearance(verticalPadding: pillPadding)
-                } else if let lull = lulls.first {
-                    Button {
-                        viewModel.seekToLull(lull)
-                    } label: {
-                        Text(viewModel.lullLabel(for: lull))
-                            .frame(maxWidth: .infinity)
-                            .pillAppearance(isActive: true, verticalPadding: pillPadding)
+                } else {
+                    HStack(spacing: DS.Spacing.sm) {
+                        ForEach(lulls) { lull in
+                            Button {
+                                viewModel.seekToLull(lull)
+                            } label: {
+                                Text(viewModel.lullLabel(for: lull))
+                                    .frame(maxWidth: .infinity)
+                                    .pillAppearance(
+                                        isActive: lull.id == lulls.first?.id,
+                                        verticalPadding: pillPadding
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
 
-                // Secondary row: cancel and re-analyze.
                 HStack(spacing: DS.Spacing.sm) {
                     Button {
                         viewModel.cancelLullAnalysis()
@@ -509,7 +538,7 @@ struct PlayerView: View {
                     .buttonStyle(.plain)
 
                     Button {
-                        viewModel.lookAgainLulls()
+                        viewModel.lookAgainSmartRewind()
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.counterclockwise")
@@ -522,6 +551,25 @@ struct PlayerView: View {
                 }
             }
         }
+    }
+
+    private func smartRewindTriggerButton(
+        title: String,
+        range: SmartRewindRange,
+        pillPadding: CGFloat
+    ) -> some View {
+        Button {
+            viewModel.analyzeSmartRewind(range)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "waveform.and.magnifyingglass")
+                Text(title)
+            }
+            .frame(maxWidth: .infinity)
+            .pillAppearance(verticalPadding: pillPadding)
+        }
+        .buttonStyle(.plain)
+        .disabled(!viewModel.isActive)
     }
 }
 

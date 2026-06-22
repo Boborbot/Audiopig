@@ -76,6 +76,58 @@ public struct WatchPlaybackSnapshot: Codable, Sendable, Equatable {
         self.updatedAt = updatedAt
     }
 
+    public func withPlaybackState(_ state: WatchPlaybackState) -> WatchPlaybackSnapshot {
+        WatchPlaybackSnapshot(
+            revision: revision,
+            bookID: bookID,
+            title: title,
+            author: author,
+            chapterTitle: chapterTitle,
+            playbackState: state,
+            playbackSpeed: playbackSpeed,
+            skipForwardSeconds: skipForwardSeconds,
+            skipBackwardSeconds: skipBackwardSeconds,
+            chapterIndex: chapterIndex,
+            chapterCount: chapterCount,
+            chapterElapsed: chapterElapsed,
+            chapterDuration: chapterDuration,
+            chapterProgress: chapterProgress,
+            globalCurrentTime: globalCurrentTime,
+            globalDuration: globalDuration,
+            playbackTimelineScope: playbackTimelineScope,
+            systemVolume: systemVolume,
+            source: source,
+            artworkJPEG: artworkJPEG,
+            updatedAt: updatedAt
+        )
+    }
+
+    public func withArtworkJPEG(_ data: Data?) -> WatchPlaybackSnapshot {
+        WatchPlaybackSnapshot(
+            revision: revision,
+            bookID: bookID,
+            title: title,
+            author: author,
+            chapterTitle: chapterTitle,
+            playbackState: playbackState,
+            playbackSpeed: playbackSpeed,
+            skipForwardSeconds: skipForwardSeconds,
+            skipBackwardSeconds: skipBackwardSeconds,
+            chapterIndex: chapterIndex,
+            chapterCount: chapterCount,
+            chapterElapsed: chapterElapsed,
+            chapterDuration: chapterDuration,
+            chapterProgress: chapterProgress,
+            globalCurrentTime: globalCurrentTime,
+            globalDuration: globalDuration,
+            playbackTimelineScope: playbackTimelineScope,
+            systemVolume: systemVolume,
+            source: source,
+            artworkJPEG: data,
+            updatedAt: updatedAt
+        )
+    }
+
     public static let idle = WatchPlaybackSnapshot(
         revision: 0,
         bookID: nil,

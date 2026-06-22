@@ -9,7 +9,6 @@ struct SettingsView: View {
     @Bindable var settings: AppSettings
     var statsViewModel: StatsViewModel
     @Bindable var monetizationViewModel: SettingsMonetizationViewModel
-    var libraryViewModel: LibraryViewModel?
     var onWatchSettingsChanged: (() -> Void)?
 
     @State private var isDeleteStatsConfirmationPresented = false
@@ -22,13 +21,11 @@ struct SettingsView: View {
         settings: AppSettings,
         statsViewModel: StatsViewModel,
         monetizationViewModel: SettingsMonetizationViewModel,
-        libraryViewModel: LibraryViewModel? = nil,
         onWatchSettingsChanged: (() -> Void)? = nil
     ) {
         _settings = Bindable(wrappedValue: settings)
         self.statsViewModel = statsViewModel
         _monetizationViewModel = Bindable(wrappedValue: monetizationViewModel)
-        self.libraryViewModel = libraryViewModel
         self.onWatchSettingsChanged = onWatchSettingsChanged
     }
 
@@ -251,7 +248,7 @@ struct SettingsView: View {
             Text("Audiopig Plus")
                 .sectionTitle()
         } footer: {
-            Text("Find Paragraph Breaks is included with Plus. Core playback stays free.")
+            Text("Smart Rewind is included with Plus. Core playback stays free.")
                 .font(DS.Typography.caption)
                 .foregroundStyle(DS.Color.tertiary)
         }
