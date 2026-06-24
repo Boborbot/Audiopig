@@ -343,7 +343,7 @@ final class WatchTransferService: WatchTransferServiceProtocol {
                 self.handleTransferCompletion(
                     bookID: bookID,
                     success: false,
-                    error: "Apple Watch didn't confirm the transfer. Open Audiopig on your Watch and try again."
+                    error: "Apple Watch didn't confirm the transfer. Open \(Brand.displayName) on your Watch and try again."
                 )
             }
         }
@@ -366,7 +366,7 @@ final class WatchTransferService: WatchTransferServiceProtocol {
                 self.handleTransferCompletion(
                     bookID: bookID,
                     success: false,
-                    error: "Transfer timed out. Open Audiopig on your Watch and try again."
+                    error: "Transfer timed out. Open \(Brand.displayName) on your Watch and try again."
                 )
             }
         }
@@ -448,10 +448,10 @@ final class WatchTransferService: WatchTransferServiceProtocol {
             return "No Apple Watch paired."
         }
         if !watchBridge.isWatchAppInstalled {
-            return "Install Audiopig on Apple Watch."
+            return "Install \(Brand.displayName) on Apple Watch."
         }
         guard await watchBridge.ensureSessionActivated(timeout: 8) else {
-            return "Could not connect to Apple Watch. Open Audiopig on both devices."
+            return "Could not connect to Apple Watch. Open \(Brand.displayName) on both devices."
         }
         return nil
     }
@@ -466,9 +466,9 @@ final class WatchTransferService: WatchTransferServiceProtocol {
             return "No Apple Watch paired."
         }
         if !watchBridge.isWatchAppInstalled {
-            return "Install Audiopig on Apple Watch."
+            return "Install \(Brand.displayName) on Apple Watch."
         }
-        return "Watch is not available. Open Audiopig on both devices."
+        return "Watch is not available. Open \(Brand.displayName) on both devices."
     }
 
     private func buildManifest(

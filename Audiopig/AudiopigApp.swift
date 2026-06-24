@@ -70,7 +70,7 @@ struct AudiopigApp: App {
             )
             OrientationLockController.shared.setLocked(dc.appSettings.orientationLock)
         } catch {
-            fatalError("Audiopig failed to initialise core services: \(error.localizedDescription)")
+            fatalError("\(Brand.displayName) failed to initialise core services: \(error.localizedDescription)")
         }
     }
 

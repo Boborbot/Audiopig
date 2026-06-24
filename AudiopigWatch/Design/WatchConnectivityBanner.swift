@@ -28,13 +28,13 @@ struct WatchConnectivityNotice: Equatable {
             return WatchConnectivityNotice(
                 kind: .setup,
                 title: "Install on iPhone",
-                detail: "Get Audiopig from the App Store on your paired iPhone."
+                detail: "Get \(Brand.displayName) from the App Store on your paired iPhone."
             )
         }
         if lower.contains("open audiopig") || lower.contains("not connected") {
             return WatchConnectivityNotice(
                 kind: .unreachable,
-                title: "Open Audiopig on iPhone",
+                title: "Open \(Brand.displayName) on iPhone",
                 detail: "Keep the app open to control playback from your Watch."
             )
         }
@@ -45,7 +45,7 @@ struct WatchConnectivityNotice: Equatable {
             return WatchConnectivityNotice(
                 kind: .unreachable,
                 title: "iPhone unavailable",
-                detail: "Open Audiopig on your iPhone and try again."
+                detail: "Open \(Brand.displayName) on your iPhone and try again."
             )
         }
         if lower.contains("could not load") {

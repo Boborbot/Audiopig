@@ -119,13 +119,13 @@ final class WatchConnectivityClient: NSObject {
     var connectionErrorMessage: String {
         switch connectionState {
         case .companionNotInstalled:
-            return "Install Audiopig on iPhone"
+            return "Install \(Brand.displayName) on iPhone"
         case .notReachable:
-            return "Open Audiopig on iPhone"
+            return "Open \(Brand.displayName) on iPhone"
         case .activating:
             return "Connecting to iPhone…"
         case .reachable:
-            return "Open Audiopig on iPhone"
+            return "Open \(Brand.displayName) on iPhone"
         }
     }
 

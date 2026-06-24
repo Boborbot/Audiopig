@@ -17,7 +17,7 @@ struct WatchSettingsView: View {
             Section {
                 artworkViewModePicker
             } footer: {
-                Text("Show cover art with transport controls on the Watch player. Audiopig Plus required.")
+                Text("Show cover art with transport controls on the Watch player. \(Brand.plusName) required.")
                     .font(.caption2)
             }
 

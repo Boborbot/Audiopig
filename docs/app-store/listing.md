@@ -1,4 +1,4 @@
-# Audiopig — App Store Connect Listing Copy
+# AudioPig — App Store Connect Listing Copy
 
 Paste these fields into App Store Connect. Adjust tone if needed; all claims match current app behavior.
 
@@ -7,7 +7,7 @@ Paste these fields into App Store Connect. Adjust tone if needed; all claims mat
 ## App Name
 
 ```
-Audiopig
+AudioPig
 ```
 
 ---
@@ -30,7 +30,7 @@ Local audiobooks, beautifully
 ## Promotional Text (170 characters max, editable without new version)
 
 ```
-Core player free. Try Find Paragraph Breaks free for 7 days with Audiopig Plus. Import, bookmark, and listen — your library stays on your device.
+Core player free. Try Find Paragraph Breaks free for 7 days with AudioPig Plus. Import, bookmark, and listen — your library stays on your device.
 ```
 
 ---
@@ -38,7 +38,7 @@ Core player free. Try Find Paragraph Breaks free for 7 days with Audiopig Plus. 
 ## Description
 
 ```
-Audiopig is a beautiful audiobook player for the files you already own. Import MP3 and M4B audiobooks from the Files app, organize them in folders, and listen with a full-featured player designed for long sessions.
+AudioPig is a beautiful audiobook player for the files you already own. Import MP3 and M4B audiobooks from the Files app, organize them in folders, and listen with a full-featured player designed for long sessions.
 
 YOUR LIBRARY, ON YOUR DEVICE
 • Import single files or entire folders from Files
@@ -56,7 +56,7 @@ BUILT FOR LISTENING
 NEVER LOSE YOUR PLACE
 • Playback position saved automatically
 • Named bookmarks with export
-• Find paragraph breaks with smart silence detection (Audiopig Plus — 7-day free trial)
+• Find paragraph breaks with smart silence detection (AudioPig Plus — 7-day free trial)
 
 MOTIVATION WITHOUT THE NOISE
 • Track total listening time and finished books
@@ -64,10 +64,10 @@ MOTIVATION WITHOUT THE NOISE
 • Celebrate finished books — optionally remove them when you're done
 
 FREE TO START. PLUS WHEN YOU NEED IT.
-Core playback, library, bookmarks, stats, and Apple Watch remote control are free. Audiopig Plus unlocks Find Paragraph Breaks (~$3.99/mo after a 7-day trial). Optional "Feed a Student" tips ($2.99 / $6.99 / $14.99) support indie development.
+Core playback, library, bookmarks, stats, and Apple Watch remote control are free. AudioPig Plus unlocks Find Paragraph Breaks (~$3.99/mo after a 7-day trial). Optional "Feed a Student" tips ($2.99 / $6.99 / $14.99) support indie development.
 
 NO ACCOUNT. NO CLOUD.
-Audiopig does not collect your data. Your audiobooks and listening history stay on your iPhone. Purchases are processed by Apple.
+AudioPig does not collect your data. Your audiobooks and listening history stay on your iPhone. Purchases are processed by Apple.
 
 Supported formats: MP3 and M4B (non-DRM).
 ```
@@ -110,7 +110,7 @@ Expect **4+** — no restricted content in the app itself. User-imported audio c
 Hosted on GitHub Pages:
 
 ```
-https://boborbot.github.io/Audiopig/
+https://audiopig-app.github.io/
 ```
 
 ## Marketing URL (optional)
@@ -124,7 +124,7 @@ Same as support URL.
 **Required.** Hosted copy (keep in sync with `docs/app-store/privacy-policy.html`):
 
 ```
-https://boborbot.github.io/Audiopig/privacy-policy.html
+https://audiopig-app.github.io/privacy-policy.html
 ```
 
 ---
@@ -134,7 +134,7 @@ https://boborbot.github.io/Audiopig/privacy-policy.html
 **Required for subscriptions.** Hosted copy (keep in sync with `docs/app-store/terms.html`). In App Store Connect → App Information → **License Agreement**, choose custom EULA and paste this URL:
 
 ```
-https://boborbot.github.io/Audiopig/terms.html
+https://audiopig-app.github.io/terms.html
 ```
 
 ---
@@ -142,7 +142,7 @@ https://boborbot.github.io/Audiopig/terms.html
 ## App Review Notes (for Apple reviewer)
 
 ```
-Audiopig plays locally imported audio only. There is no sign-in, no server, and no sample content bundled.
+AudioPig plays locally imported audio only. There is no sign-in, no server, and no sample content bundled.
 
 To test:
 1. Open the Library tab
@@ -150,7 +150,7 @@ To test:
 3. Select an MP3 or M4B from Files / iCloud Drive
 4. Tap the book to play; use the player sheet for speed, bookmarks, and sleep timer
 5. Tap "Find Paragraph Breaks" — without Plus, a trial paywall appears; with StoreKit testing or sandbox Plus, analysis runs
-6. Settings → Audiopig Plus / Feed a Student for subscription management and optional tips
+6. Settings → AudioPig Plus / Feed a Student for subscription management and optional tips
 
 StoreKit: Xcode scheme uses Audiopig.storekit for local testing. Sandbox account required on device for real IAP QA.
 

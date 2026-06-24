@@ -55,7 +55,7 @@ struct WatchLibraryManagementView: View {
                 Text("Library")
                     .sectionTitle()
             } footer: {
-                Text("Large audiobooks can take several minutes. Open Audiopig on your Watch before transferring.")
+                Text("Large audiobooks can take several minutes. Open \(Brand.displayName) on your Watch before transferring.")
                     .font(DS.Typography.caption)
                     .foregroundStyle(DS.Color.tertiary)
             }

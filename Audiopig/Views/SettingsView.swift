@@ -113,7 +113,7 @@ struct SettingsView: View {
                     Text("Bookmark Export")
                         .sectionTitle()
                 } footer: {
-                    Text("Notes are saved to On My iPhone › Audiopig › Exported Bookmarks and are visible in the Files app.")
+                    Text("Notes are saved to On My iPhone › \(Brand.displayName) › Exported Bookmarks and are visible in the Files app.")
                         .font(DS.Typography.caption)
                         .foregroundStyle(DS.Color.tertiary)
                 }
@@ -195,7 +195,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Audiopig Plus
+    // MARK: - AudioPig Plus
 
     private var plusSection: some View {
         Section {
@@ -211,15 +211,15 @@ struct SettingsView: View {
                 } label: {
                     if monetizationViewModel.isProcessing {
                         HStack {
-                            Text("Subscribe to Audiopig Plus")
+                            Text("Subscribe to \(Brand.plusName)")
                             Spacer()
                             ProgressView()
                                 .scaleEffect(0.85)
                         }
                     } else if let price = monetizationViewModel.plusDisplayPrice {
-                        Text("Subscribe to Audiopig Plus — \(price)/mo")
+                        Text("Subscribe to \(Brand.plusName) — \(price)/mo")
                     } else {
-                        Text("Subscribe to Audiopig Plus")
+                        Text("Subscribe to \(Brand.plusName)")
                     }
                 }
                 .disabled(monetizationViewModel.isProcessing)
@@ -245,7 +245,7 @@ struct SettingsView: View {
                     .foregroundStyle(.red)
             }
         } header: {
-            Text("Audiopig Plus")
+            Text(Brand.plusName)
                 .sectionTitle()
         } footer: {
             Text("Smart Rewind is included with Plus. Core playback stays free.")

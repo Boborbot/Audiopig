@@ -16,7 +16,7 @@ public enum WidgetPlaybackError: Error, CustomLocalizedStringResourceConvertible
     public var localizedStringResource: LocalizedStringResource {
         switch self {
         case .notReady:
-            "Audiopig is not ready to play yet."
+            "\(Brand.displayName) is not ready to play yet."
         case .noLastPlayedBook:
             "No recent audiobook to resume."
         case .bookNotFound:

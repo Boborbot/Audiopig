@@ -54,7 +54,7 @@ struct TipJarSection: View {
             Text("Feed a Student")
                 .sectionTitle()
         } footer: {
-            Text("Audiopig is a student-built indie app. Tips are optional and go toward keeping development going — they don't unlock features.")
+            Text("\(Brand.displayName) is a student-built indie app. Tips are optional and go toward keeping development going — they don't unlock features.")
                 .font(DS.Typography.caption)
                 .foregroundStyle(DS.Color.tertiary)
         }

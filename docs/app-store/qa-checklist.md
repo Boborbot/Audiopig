@@ -1,4 +1,4 @@
-# Audiopig — Pre-Submission QA Checklist
+# AudioPig — Pre-Submission QA Checklist
 
 Run on a **physical iPhone** (not just Simulator). Use iOS 17+ and at least one long audiobook (30+ minutes) plus a multi-file merged book.
 
@@ -104,7 +104,7 @@ Test with **Xcode StoreKit Configuration** (`Audiopig.storekit`) on Simulator, t
 ### Local StoreKit Testing (Simulator)
 
 - [ ] Scheme uses StoreKit configuration file (Edit Scheme → Run → Options)
-- [ ] Settings → Audiopig Plus shows localized price
+- [ ] Settings → AudioPig Plus shows localized price
 - [ ] Start 7-day trial from player paywall → Find Paragraph Breaks works
 - [ ] Settings status shows trial end date or Active after subscribe
 - [ ] Manage Subscription link opens Apple subscriptions page
@@ -152,7 +152,7 @@ Coffee ($2.99), Lunch ($6.99), and Today's Rent ($14.99).
 - [ ] Appearance: system / light / dark each apply correctly
 - [ ] Default speed, skip intervals persist after relaunch
 - [ ] Track reading stats toggle behaves as expected
-- [ ] Audiopig Plus section shows status, subscribe, manage, restore
+- [ ] AudioPig Plus section shows status, subscribe, manage, restore
 - [ ] Feed a Student tips show prices and thank-you on purchase
 - [ ] Apple Watch settings: artwork skip gestures toggle
 - [ ] About section displays correctly
@@ -161,7 +161,7 @@ Coffee ($2.99), Lunch ($6.99), and Today's Rent ($14.99).
 
 ## Apple Watch
 
-Test with iPhone paired and Audiopig installed on both.
+Test with iPhone paired and AudioPig installed on both.
 
 ### Source picker and remote playback (iPhone as source)
 

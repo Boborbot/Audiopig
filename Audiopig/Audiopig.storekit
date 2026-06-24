@@ -140,13 +140,13 @@
           "localizations" : [
             {
               "description" : "Unlock Find Paragraph Breaks",
-              "displayName" : "Audiopig Plus",
+              "displayName" : "AudioPig Plus",
               "locale" : "en_US"
             }
           ],
           "productID" : "com.nitay.Audiopig.plus.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Audiopig Plus Monthly",
+          "referenceName" : "AudioPig Plus Monthly",
           "type" : "RecurringSubscription"
         }
       ]

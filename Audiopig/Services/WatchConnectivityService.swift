@@ -192,7 +192,7 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
                 session.transferUserInfo(payload)
                 return .ok()
             }
-            return .failure("Open Audiopig on Apple Watch.")
+            return .failure("Open \(Brand.displayName) on Apple Watch.")
         }
 
         return await withCheckedContinuation { continuation in

@@ -5,7 +5,7 @@
 
 import Foundation
 
-/// How the Watch player shows a dedicated artwork + transport screen (Audiopig Plus).
+/// How the Watch player shows a dedicated artwork + transport screen (AudioPig Plus).
 public enum WatchArtworkViewMode: String, Codable, Sendable, CaseIterable, Equatable {
     case off
     case replaceStandardControls

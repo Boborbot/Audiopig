@@ -609,7 +609,7 @@
 				DEVELOPMENT_TEAM = AQTL3YUMV3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AudiopigWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Audiopig;
+				INFOPLIST_KEY_CFBundleDisplayName = AudioPig;
 				INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -641,7 +641,7 @@
 				DEVELOPMENT_TEAM = AQTL3YUMV3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AudiopigWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Audiopig;
+				INFOPLIST_KEY_CFBundleDisplayName = AudioPig;
 				INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier = "com.apple.widgetkit-extension";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -673,7 +673,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Audiopig;
+				INFOPLIST_KEY_CFBundleDisplayName = AudioPig;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.nitay.Audiopig;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -706,7 +706,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Audiopig;
+				INFOPLIST_KEY_CFBundleDisplayName = AudioPig;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.nitay.Audiopig;
 				LD_RUNPATH_SEARCH_PATHS = (

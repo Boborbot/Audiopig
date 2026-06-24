@@ -1,4 +1,4 @@
-# Audiopig
+# AudioPig
 
 A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData, and AVFoundation.
 
@@ -20,7 +20,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Full playback engine** — speed control (0.5–3.0×), configurable skip intervals, dual scrubber mode (entire book or current chapter)
 - **Bookmarks** — save named timestamps, edit, jump, long-press browser, swipe to delete, export as table
 - **Sleep timer** — off, N minutes, or end of current chapter; persists across app restarts
-- **Lull detection** — find paragraph/chapter break points via silence analysis (Audiopig Plus; 7-day free trial)
+- **Lull detection** — find paragraph/chapter break points via silence analysis (AudioPig Plus; 7-day free trial)
 - **Background audio** — continues playing when the screen is off or the app is backgrounded
 - **Lock screen controls** — play/pause, skip forward/back, and scrubbing via `MPRemoteCommandCenter`
 - **Persistent playback position** — saved every 5 seconds during playback and on backgrounding
@@ -30,7 +30,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Finish celebrations** — confetti and optional delete confirmation when marking a book finished
 - **Appearance** — system, light, or dark mode; optional portrait orientation lock
 - **Landscape player** — when orientation lock is off, the full player splits into artwork+title and controls columns (cover art on the notch side); no scrolling required
-- **Audiopig Plus** — monthly subscription unlocks lull detection; optional "Feed a Student" consumable tips ($2.99 / $6.99 / $14.99) in Settings
+- **AudioPig Plus** — monthly subscription unlocks lull detection; optional "Feed a Student" consumable tips ($2.99 / $6.99 / $14.99) in Settings
 - **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback (recent books, controls, chapters, artwork skip gestures). On-Watch local library transfer is archived until a future release (`WatchFeatures.localPlaybackEnabled`).
 - **Home screen widgets** (`AudiopigWidget`) — listening stats, artwork, recent books, hour-club progress, and a lock screen **Continue Listening** circular widget (progress ring + pig glyph; tap resumes last book and opens the player)
 - **Lock screen control** (iOS 18+) — optional bottom-corner control to resume the last audiobook (`ContinueListeningControl`)
@@ -40,7 +40,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 
 ## Architecture
 
-Audiopig follows strict MVVM. Views contain zero business logic and have no direct access to AVFoundation.
+AudioPig follows strict MVVM. Views contain zero business logic and have no direct access to AVFoundation.
 
 ```
 Views (SwiftUI)
@@ -113,8 +113,9 @@ See `docs/app-store/` for:
 
 - `qa-checklist.md` — manual device QA before submit
 - `listing.md` — description, subtitle, keywords, promotional text
-- `privacy-policy.html` — canonical copy in `docs/app-store/`; public URL: https://boborbot.github.io/Audiopig/privacy-policy.html
-- `terms.html` — Terms of Use (EULA); public URL: https://boborbot.github.io/Audiopig/terms.html
+- `privacy-policy.html` — canonical copy in `docs/app-store/`; public URL: https://audiopig-app.github.io/privacy-policy.html
+- `terms.html` — Terms of Use (EULA); public URL: https://audiopig-app.github.io/terms.html
+- `hosting-setup.md` — publish `support-site/` to the `audiopig-app` GitHub org
 - `submission-guide.md` — archive, upload, and Connect checklist
 
 ---

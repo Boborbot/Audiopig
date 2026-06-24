@@ -415,7 +415,7 @@ final class LibraryViewModel {
 
         case .setWatchArtworkViewMode(let mode):
             guard mode == .off || monetization.hasAccess(to: .watchArtworkView) else {
-                return .failure("Audiopig Plus required on iPhone.")
+                return .failure("\(Brand.plusName) required on iPhone.")
             }
             appSettings.watchArtworkViewMode = mode
             syncWatchSettings()
@@ -427,7 +427,7 @@ final class LibraryViewModel {
 
         case .analyzeLulls:
             guard monetization.hasAccess(to: .paragraphBreaks) else {
-                return .failure("Audiopig Plus required on iPhone.")
+                return .failure("\(Brand.plusName) required on iPhone.")
             }
             guard playerViewModel.audiobook != nil else {
                 return .failure("No book loaded on iPhone.")
