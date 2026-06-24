@@ -88,11 +88,12 @@ struct MainTabView: View {
             .spring(response: 0.38, dampingFraction: 0.80),
             value: viewModel.playerViewModel.isActive
         )
-        .sheet(isPresented: $isPlayerPresented) {
-            PlayerView(viewModel: viewModel.playerViewModel)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
+        .modifier(
+            PlayerPresentationModifier(
+                isPresented: $isPlayerPresented,
+                viewModel: viewModel.playerViewModel
+            )
+        )
         .onChange(of: appSettings.orientationLock) { _, locked in
             OrientationLockController.shared.setLocked(locked)
         }
@@ -120,5 +121,44 @@ struct MainTabView: View {
         guard let pathComponent, let bookID = UUID(uuidString: pathComponent) else { return }
         guard viewModel.playAudiobook(id: bookID) else { return }
         isPlayerPresented = true
+    }
+}
+
+// MARK: - Player Presentation
+
+/// iPhone keeps the draggable sheet; iPad uses full-screen cover so PlayerView's
+/// GeometryReader receives the real display bounds (landscape split layout included).
+private struct PlayerPresentationModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    let viewModel: PlayerViewModel
+
+    private var usesFullScreenCover: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    private var fullScreenBinding: Binding<Bool> {
+        Binding(
+            get: { isPresented && usesFullScreenCover },
+            set: { isPresented = $0 }
+        )
+    }
+
+    private var sheetBinding: Binding<Bool> {
+        Binding(
+            get: { isPresented && !usesFullScreenCover },
+            set: { isPresented = $0 }
+        )
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .fullScreenCover(isPresented: fullScreenBinding) {
+                PlayerView(viewModel: viewModel)
+            }
+            .sheet(isPresented: sheetBinding) {
+                PlayerView(viewModel: viewModel)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
     }
 }

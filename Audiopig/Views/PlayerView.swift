@@ -10,6 +10,10 @@ struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var paywallViewModel: PaywallViewModel?
 
+    private var usesFullScreenPresentation: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             // Ambient blurred cover art fills the entire background
@@ -26,6 +30,11 @@ struct PlayerView: View {
                     }
                 }
                 .snapLayoutOnBackgroundTransition()
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if usesFullScreenPresentation {
+                    playerDismissControl
+                }
             }
         }
         .sheet(isPresented: $viewModel.isChaptersPresented) {
@@ -52,24 +61,53 @@ struct PlayerView: View {
         }
     }
 
+    // MARK: - Dismiss
+
+    private var playerDismissControl: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "chevron.compact.down")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(DS.Color.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, DS.Spacing.sm)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close player")
+    }
+
     // MARK: - Layout
 
     @ViewBuilder
     private func portraitLayout(metrics: PlayerLayoutMetrics, geometry: GeometryProxy) -> some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: DS.Spacing.sm)
+        let content = VStack(spacing: 0) {
+            Spacer(minLength: 0)
 
             artworkSection(width: metrics.artworkWidth, height: metrics.artworkHeight)
 
-            titleSection
+            titleSection(compact: metrics.isPad)
                 .layoutPriority(1)
 
-            controlsPanel()
+            controlsPanel(compact: false)
                 .layoutPriority(1)
 
-            Spacer(minLength: DS.Spacing.sm)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, metrics.horizontalPadding)
+        .frame(width: geometry.size.width)
+
+        Group {
+            if metrics.isPad {
+                ScrollView(.vertical, showsIndicators: false) {
+                    content
+                        .frame(minHeight: geometry.size.height - metrics.bottomInset)
+                }
+            } else {
+                content
+            }
+        }
+        .padding(.bottom, metrics.bottomInset)
         .frame(width: geometry.size.width, height: geometry.size.height)
     }
 
@@ -91,25 +129,29 @@ struct PlayerView: View {
 
     private func artworkColumn(metrics: PlayerLayoutMetrics) -> some View {
         VStack(spacing: 0) {
-            Spacer(minLength: DS.Spacing.sm)
+            Spacer(minLength: 0)
 
             artworkSection(width: metrics.artworkWidth, height: metrics.artworkHeight)
 
-            titleSection
+            titleSection(compact: true)
 
-            Spacer(minLength: DS.Spacing.sm)
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, metrics.horizontalPadding)
         .frame(width: metrics.columnWidth, height: metrics.screenSize.height)
     }
 
     private func controlsColumn(metrics: PlayerLayoutMetrics) -> some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: DS.Spacing.sm)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                Spacer(minLength: DS.Spacing.sm)
 
-            controlsPanel(compact: true)
+                controlsPanel(compact: true)
 
-            Spacer(minLength: DS.Spacing.sm)
+                Spacer(minLength: DS.Spacing.sm)
+            }
+            .frame(minHeight: metrics.screenSize.height - metrics.bottomInset)
+            .padding(.bottom, metrics.bottomInset)
         }
         .padding(.horizontal, metrics.horizontalPadding)
         .frame(width: metrics.columnWidth, height: metrics.screenSize.height)
@@ -172,7 +214,7 @@ struct PlayerView: View {
 
     // MARK: - Title & Author
 
-    private var titleSection: some View {
+    private func titleSection(compact: Bool = false) -> some View {
         VStack(spacing: DS.Spacing.xs) {
             Text(viewModel.playerTitle)
                 .playerTitleStyle()
@@ -185,15 +227,15 @@ struct PlayerView: View {
                 .foregroundStyle(DS.Color.coral)
                 .lineLimit(1)
         }
-        .padding(.top, DS.Spacing.lg)
+        .padding(.top, compact ? DS.Spacing.sm : DS.Spacing.md)
     }
 
     // MARK: - Controls (laid directly on the glass surface)
 
     private func controlsPanel(compact: Bool = false) -> some View {
-        let sectionGap = compact ? DS.Spacing.sm : DS.Spacing.md + DS.Spacing.sm
-        let panelTop = compact ? DS.Spacing.sm : DS.Spacing.md
-        let lullBottom = compact ? DS.Spacing.sm : DS.Spacing.md
+        let sectionGap = compact ? DS.Spacing.sm : DS.Spacing.md
+        let panelTop = DS.Spacing.sm
+        let lullBottom = DS.Spacing.md
 
         return VStack(spacing: 0) {
             // Hairline separator between title and controls
@@ -493,6 +535,7 @@ struct PlayerView: View {
                     pillPadding: pillPadding
                 )
             }
+            .frame(maxWidth: .infinity)
 
         case .analyzing:
             HStack(spacing: 8) {
@@ -565,7 +608,6 @@ struct PlayerView: View {
                 Image(systemName: "waveform.and.magnifyingglass")
                 Text(title)
             }
-            .frame(maxWidth: .infinity)
             .pillAppearance(verticalPadding: pillPadding)
         }
         .buttonStyle(.plain)
@@ -576,32 +618,44 @@ struct PlayerView: View {
 // MARK: - Layout Metrics
 
 private struct PlayerLayoutMetrics {
+    /// Between the original full-size art (1.0) and the tighter iPad pass (0.85).
+    private static let artworkScale: CGFloat = 0.925
+    /// iPad portrait height cap — between uncapped width-based square and the 0.42 tight cap.
+    private static let padPortraitHeightCap: CGFloat = 0.50
+
     let isLandscape: Bool
+    let isPad: Bool
     let artworkOnLeading: Bool
     let artworkWidth: CGFloat
     let artworkHeight: CGFloat
     let columnWidth: CGFloat
     let horizontalPadding: CGFloat
+    let bottomInset: CGFloat
     let screenSize: CGSize
 
     init(geometry: GeometryProxy) {
         let size = geometry.size
-        let padding = DS.Spacing.playerH
+        isPad = UIDevice.current.userInterfaceIdiom == .pad
+        let padding = isPad ? DS.Spacing.md : DS.Spacing.playerH
         isLandscape = size.width > size.height
         horizontalPadding = padding
         screenSize = size
         artworkOnLeading = geometry.safeAreaInsets.leading >= geometry.safeAreaInsets.trailing
+        bottomInset = max(geometry.safeAreaInsets.bottom, DS.Spacing.md)
 
         if isLandscape {
             columnWidth = size.width / 2
             let columnInner = columnWidth - (padding * 2)
-            artworkWidth = columnInner
-            artworkHeight = min(columnInner, size.height * 0.62)
+            let baseArtSize = min(columnInner, size.height * 0.62)
+            artworkWidth = baseArtSize * Self.artworkScale
+            artworkHeight = baseArtSize * Self.artworkScale
         } else {
             columnWidth = size.width
             let contentWidth = size.width - (padding * 2)
-            artworkWidth = contentWidth
-            artworkHeight = contentWidth
+            let heightCap = isPad ? size.height * Self.padPortraitHeightCap : .greatestFiniteMagnitude
+            let baseArtSize = min(contentWidth, heightCap)
+            artworkWidth = baseArtSize * Self.artworkScale
+            artworkHeight = baseArtSize * Self.artworkScale
         }
     }
 }
