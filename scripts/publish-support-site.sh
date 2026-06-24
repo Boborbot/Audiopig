@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Publishes support-site/ to audiopig-app/audiopig-app.github.io for GitHub Pages.
+# Publishes support-site/ to AudioPig/AudioPig.github.io for GitHub Pages.
 set -euo pipefail
 
-ORG="audiopig-app"
-REPO="audiopig-app.github.io"
+ORG="AudioPig"
+REPO="AudioPig.github.io"
+PAGES_URL="https://audiopig.github.io"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SITE="$ROOT/support-site"
 
@@ -26,7 +27,7 @@ fi
 
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
-cp -R "$SITE/"* "$workdir/"
+cp -R "$SITE"/. "$workdir/"
 cd "$workdir"
 git init -q
 git add .
@@ -47,6 +48,6 @@ fi
 
 echo ""
 echo "Published to https://github.com/${ORG}/${REPO}"
-echo "GitHub Pages URL (may take 1–2 minutes): https://${ORG}.github.io/"
+echo "GitHub Pages URL (may take 1–2 minutes): ${PAGES_URL}/"
 echo ""
-echo "If the site 404s, open repo Settings → Pages → Build from branch main, folder / (root)."
+echo "If the site 404s, open repo Settings → Pages → Source: GitHub Actions."

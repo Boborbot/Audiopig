@@ -113,9 +113,9 @@ See `docs/app-store/` for:
 
 - `qa-checklist.md` — manual device QA before submit
 - `listing.md` — description, subtitle, keywords, promotional text
-- `privacy-policy.html` — canonical copy in `docs/app-store/`; public URL: https://audiopig-app.github.io/privacy-policy.html
-- `terms.html` — Terms of Use (EULA); public URL: https://audiopig-app.github.io/terms.html
-- `hosting-setup.md` — publish `support-site/` to the `audiopig-app` GitHub org
+- `privacy-policy.html` — canonical copy in `docs/app-store/`; public URL: https://audiopig.github.io/privacy-policy.html
+- `terms.html` — Terms of Use (EULA); public URL: https://audiopig.github.io/terms.html
+- `hosting-setup.md` — publish `support-site/` to the `AudioPig` GitHub org
 - `submission-guide.md` — archive, upload, and Connect checklist
 
 ---

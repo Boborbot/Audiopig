@@ -110,7 +110,7 @@ Expect **4+** — no restricted content in the app itself. User-imported audio c
 Hosted on GitHub Pages:
 
 ```
-https://audiopig-app.github.io/
+https://audiopig.github.io/
 ```
 
 ## Marketing URL (optional)
@@ -124,7 +124,7 @@ Same as support URL.
 **Required.** Hosted copy (keep in sync with `docs/app-store/privacy-policy.html`):
 
 ```
-https://audiopig-app.github.io/privacy-policy.html
+https://audiopig.github.io/privacy-policy.html
 ```
 
 ---
@@ -134,7 +134,7 @@ https://audiopig-app.github.io/privacy-policy.html
 **Required for subscriptions.** Hosted copy (keep in sync with `docs/app-store/terms.html`). In App Store Connect → App Information → **License Agreement**, choose custom EULA and paste this URL:
 
 ```
-https://audiopig-app.github.io/terms.html
+https://audiopig.github.io/terms.html
 ```
 
 ---
