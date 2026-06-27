@@ -148,6 +148,8 @@ final class PlayerViewModel {
     private(set) var subtitleLines: [SubtitleLineItem] = []
     /// Controls the subtitles management sheet (long-press on the captions button).
     var isSubtitlesPresented: Bool = false
+    /// Controls the subtitle search sheet (search pill on the player).
+    var isSubtitleSearchPresented: Bool = false
 
     enum WholeBookSubtitleJobState: Equatable {
         case idle
@@ -985,7 +987,7 @@ final class PlayerViewModel {
     }
 
     func seekToSubtitleFromSearch(at startTime: TimeInterval) {
-        isSubtitlesPresented = false
+        isSubtitleSearchPresented = false
         seekToSubtitle(at: startTime)
     }
 

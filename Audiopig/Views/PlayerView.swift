@@ -48,6 +48,9 @@ struct PlayerView: View {
         .sheet(isPresented: $viewModel.isSubtitlesPresented) {
             SubtitlesListView(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.isSubtitleSearchPresented) {
+            SubtitleSearchSheet(viewModel: viewModel)
+        }
         .sheet(item: $viewModel.pendingNewBookmark) { bookmark in
             BookmarkEditView(viewModel: viewModel, bookmark: bookmark)
         }
@@ -294,9 +297,21 @@ struct PlayerView: View {
             smartRewindSection(compact: compact)
                 .padding(.top, DS.Spacing.sm)
                 .padding(.horizontal, DS.Spacing.md)
-                .padding(.bottom, lullBottom)
+                .animation(DS.Animation.standard, value: viewModel.lullAnalysisState)
+
+            if showsSecondaryPillRow {
+                secondaryPillRow(compact: compact)
+                    .padding(.top, DS.Spacing.sm)
+                    .padding(.horizontal, DS.Spacing.md)
+                    .padding(.bottom, lullBottom)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            } else {
+                Color.clear
+                    .frame(height: lullBottom)
+            }
         }
         .padding(.top, panelTop)
+        .animation(DS.Animation.standard, value: showsSecondaryPillRow)
     }
 
     // MARK: - Failed State Banner
@@ -453,13 +468,11 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Bottom Row (speed | EQ | subtitles | chapters | bookmarks | sleep timer)
+    // MARK: - Bottom Row (speed | chapters | bookmarks | sleep timer)
 
     private var bottomRow: some View {
         HStack(spacing: DS.Spacing.sm) {
             speedMenu
-            eqButton
-            subtitlesButton
             chaptersButton
             bookmarksButton
             sleepTimerMenu
@@ -467,7 +480,43 @@ struct PlayerView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var subtitlesButton: some View {
+    /// EQ, Subtitles, and Search hide while Look results expand the control stack.
+    private var showsSecondaryPillRow: Bool {
+        switch viewModel.lullAnalysisState {
+        case .idle, .analyzing:
+            return true
+        case .results:
+            return false
+        }
+    }
+
+    private func secondaryPillRow(compact: Bool) -> some View {
+        let pillPadding: CGFloat = compact ? 10 : 14
+
+        return HStack(spacing: DS.Spacing.sm) {
+            eqPillButton(pillPadding: pillPadding)
+            subtitlesPillButton(pillPadding: pillPadding)
+            searchPillButton(pillPadding: pillPadding)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func eqPillButton(pillPadding: CGFloat) -> some View {
+        Button {
+            viewModel.presentEQSheet()
+        } label: {
+            Image(systemName: "slider.vertical.3")
+                .pillAppearance(isActive: viewModel.isAudioEnhancementActive, verticalPadding: pillPadding)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            viewModel.isAudioEnhancementActive
+                ? "Equalizer, \(viewModel.activeSpeechEQPreset.label)"
+                : "Equalizer"
+        )
+    }
+
+    private func subtitlesPillButton(pillPadding: CGFloat) -> some View {
         let isTranscribing = viewModel.isSubtitleTranscriptionActive
         let isActive = viewModel.isSubtitlesVisible || isTranscribing
 
@@ -481,7 +530,7 @@ struct PlayerView: View {
                     options: .repeating.speed(0.35),
                     isActive: isTranscribing && !reduceMotion
                 )
-                .playerAccessoryPill(isActive: isActive)
+                .pillAppearance(isActive: isActive, verticalPadding: pillPadding)
         }
         .buttonStyle(.plain)
         .simultaneousGesture(
@@ -499,6 +548,17 @@ struct PlayerView: View {
         )
     }
 
+    private func searchPillButton(pillPadding: CGFloat) -> some View {
+        Button {
+            viewModel.isSubtitleSearchPresented = true
+        } label: {
+            Image(systemName: "magnifyingglass")
+                .pillAppearance(verticalPadding: pillPadding)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Search subtitles")
+    }
+
     // MARK: - Speed Button
 
     private var speedMenu: some View {
@@ -511,23 +571,6 @@ struct PlayerView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Playback speed, \(viewModel.speedLabel)")
-    }
-
-    // MARK: - EQ Button
-
-    private var eqButton: some View {
-        Button {
-            viewModel.presentEQSheet()
-        } label: {
-            Image(systemName: "slider.vertical.3")
-                .playerAccessoryPill(isActive: viewModel.isAudioEnhancementActive)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-            viewModel.isAudioEnhancementActive
-                ? "Equalizer, \(viewModel.activeSpeechEQPreset.label)"
-                : "Equalizer"
-        )
     }
 
     // MARK: - Chapters Button

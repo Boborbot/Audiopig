@@ -8,45 +8,24 @@ import SwiftUI
 struct SubtitlesListView: View {
     @Bindable var viewModel: PlayerViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var searchText = ""
     @State private var shareItems: [Any]?
     @State private var isShareSheetPresented = false
     @State private var exportErrorMessage: String?
     @State private var isDeleteTranscriptionConfirmationPresented = false
 
-    private var isSearching: Bool {
-        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var searchResults: PlayerViewModel.SubtitleSearchResults {
-        viewModel.subtitleSearchResults(matching: searchText)
-    }
-
     var body: some View {
         NavigationStack {
             List {
-                if isSearching {
-                    searchResultsSection
-                    if !viewModel.hasSavedSubtitles {
-                        wholeBookSection
-                    }
-                } else {
-                    transcribeAsYouGoSection
-                    coverageSection
-                    wholeBookSection
-                    exportSection
-                    deleteTranscriptionSection
-                    disclaimerSection
-                }
+                transcribeAsYouGoSection
+                coverageSection
+                wholeBookSection
+                exportSection
+                deleteTranscriptionSection
+                disclaimerSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Subtitles")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(
-                text: $searchText,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search transcribed text"
-            )
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -90,43 +69,6 @@ struct SubtitlesListView: View {
         } footer: {
             Text("Automatically transcribe the next ten-minute section when you get within about two minutes of saved subtitles. The captions button animates while transcription runs.")
                 .font(DS.Typography.caption)
-        }
-    }
-
-    private var searchResultsSection: some View {
-        Section {
-            if !viewModel.hasSavedSubtitles {
-                Text("No transcribed text yet. Generate subtitles from the player or transcribe the entire book below.")
-                    .font(DS.Typography.caption)
-                    .foregroundStyle(DS.Color.secondary)
-            } else if searchResults.items.isEmpty {
-                Text("No matches in transcribed sections.")
-                    .font(DS.Typography.caption)
-                    .foregroundStyle(DS.Color.secondary)
-            } else {
-                ForEach(searchResults.items) { result in
-                    Button {
-                        viewModel.seekToSubtitleFromSearch(at: result.startTime)
-                    } label: {
-                        SubtitleSearchResultRow(
-                            text: result.text,
-                            timestamp: PlayerViewModel.formatTime(result.startTime),
-                            chapterTitle: result.chapterTitle
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        } header: {
-            Text("Search Results")
-        } footer: {
-            if viewModel.hasSavedSubtitles, searchResults.totalCount > searchResults.items.count {
-                Text("Showing \(searchResults.items.count) of \(searchResults.totalCount) matches.")
-                    .font(DS.Typography.caption)
-            } else if viewModel.hasSavedSubtitles, !searchResults.items.isEmpty {
-                Text("Tap a line to jump to that moment in the book.")
-                    .font(DS.Typography.caption)
-            }
         }
     }
 
@@ -324,41 +266,5 @@ struct SubtitlesListView: View {
         } catch {
             exportErrorMessage = error.localizedDescription
         }
-    }
-}
-
-// MARK: - Search Result Row
-
-private struct SubtitleSearchResultRow: View {
-    let text: String
-    let timestamp: String
-    let chapterTitle: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-            Text(text)
-                .font(DS.Typography.listBody)
-                .foregroundStyle(DS.Color.primary)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: DS.Spacing.xs) {
-                Text(timestamp)
-                    .font(DS.Typography.timestamp)
-                    .foregroundStyle(DS.Color.secondary)
-
-                if let chapterTitle {
-                    Text("·")
-                        .font(DS.Typography.timestamp)
-                        .foregroundStyle(DS.Color.tertiary)
-                    Text(chapterTitle)
-                        .font(DS.Typography.timestamp)
-                        .foregroundStyle(DS.Color.secondary)
-                        .lineLimit(1)
-                }
-            }
-        }
-        .padding(.vertical, DS.Spacing.xs)
-        .contentShape(Rectangle())
     }
 }
