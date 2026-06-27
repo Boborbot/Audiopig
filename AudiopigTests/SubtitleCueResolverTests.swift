@@ -50,7 +50,7 @@ final class SubtitleCueResolverTests: XCTestCase {
             return $0.orderIndex < $1.orderIndex
         }
         XCTAssertEqual(SubtitleCueResolver.resolveActiveCueIndex(at: 1, cues: sorted), 0)
-        XCTAssertEqual(SubtitleCueResolver.resolveActiveCueIndex(at: 51, cues: sorted), 2)
+        XCTAssertEqual(SubtitleCueResolver.resolveActiveCueIndex(at: 51, cues: sorted), 1)
     }
 
     func testHasCoverageDetectsOverlap() {

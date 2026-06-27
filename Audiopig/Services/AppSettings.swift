@@ -42,6 +42,31 @@ enum AppAppearance: String, CaseIterable {
     }
 }
 
+// MARK: - SubtitleFont
+
+/// Built-in typefaces available for on-screen subtitles in the player.
+enum SubtitleFont: String, CaseIterable, Identifiable {
+    case sanFrancisco = "sanFrancisco"
+    case sfRounded    = "sfRounded"
+    case newYork      = "newYork"
+    case charter      = "charter"
+    case sfMono       = "sfMono"
+
+    var id: String { rawValue }
+
+    static let `default`: SubtitleFont = .newYork
+
+    var label: String {
+        switch self {
+        case .sanFrancisco: return "San Francisco"
+        case .sfRounded:    return "SF Rounded"
+        case .newYork:      return "New York"
+        case .charter:      return "Charter"
+        case .sfMono:       return "SF Mono"
+        }
+    }
+}
+
 // MARK: - AppSettings
 
 @MainActor
@@ -83,6 +108,9 @@ final class AppSettings {
         static let librarySortDirection     = "settings.librarySortDirection"
         static let playbackTimelineScope    = "settings.playbackTimelineScope"
         static let leftTimeShowsRemaining   = "settings.leftTimeShowsRemaining"
+        static let subtitleLocaleIdentifier = "settings.subtitleLocaleIdentifier"
+        static let subtitlesAutoGenerateOnImport = "settings.subtitlesAutoGenerateOnImport"
+        static let subtitleFont = "settings.subtitleFont"
     }
 
     // MARK: - Backing Stores (not observed individually)
@@ -281,6 +309,25 @@ final class AppSettings {
     private var _leftTimeShowsRemaining: Bool = UserDefaults.standard.bool(
         forKey: Keys.leftTimeShowsRemaining
     )
+
+    @ObservationIgnored
+    private var _subtitleLocaleIdentifier: String? = UserDefaults.standard.string(
+        forKey: Keys.subtitleLocaleIdentifier
+    )
+
+    @ObservationIgnored
+    private var _subtitlesAutoGenerateOnImport: Bool = UserDefaults.standard.bool(
+        forKey: Keys.subtitlesAutoGenerateOnImport
+    )
+
+    @ObservationIgnored
+    private var _subtitleFont: SubtitleFont = {
+        guard let raw = UserDefaults.standard.string(forKey: Keys.subtitleFont),
+              let font = SubtitleFont(rawValue: raw) else {
+            return .default
+        }
+        return font
+    }()
 
     // MARK: - Observable Properties
 
@@ -693,6 +740,49 @@ final class AppSettings {
             withMutation(keyPath: \.leftTimeShowsRemaining) {
                 _leftTimeShowsRemaining = newValue
                 UserDefaults.standard.set(newValue, forKey: Keys.leftTimeShowsRemaining)
+            }
+        }
+    }
+
+    var subtitleLocaleIdentifier: String? {
+        get {
+            access(keyPath: \.subtitleLocaleIdentifier)
+            return _subtitleLocaleIdentifier
+        }
+        set {
+            withMutation(keyPath: \.subtitleLocaleIdentifier) {
+                _subtitleLocaleIdentifier = newValue
+                if let newValue {
+                    UserDefaults.standard.set(newValue, forKey: Keys.subtitleLocaleIdentifier)
+                } else {
+                    UserDefaults.standard.removeObject(forKey: Keys.subtitleLocaleIdentifier)
+                }
+            }
+        }
+    }
+
+    var subtitlesAutoGenerateOnImport: Bool {
+        get {
+            access(keyPath: \.subtitlesAutoGenerateOnImport)
+            return _subtitlesAutoGenerateOnImport
+        }
+        set {
+            withMutation(keyPath: \.subtitlesAutoGenerateOnImport) {
+                _subtitlesAutoGenerateOnImport = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.subtitlesAutoGenerateOnImport)
+            }
+        }
+    }
+
+    var subtitleFont: SubtitleFont {
+        get {
+            access(keyPath: \.subtitleFont)
+            return _subtitleFont
+        }
+        set {
+            withMutation(keyPath: \.subtitleFont) {
+                _subtitleFont = newValue
+                UserDefaults.standard.set(newValue.rawValue, forKey: Keys.subtitleFont)
             }
         }
     }

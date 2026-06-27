@@ -22,8 +22,7 @@ Device: _______________   iOS: _______________   Date: _______________
 
 - [ ] Import single `.mp3` from Files app
 - [ ] Import single `.m4b` from Files app
-- [ ] Import multiple audio files at once
-- [ ] Import entire folder (each file becomes a book or merges as expected)
+- [ ] Import multiple audio files at once (each becomes a book, or merge afterward)
 - [ ] Cover art extracted from file metadata when present
 - [ ] Title and author populated from metadata when present
 - [ ] Import progress overlay appears and dismisses cleanly
@@ -53,6 +52,7 @@ Device: _______________   iOS: _______________   Date: _______________
 - [ ] Skip forward / backward use Settings intervals
 - [ ] Speed 0.5× through 3.0×; audio sounds correct at each step
 - [ ] Chapter list: jump to chapter; correct file and position
+- [ ] Chapter list → Edit: rename a chapter; adjust start time; reorder; Save persists after relaunch
 - [ ] Playback continues with screen locked
 - [ ] Lock screen controls: play/pause, skip, scrub
 - [ ] Switch to another app; audio continues; return and UI state matches
@@ -60,7 +60,7 @@ Device: _______________   iOS: _______________   Date: _______________
 - [ ] With orientation lock **off**, rotate to landscape: artwork+title on notch side, controls on opposite side; no scroll needed
 - [ ] Landscape left and landscape right: artwork column follows the camera/notch edge
 - [ ] Non-square cover art in landscape (tall and wide) looks correct in the artwork column
-- [ ] All player controls reachable in landscape (scrubber, transport, speed, chapters, bookmarks, sleep timer, lull section)
+- [ ] All player controls reachable in landscape (scrubber, transport, speed, chapters, bookmarks, sleep timer, Smart Rewind, subtitles)
 
 ---
 
@@ -84,16 +84,38 @@ Device: _______________   iOS: _______________   Date: _______________
 
 ---
 
-## Lull Detection
+## Smart Rewind
 
-- [ ] "Find Paragraph Breaks" runs without crash on a real chapter (with Plus or active trial)
+- [ ] Look Far runs without crash on a real chapter (with Plus or active trial)
+- [ ] Look Near runs without crash on a real chapter (with Plus or active trial)
 - [ ] Without Plus: tap shows paywall sheet (button looks normal — no lock icon)
 - [ ] Paywall: trial CTA when eligible; subscribe-only when not
 - [ ] Restore Purchases from paywall and Settings works on a second device / fresh install
 - [ ] After subscribing or starting trial, analysis runs on tap
 - [ ] Results list shows plausible break points
 - [ ] Tap result → seeks correctly
+- [ ] Long press Look Far / Look Near → scope popover; adjust window; Look Again works
 - [ ] Cancel mid-analysis works
+- [ ] Settings → Playback → Smart Rewind offset pickers persist after relaunch
+
+---
+
+## Subtitles (iOS 26+ device required)
+
+Skip this section on iOS 17–25 — confirm the player shows "Subtitles Unavailable" without crashing.
+
+- [ ] Captions button toggles subtitle panel on cover art
+- [ ] Without Plus: generate shows subtitles paywall
+- [ ] With Plus: generate near playhead transcribes and synced lines appear
+- [ ] Long press captions → options: near playhead, whole book, export, delete saved transcription
+- [ ] Whole-book generation: progress shown; pause / resume / cancel work
+- [ ] Tap a subtitle line → seeks correctly
+- [ ] Subtitle search finds text and seeks on tap
+- [ ] Bookmark from subtitle line works
+- [ ] Export subtitles (share sheet); file readable
+- [ ] Settings → Subtitles → Auto-generate on import (optional) runs after import when playback pauses
+- [ ] Speech permission prompt appears on first generation; denying shows clear error
+- [ ] Language pack download on Wi‑Fi completes or surfaces error
 
 ---
 
@@ -105,7 +127,7 @@ Test with **Xcode StoreKit Configuration** (`Audiopig.storekit`) on Simulator, t
 
 - [ ] Scheme uses StoreKit configuration file (Edit Scheme → Run → Options)
 - [ ] Settings → AudioPig Plus shows localized price
-- [ ] Start 7-day trial from player paywall → Find Paragraph Breaks works
+- [ ] Start 7-day trial from player paywall → Smart Rewind works
 - [ ] Settings status shows trial end date or Active after subscribe
 - [ ] Manage Subscription link opens Apple subscriptions page
 - [ ] Restore Purchases refreshes entitlement state
@@ -142,7 +164,7 @@ Coffee ($2.99), Lunch ($6.99), and Today's Rent ($14.99).
 
 - [ ] Total listening time updates after playback
 - [ ] Finished books count matches manual marks
-- [ ] Icon gallery shows tiers; switching icon works (if unlocked)
+- [ ] Icon gallery shows tiers and secret achievements; switching icon works (if unlocked)
 - [ ] Delete all reading data (Settings) clears stats
 
 ---
@@ -155,7 +177,8 @@ Coffee ($2.99), Lunch ($6.99), and Today's Rent ($14.99).
 - [ ] AudioPig Plus section shows status, subscribe, manage, restore
 - [ ] Feed a Student tips show prices and thank-you on purchase
 - [ ] Apple Watch settings: artwork skip gestures toggle
-- [ ] About section displays correctly
+- [ ] Subtitles section copy visible; auto-generate toggle persists
+- [ ] About section displays version 1.1
 
 ---
 

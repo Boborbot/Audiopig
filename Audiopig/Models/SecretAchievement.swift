@@ -19,6 +19,8 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
     case pigaladriel
     case sirPigNosalot
     case thePigWhoLived
+    case sherpig
+    case pigSawyer
 
     var id: String { rawValue }
 
@@ -30,6 +32,8 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
         case .pigaladriel:     return "AppIcon-Pigaladriel"
         case .sirPigNosalot:     return "AppIcon-SirPigNosalot"
         case .thePigWhoLived:    return "AppIcon-ThePigWhoLived"
+        case .sherpig:           return "AppIcon-Sherpig"
+        case .pigSawyer:         return "AppIcon-PigSawyer"
         }
     }
 
@@ -41,6 +45,8 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
         case .pigaladriel:     return "Gallery-Pigaladriel"
         case .sirPigNosalot:     return "Gallery-SirPigNosalot"
         case .thePigWhoLived:    return "Gallery-ThePigWhoLived"
+        case .sherpig:           return "Gallery-Sherpig"
+        case .pigSawyer:         return "Gallery-PigSawyer"
         }
     }
 
@@ -52,6 +58,8 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
         case .pigaladriel:     return "Pigaladriel"
         case .sirPigNosalot:     return "Sir Pig Nosalot"
         case .thePigWhoLived:    return "The Pig Who Lived"
+        case .sherpig:           return "Sher Pig"
+        case .pigSawyer:         return "Pig Sawyer"
         }
     }
 
@@ -67,6 +75,10 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
             return "A pig has no name."
         case .thePigWhoLived:
             return "Yer a listener, Harry."
+        case .sherpig:
+            return "Elementary, my dear pig."
+        case .pigSawyer:
+            return "I reckon that's a finished fence."
         }
     }
 
@@ -94,6 +106,20 @@ enum SecretAchievement: String, CaseIterable, Identifiable {
             )
         case .thePigWhoLived:
             return HogwartsFinishCondition.isSatisfied(
+                title: event.title,
+                author: event.author,
+                listenedSeconds: event.listenedSeconds,
+                totalSeconds: event.totalSeconds
+            )
+        case .sherpig:
+            return SherlockHolmesFinishCondition.isSatisfied(
+                title: event.title,
+                author: event.author,
+                listenedSeconds: event.listenedSeconds,
+                totalSeconds: event.totalSeconds
+            )
+        case .pigSawyer:
+            return TomSawyerFinishCondition.isSatisfied(
                 title: event.title,
                 author: event.author,
                 listenedSeconds: event.listenedSeconds,

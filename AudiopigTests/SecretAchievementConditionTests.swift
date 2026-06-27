@@ -141,4 +141,74 @@ final class SecretAchievementConditionTests: XCTestCase {
         )
         XCTAssertFalse(SecretAchievement.thePigWhoLived.isUnlocked(by: event, calendar: calendar))
     }
+
+    func testSherpigUnlocksForSherlockHolmesTitle() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "The Adventures of Sherlock Holmes",
+            author: "Unknown Author",
+            totalSeconds: 10_000,
+            listenedSeconds: 8_000,
+            chapterCount: 12,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertTrue(SecretAchievement.sherpig.isUnlocked(by: event, calendar: calendar))
+    }
+
+    func testSherpigUnlocksForConanDoyleAuthor() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "A Study in Scarlet",
+            author: "Arthur Conan Doyle",
+            totalSeconds: 10_000,
+            listenedSeconds: 8_000,
+            chapterCount: 14,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertTrue(SecretAchievement.sherpig.isUnlocked(by: event, calendar: calendar))
+    }
+
+    func testSherpigDoesNotUnlockForUnrelatedBook() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "Murder on the Orient Express",
+            author: "Agatha Christie",
+            totalSeconds: 10_000,
+            listenedSeconds: 9_000,
+            chapterCount: 14,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertFalse(SecretAchievement.sherpig.isUnlocked(by: event, calendar: calendar))
+    }
+
+    func testPigSawyerUnlocksForTomSawyerAndMarkTwain() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "The Adventures of Tom Sawyer",
+            author: "Mark Twain",
+            totalSeconds: 10_000,
+            listenedSeconds: 8_000,
+            chapterCount: 35,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertTrue(SecretAchievement.pigSawyer.isUnlocked(by: event, calendar: calendar))
+    }
+
+    func testPigSawyerDoesNotUnlockForHuckleberryFinnAlone() {
+        let event = BookFinishEvent(
+            audiobookID: UUID(),
+            title: "Adventures of Huckleberry Finn",
+            author: "Mark Twain",
+            totalSeconds: 10_000,
+            listenedSeconds: 9_000,
+            chapterCount: 43,
+            finishedAt: date(month: 6, day: 17),
+            wasManuallyMarked: false
+        )
+        XCTAssertFalse(SecretAchievement.pigSawyer.isUnlocked(by: event, calendar: calendar))
+    }
 }

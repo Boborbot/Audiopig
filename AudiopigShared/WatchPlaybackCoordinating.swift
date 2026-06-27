@@ -50,6 +50,18 @@ public enum WatchSpeedRange {
         speedAtStepIndex(stepIndex(for: speed) + delta)
     }
 
+    /// Longest display label in `[min, max]` — sizes the player speed pill so the value never wraps.
+    public static var widestLabel: String {
+        var widest = ""
+        for index in minStepIndex...maxStepIndex {
+            let label = formatLabel(speedAtStepIndex(index))
+            if label.count > widest.count {
+                widest = label
+            }
+        }
+        return widest
+    }
+
     /// Display label: up to two decimals, trailing zeros omitted (e.g. `1×`, `1.1×`, `1.15×`).
     public static func formatLabel(_ speed: Float) -> String {
         let centi = stepIndex(for: speed) * centiPerStep

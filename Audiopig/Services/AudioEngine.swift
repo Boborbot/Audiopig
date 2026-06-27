@@ -121,26 +121,9 @@ final class AudioEngine: AudioEngineProtocol {
         }
 
         tearDownCurrentPlayback()
-
-        let snapshots = chapters
-            .sorted { $0.orderIndex < $1.orderIndex }
-            .map(ResolvedChapter.init(from:))
-
-        resolvedChapters = snapshots
-        // Build a URL → earliest-startTime map once so the time observer and seek
-        // logic can look up the file-global offset in O(1) instead of scanning every tick.
-        var offsets: [URL: TimeInterval] = [:]
-        for chapter in snapshots {
-            if let existing = offsets[chapter.fileURL] {
-                if chapter.startTime < existing { offsets[chapter.fileURL] = chapter.startTime }
-            } else {
-                offsets[chapter.fileURL] = chapter.startTime
-            }
-        }
-        fileGlobalOffsets = offsets
+        rebuildChapterSnapshots(from: audiobook)
 
         _loadedAudiobookID = audiobook.id
-        _loadedDuration = audiobook.duration
         _playbackState.send(.loading)
 
         _nowPlayingTitle = audiobook.title
@@ -156,7 +139,7 @@ final class AudioEngine: AudioEngineProtocol {
             throw AudioEngineError.loadFailed
         }
 
-        let localOffset = resumeTime - snapshots[startIndex].startTime
+        let localOffset = resumeTime - resolvedChapters[startIndex].startTime
 
         // loadChapter is non-blocking for item readiness; failures surface via .failed state.
         // It can still throw synchronously for an invalid index, so keep the do/catch.
@@ -182,6 +165,21 @@ final class AudioEngine: AudioEngineProtocol {
         _nowPlayingTimelineScope = .entireBook
         _lastNowPlayingChapterIndex = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
+    func updateResolvedChapters(from audiobook: Audiobook) {
+        guard _loadedAudiobookID == audiobook.id else { return }
+
+        rebuildChapterSnapshots(from: audiobook)
+
+        let clampedTime = max(0, min(_currentTime.value, _loadedDuration))
+        if clampedTime != _currentTime.value {
+            _currentTime.send(clampedTime)
+        }
+        if let newIndex = chapterIndex(forGlobalTime: clampedTime) {
+            currentChapterIndex = newIndex
+        }
+        updateNowPlayingInfo(elapsedTime: clampedTime)
     }
 
     // MARK: - AudioEngineProtocol — Transport
@@ -445,6 +443,29 @@ final class AudioEngine: AudioEngineProtocol {
                 await self?.handleChapterEnd()
             }
         }
+    }
+
+    // MARK: - Private — Chapter Snapshots
+
+    private func rebuildChapterSnapshots(from audiobook: Audiobook) {
+        let snapshots = audiobook.chapters
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .map(ResolvedChapter.init(from:))
+
+        resolvedChapters = snapshots
+
+        // Build a URL → earliest-startTime map once so the time observer and seek
+        // logic can look up the file-global offset in O(1) instead of scanning every tick.
+        var offsets: [URL: TimeInterval] = [:]
+        for chapter in snapshots {
+            if let existing = offsets[chapter.fileURL] {
+                if chapter.startTime < existing { offsets[chapter.fileURL] = chapter.startTime }
+            } else {
+                offsets[chapter.fileURL] = chapter.startTime
+            }
+        }
+        fileGlobalOffsets = offsets
+        _loadedDuration = audiobook.duration
     }
 
     // MARK: - Private — Teardown

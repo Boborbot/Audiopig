@@ -220,6 +220,11 @@ final class WatchPlayerViewModel: ObservableObject {
     var skipForwardInterval: Int { Int(snapshot.skipForwardSeconds) }
     var skipBackwardInterval: Int { Int(snapshot.skipBackwardSeconds) }
 
+    func formatSpeedAdjustedDuration(_ contentDuration: TimeInterval) -> String {
+        let adjusted = contentDuration / Double(max(snapshot.playbackSpeed, WatchSpeedRange.min))
+        return WatchTimeFormat.format(adjusted)
+    }
+
     var speedLabel: String {
         WatchSpeedRange.formatLabel(speedDraft)
     }

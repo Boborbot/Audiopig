@@ -53,7 +53,7 @@ struct ChapterListView: View {
                                     .font(isCurrent ? .caption.weight(.semibold) : .caption)
                                     .foregroundStyle(isCurrent ? WDS.Color.coral : .primary)
                                     .lineLimit(2)
-                                Text(WatchTimeFormat.format(chapter.duration))
+                                Text(viewModel.formatSpeedAdjustedDuration(chapter.duration))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }

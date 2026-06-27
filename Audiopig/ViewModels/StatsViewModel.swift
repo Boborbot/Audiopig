@@ -24,7 +24,6 @@ final class StatsViewModel {
     private(set) var finishedBooksCount: Int = 0
 
     /// Total seconds listened across **finished** books only.
-    /// Used by the icon gallery progress bars (mirrors AppIconManager's unlock logic).
     private(set) var finishedListenedSeconds: TimeInterval = 0
 
     // MARK: - Formatted helpers
@@ -46,7 +45,8 @@ final class StatsViewModel {
 
     // MARK: - Refresh
 
-    /// Re-queries SwiftData and recomputes all stats. Call on appear.
+    /// Re-queries SwiftData and recomputes all stats.
+    /// Called when the Stats tab appears and whenever listening progress is persisted (at most once per minute during playback).
     func refresh() {
         let records    = (try? modelContext.fetch(FetchDescriptor<FinishedRecord>())) ?? []
         let audiobooks = (try? modelContext.fetch(FetchDescriptor<Audiobook>()))      ?? []

@@ -139,7 +139,7 @@
           },
           "localizations" : [
             {
-              "description" : "Unlock Find Paragraph Breaks",
+              "description" : "Unlock Smart Rewind and on-device subtitles",
               "displayName" : "AudioPig Plus",
               "locale" : "en_US"
             }

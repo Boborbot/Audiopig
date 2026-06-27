@@ -5,8 +5,10 @@
 //  Manages unlockable achievement icons and secret achievement icons.
 //
 //  Unlock state and the active icon selection are persisted in UserDefaults.
-//  Call `checkForNewUnlocks(...)` after every book-finish event — it returns
+//  Call `checkForNewUnlocks(...)` when listening totals change — it returns
 //  any newly unlocked icons so callers can trigger celebration overlays.
+//  Hour tiers use cumulative listening time; secret achievements still require
+//  a book-finish event.
 //
 
 import Observation
@@ -41,6 +43,7 @@ final class AppIconManager {
 
     // MARK: - State
 
+    private let userDefaults: UserDefaults
     private(set) var unlockedTierRawValues: Set<Int>
     private(set) var unlockedSecretRawValues: Set<String>
     private(set) var activeIconName: String?
@@ -97,24 +100,26 @@ final class AppIconManager {
 
     // MARK: - Init
 
-    init() {
-        let savedTiers = UserDefaults.standard.array(forKey: Self.unlockedTierKey) as? [Int] ?? []
+    init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
+
+        let savedTiers = userDefaults.array(forKey: Self.unlockedTierKey) as? [Int] ?? []
         unlockedTierRawValues = Set(savedTiers)
 
-        let savedSecrets = UserDefaults.standard.stringArray(forKey: Self.unlockedSecretKey) ?? []
+        let savedSecrets = userDefaults.stringArray(forKey: Self.unlockedSecretKey) ?? []
         unlockedSecretRawValues = Set(savedSecrets)
 
-        if let iconName = UserDefaults.standard.string(forKey: Self.activeIconNameKey) {
+        if let iconName = userDefaults.string(forKey: Self.activeIconNameKey) {
             activeIconName = iconName
-        } else if let legacyRaw = UserDefaults.standard.object(forKey: Self.legacyActiveKey) as? Int,
+        } else if let legacyRaw = userDefaults.object(forKey: Self.legacyActiveKey) as? Int,
                   let tier = AppIconTier(rawValue: legacyRaw) {
             activeIconName = tier.alternateIconName
             if let iconName = tier.alternateIconName {
-                UserDefaults.standard.set(iconName, forKey: Self.activeIconNameKey)
+                userDefaults.set(iconName, forKey: Self.activeIconNameKey)
             } else {
-                UserDefaults.standard.removeObject(forKey: Self.activeIconNameKey)
+                userDefaults.removeObject(forKey: Self.activeIconNameKey)
             }
-            UserDefaults.standard.removeObject(forKey: Self.legacyActiveKey)
+            userDefaults.removeObject(forKey: Self.legacyActiveKey)
         } else {
             activeIconName = nil
         }
@@ -125,13 +130,13 @@ final class AppIconManager {
     /// Inspects listening totals and the latest finish event for newly unlocked icons.
     /// Returns all newly unlocked icons (achievements first, then secrets).
     func checkForNewUnlocks(
-        totalFinishedSeconds: TimeInterval,
+        totalListenedSeconds: TimeInterval,
         finishEvent: BookFinishEvent? = nil
     ) -> [AppIconUnlock] {
         var newlyUnlocked: [AppIconUnlock] = []
 
         for tier in AppIconTier.allCases where !tier.isAlwaysUnlocked {
-            guard totalFinishedSeconds >= tier.requiredSeconds else { continue }
+            guard totalListenedSeconds >= tier.requiredSeconds else { continue }
             guard !unlockedTierRawValues.contains(tier.rawValue) else { continue }
             unlockedTierRawValues.insert(tier.rawValue)
             newlyUnlocked.append(.achievement(tier))
@@ -173,9 +178,9 @@ final class AppIconManager {
                 guard let self else { return }
                 activeIconName = iconName
                 if let iconName {
-                    UserDefaults.standard.set(iconName, forKey: Self.activeIconNameKey)
+                    self.userDefaults.set(iconName, forKey: Self.activeIconNameKey)
                 } else {
-                    UserDefaults.standard.removeObject(forKey: Self.activeIconNameKey)
+                    self.userDefaults.removeObject(forKey: Self.activeIconNameKey)
                 }
             }
         }
@@ -187,7 +192,7 @@ final class AppIconManager {
     // MARK: - Private
 
     private func persistUnlockState() {
-        UserDefaults.standard.set(Array(unlockedTierRawValues), forKey: Self.unlockedTierKey)
-        UserDefaults.standard.set(Array(unlockedSecretRawValues), forKey: Self.unlockedSecretKey)
+        userDefaults.set(Array(unlockedTierRawValues), forKey: Self.unlockedTierKey)
+        userDefaults.set(Array(unlockedSecretRawValues), forKey: Self.unlockedSecretKey)
     }
 }

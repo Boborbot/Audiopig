@@ -191,9 +191,15 @@ final class LibraryViewModel {
     private let volumeController: SystemVolumeController
     private let monetization: any MonetizationServiceProtocol
 
-    /// Called after listening stats change (book finish, merge cleanup, etc.).
+    /// Called after listening stats change (playback saves, book finish, merge cleanup, etc.).
     @ObservationIgnored
     var onReadingStatsChanged: (() -> Void)?
+
+    /// Minimum interval between stats refreshes during periodic playback saves.
+    private static let readingStatsRefreshInterval: TimeInterval = 60
+
+    @ObservationIgnored
+    private var lastReadingStatsRefreshAt: Date?
 
     // MARK: - Init
 
@@ -224,13 +230,20 @@ final class LibraryViewModel {
             modelContext: modelContext,
             appSettings: appSettings,
             watchBridge: watchBridge,
-            monetization: monetization
+            monetization: monetization,
+            subtitleStore: SubtitleStore(modelContext: modelContext)
         )
         self.playerViewModel.onNaturalFinish = { [weak self] audiobook in
             self?.handleNaturalFinish(audiobook)
         }
-        self.playerViewModel.onPlaybackPositionSaved = { [weak self] in
+        self.playerViewModel.onPlaybackPositionSaved = { [weak self] isPeriodicSave in
             self?.syncWatchRecentBooks()
+            self?.checkForIconUnlocks()
+            if isPeriodicSave {
+                self?.refreshReadingStatsIfDue()
+            } else {
+                self?.refreshReadingStatsNow()
+            }
         }
         self.playerViewModel.onAudiobookLoaded = { [weak self] in
             self?.syncWatchRecentBooks()
@@ -267,6 +280,7 @@ final class LibraryViewModel {
         }
         await monetization.refreshEntitlements()
         syncWatchSettings()
+        checkForIconUnlocks()
     }
 
     // MARK: - Fetch
@@ -630,7 +644,7 @@ final class LibraryViewModel {
         }
 
         saveContext(errorContext: "mark finished")
-        enqueueIconUnlocks(finishEvent: finishEvent)
+        checkForIconUnlocks(finishEvent: finishEvent)
 
         if appSettings.autoExportOnFinish {
             _ = try? BookmarkExportService.export(audiobook)
@@ -641,12 +655,12 @@ final class LibraryViewModel {
         }
 
         celebratedBook = audiobook
-        onReadingStatsChanged?()
+        refreshReadingStatsNow()
     }
 
-    /// Computes total finished-book listening time and asks `AppIconManager`
+    /// Computes cumulative listening time and asks `AppIconManager`
     /// whether any new icons are now unlocked.
-    private func enqueueIconUnlocks(finishEvent: BookFinishEvent) {
+    private func checkForIconUnlocks(finishEvent: BookFinishEvent? = nil) {
         let records    = (try? modelContext.fetch(FetchDescriptor<FinishedRecord>())) ?? []
         let allBooks   = (try? modelContext.fetch(FetchDescriptor<Audiobook>()))      ?? []
 
@@ -668,7 +682,7 @@ final class LibraryViewModel {
         )
 
         let unlocks = appIconManager.checkForNewUnlocks(
-            totalFinishedSeconds: totals.finishedListenedSeconds,
+            totalListenedSeconds: totals.totalListenedSeconds,
             finishEvent: finishEvent
         )
 
@@ -694,7 +708,7 @@ final class LibraryViewModel {
         audiobook.isManuallyFinished = false
         removeFinishedRecords(for: audiobook.id)
         saveContext(errorContext: "mark unfinished")
-        onReadingStatsChanged?()
+        refreshReadingStatsNow()
     }
 
     /// Clears the celebration overlay; prompts to delete when auto-delete is pending.
@@ -875,7 +889,8 @@ final class LibraryViewModel {
             isSelectionModeActive = false
             selectedIDs.removeAll()
             fetchAudiobooks()
-            onReadingStatsChanged?()
+            refreshReadingStatsNow()
+            checkForIconUnlocks()
         } catch {
             errorMessage = "Merge failed. Please try again."
         }
@@ -945,6 +960,20 @@ final class LibraryViewModel {
     func reportError(_ message: String) { errorMessage = message }
 
     // MARK: - Private
+
+    private func refreshReadingStatsNow() {
+        lastReadingStatsRefreshAt = Date()
+        onReadingStatsChanged?()
+    }
+
+    private func refreshReadingStatsIfDue() {
+        let now = Date()
+        if let last = lastReadingStatsRefreshAt,
+           now.timeIntervalSince(last) < Self.readingStatsRefreshInterval {
+            return
+        }
+        refreshReadingStatsNow()
+    }
 
     private func saveContext(errorContext: String) {
         do {

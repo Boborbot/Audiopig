@@ -12,6 +12,8 @@
 	<string>Audiopig uses the camera when you choose to capture cover art for a book or folder.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Audiopig uses your photo library when you choose a cover image for a book or folder.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Audiopig transcribes narration on your device to generate synced subtitles. Audio never leaves your iPhone.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>CFBundleURLTypes</key>

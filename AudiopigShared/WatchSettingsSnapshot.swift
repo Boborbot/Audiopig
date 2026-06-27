@@ -19,7 +19,7 @@ public struct WatchSettingsSnapshot: Codable, Sendable, Equatable {
     public let universalPlaybackSpeedEnabled: Bool?
     /// Optional to allow older payloads to decode.
     public let universalPlaybackSpeed: Float?
-    /// Whether Find Paragraph Breaks is unlocked on iPhone (Plus or trial).
+    /// Whether Smart Rewind is unlocked on iPhone (Plus or trial).
     public let hasParagraphBreaksAccess: Bool?
     /// Optional to allow older payloads to decode.
     public let watchArtworkViewMode: WatchArtworkViewMode?

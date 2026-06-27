@@ -20,7 +20,9 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Full playback engine** — speed control (0.5–3.0×), configurable skip intervals, dual scrubber mode (entire book or current chapter)
 - **Bookmarks** — save named timestamps, edit, jump, long-press browser, swipe to delete, export as table
 - **Sleep timer** — off, N minutes, or end of current chapter; persists across app restarts
-- **Lull detection** — find paragraph/chapter break points via silence analysis (AudioPig Plus; 7-day free trial)
+- **Smart Rewind** — Look Far and Look Near scan silence in a window before the playhead to jump back to a natural break (AudioPig Plus; 7-day free trial)
+- **Live subtitles** — on-device transcription near the playhead or for the whole book; search, export, bookmark from a line (AudioPig Plus; requires iOS 26+)
+- **Chapter editing** — rename chapters and adjust start times / order in the chapter list
 - **Background audio** — continues playing when the screen is off or the app is backgrounded
 - **Lock screen controls** — play/pause, skip forward/back, and scrubbing via `MPRemoteCommandCenter`
 - **Persistent playback position** — saved every 5 seconds during playback and on backgrounding
@@ -30,7 +32,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Finish celebrations** — confetti and optional delete confirmation when marking a book finished
 - **Appearance** — system, light, or dark mode; optional portrait orientation lock
 - **Landscape player** — when orientation lock is off, the full player splits into artwork+title and controls columns (cover art on the notch side); no scrolling required
-- **AudioPig Plus** — monthly subscription unlocks lull detection; optional "Feed a Student" consumable tips ($2.99 / $6.99 / $14.99) in Settings
+- **AudioPig Plus** — monthly subscription unlocks Smart Rewind and on-device subtitles; optional "Feed a Student" consumable tips ($2.99 / $6.99 / $14.99) in Settings
 - **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback (recent books, controls, chapters, artwork skip gestures). On-Watch local library transfer is archived until a future release (`WatchFeatures.localPlaybackEnabled`).
 - **Home screen widgets** (`AudiopigWidget`) — listening stats, artwork, recent books, hour-club progress, and a lock screen **Continue Listening** circular widget (progress ring + pig glyph; tap resumes last book and opens the player)
 - **Lock screen control** (iOS 18+) — optional bottom-corner control to resume the last audiobook (`ContinueListeningControl`)
@@ -52,7 +54,7 @@ Views (SwiftUI)
 Key constraints:
 - All playback calls go through `AudioEngineProtocol` — the concrete `AudioEngine` is never imported by a view or view model directly
 - `DependencyContainer` constructs and wires all services at launch (`AudiopigApp.swift`)
-- `AudiopigShared` holds cross-target types (Watch connectivity payloads, widget snapshots, `ChapterProgressCalculator`)
+- `AudiopigShared` holds cross-target types (Watch connectivity payloads, widget snapshots, subtitle math, Smart Rewind policy, `ChapterProgressCalculator`)
 - Visual tokens (colors, typography, spacing, shadows) live exclusively in `DesignSystem.swift`; ad-hoc styling in views is a regression
 
 ---
@@ -62,13 +64,13 @@ Key constraints:
 ```
 Audiopig/
 ├── Audiopig/                   Main iOS app target
-│   ├── Models/                 SwiftData @Model types: Audiobook, Chapter, Bookmark, Folder, FinishedRecord
+│   ├── Models/                 SwiftData @Model types: Audiobook, Chapter, Bookmark, SubtitleCue, Folder, FinishedRecord
 │   ├── ViewModels/             LibraryViewModel, PlayerViewModel, StatsViewModel, Edit*ViewModels
 │   ├── Views/                  MainTabView, LibraryView, PlayerView, SettingsView, StatsView, Edit*Views
-│   │   └── Components/         MiniPlayerView, AppIconGalleryThumbnail, celebration overlays, row views
+│   │   └── Components/         MiniPlayerView, SubtitlesPanel, SmartRewindScopeSheet, celebration overlays, row views
 │   ├── Intents/                App Shortcuts (`PlayLastAudiobookIntent`)
-│   ├── Services/               AudioEngine, LibraryManager, WatchConnectivity, WatchTransfer, StoreKit, WidgetSnapshotWriter, WidgetPlaybackService
-│   ├── Protocols/              AudioEngineProtocol, LibraryManagerProtocol, MonetizationServiceProtocol, WatchTransferServiceProtocol
+│   ├── Services/               AudioEngine, LibraryManager, LullDetector, SubtitleStore, SubtitleGenerationOrchestrator, WatchConnectivity, StoreKit, WidgetSnapshotWriter
+│   ├── Protocols/              AudioEngineProtocol, LibraryManagerProtocol, SubtitleStoreProtocol, MonetizationServiceProtocol, WatchTransferServiceProtocol
 │   ├── DependencyInjection/    DependencyContainer, AudiopigModelContainer
 │   ├── Design/                 DesignSystem, GlassModifiers, ButtonStyles, ViewExtensions
 │   ├── Support/                PlaybackState, errors, formatters
@@ -77,7 +79,7 @@ Audiopig/
 ├── AudiopigShared/             Shared Swift sources compiled into app, Watch, and Widget targets
 ├── AudiopigWatch/              watchOS companion (remote playback; local transfer archived)
 ├── AudiopigWidget/             WidgetKit extension (stats, artwork, recent books, Continue Listening widget + iOS 18 control)
-└── AudiopigTests/              Unit tests (ChapterProgressCalculator, export formatting, achievements)
+└── AudiopigTests/              Unit tests (chapter progress, subtitles, Smart Rewind, achievements, monetization, widgets)
 ```
 
 ---
@@ -124,7 +126,8 @@ See `docs/app-store/` for:
 
 | Area | Status |
 |---|---|
-| Automated tests | `AudiopigTests` covers pure logic (including `WidgetListeningSnapshot`); no UI or AVFoundation integration tests yet |
+| Automated tests | `AudiopigTests` covers pure logic (widgets, subtitles, Smart Rewind, achievements); no UI or AVFoundation integration tests yet |
+| Live subtitles | Requires iOS 26+ and on-device Apple speech models; graceful unavailable message on older OS |
 | Per-book playback speed | Global default from Settings applies on load; not saved per book |
 | Format support | Only `.mp3` and `.m4b`; no `.aax`, `.opus`, etc. |
 | Watch local transfer | Archived (`WatchFeatures.localPlaybackEnabled`); code retained for a future release |
@@ -141,3 +144,5 @@ See `docs/app-store/` for:
 | 10 | Folder import, merge file cleanup, dead code removal, README |
 | 11 | Stats tab, lull detection, unlockable icons, bookmarks export, edit details, App Store prep |
 | 12 | Watch companion (remote playback), widgets, AudiopigShared, StoreKit monetization, icon gallery, orientation lock, unit tests |
+| 13 | App Store v1.0 stabilization, legal URLs on GitHub Pages, iPad full-screen player layout |
+| 14 | v1.1 — Smart Rewind, on-device subtitles, chapter editing, 2000h/2500h icons, Sher Pig and Pig Sawyer secret icons |

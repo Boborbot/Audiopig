@@ -10,7 +10,7 @@ import SwiftUI
 
 struct StatsView: View {
 
-    @State private var viewModel: StatsViewModel
+    private let viewModel: StatsViewModel
     private let appIconManager: AppIconManager
 
     private let twoColumns = [
@@ -19,7 +19,7 @@ struct StatsView: View {
     ]
 
     init(viewModel: StatsViewModel, appIconManager: AppIconManager) {
-        _viewModel = State(initialValue: viewModel)
+        self.viewModel = viewModel
         self.appIconManager = appIconManager
     }
 
@@ -75,7 +75,7 @@ struct StatsView: View {
                             tier: tier,
                             isUnlocked: appIconManager.isUnlocked(tier),
                             isActive: appIconManager.isActive(tier),
-                            totalListenedHours: Int(viewModel.finishedListenedSeconds / 3_600),
+                            totalListenedHours: Int(viewModel.totalListenedSeconds / 3_600),
                             onSelect: { appIconManager.applyIcon(tier) }
                         )
                     }

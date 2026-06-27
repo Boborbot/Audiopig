@@ -48,6 +48,10 @@ protocol AudioEngineProtocol: AnyObject {
     /// Unloads the current audiobook and resets all state to idle.
     func unload()
 
+    /// Refreshes resolved chapter snapshots after the user edits chapter metadata
+    /// without tearing down the active AVPlayerItem.
+    func updateResolvedChapters(from audiobook: Audiobook)
+
     // MARK: - Transport
 
     func play() throws

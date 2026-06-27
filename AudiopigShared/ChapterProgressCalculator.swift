@@ -84,4 +84,15 @@ public enum ChapterProgressCalculator {
         }
         return max(0, chapters.count - 1)
     }
+
+    /// Returns the chapter title at a global timeline position when the book has multiple chapters.
+    public static func chapterTitle(
+        at globalTime: TimeInterval,
+        chapters: [WatchChapterSummary]
+    ) -> String? {
+        guard chapters.count > 1 else { return nil }
+        let timings = chapters.map { WatchChapterTiming(startTime: $0.startTime, duration: $0.duration) }
+        let index = resolveChapterIndex(for: globalTime, chapters: timings)
+        return chapters[index].title
+    }
 }

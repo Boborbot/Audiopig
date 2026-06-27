@@ -6,6 +6,10 @@ xcuserdata/
 # macOS
 .DS_Store
 
+# Python
+__pycache__/
+*.pyc
+
 # Local test audiobooks — keep large files untracked
 Assets for Testing/*.m4b
 Assets for Testing/*.mp3

@@ -49,4 +49,25 @@ final class ChapterProgressCalculatorTests: XCTestCase {
         XCTAssertEqual(result.chapterIndex, 2)
         XCTAssertEqual(result.chapterDuration, 150, accuracy: 0.001)
     }
+
+    func testChapterTitleReturnsNilForSingleChapterBook() {
+        let single = [
+            WatchChapterSummary(
+                id: UUID(),
+                title: "Whole Book",
+                startTime: 0,
+                duration: 100,
+                orderIndex: 0
+            )
+        ]
+        XCTAssertNil(ChapterProgressCalculator.chapterTitle(at: 10, chapters: single))
+    }
+
+    func testChapterTitleResolvesMultiChapterBook() {
+        let multi = [
+            WatchChapterSummary(id: UUID(), title: "Intro", startTime: 0, duration: 100, orderIndex: 0),
+            WatchChapterSummary(id: UUID(), title: "Middle", startTime: 100, duration: 200, orderIndex: 1),
+        ]
+        XCTAssertEqual(ChapterProgressCalculator.chapterTitle(at: 150, chapters: multi), "Middle")
+    }
 }

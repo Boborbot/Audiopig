@@ -20,5 +20,9 @@ final class AppIconTierTests: XCTestCase {
         XCTAssertEqual(AppIconTier.h100.alternateIconName, "AppIcon-100h")
         XCTAssertEqual(AppIconTier.h100.galleryImageName, "Gallery-100h")
         XCTAssertEqual(AppIconTier.h1500.label, "1500 Hours")
+        XCTAssertEqual(AppIconTier.h1000.alternateIconName, "AppIcon-1000h")
+        XCTAssertEqual(AppIconTier.h2000.alternateIconName, "AppIcon-2000h")
+        XCTAssertEqual(AppIconTier.h2500.requiredHours, 2500)
+        XCTAssertEqual(AppIconTier.h2500.alternateIconName, "AppIcon-2500h")
     }
 }

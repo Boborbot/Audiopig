@@ -27,6 +27,7 @@ struct BookmarksListView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
+                        Haptics.subtle()
                         viewModel.addBookmark()
                     } label: {
                         Label("Add", systemImage: "plus")

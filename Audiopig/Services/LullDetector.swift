@@ -34,9 +34,18 @@ struct LullResult: Sendable, Identifiable, Equatable {
 
 // MARK: - LullAnalysisState
 
-enum SmartRewindRange: Sendable, Equatable {
+enum SmartRewindRange: Sendable, Equatable, Identifiable {
     case far
     case near
+
+    var id: Self { self }
+
+    var scopeKind: SmartRewindScopeKind {
+        switch self {
+        case .far: return .far
+        case .near: return .near
+        }
+    }
 }
 
 enum LullAnalysisState: Equatable {

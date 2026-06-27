@@ -19,14 +19,16 @@ Step-by-step from a clean build to App Store Connect. Assumes Apple Developer Pr
 
 ## Version numbers
 
-In Xcode → Audiopig target → General:
+In Xcode → Audiopig target → General (all targets should match):
 
-| Field | Suggested v1.0 |
+| Field | v1.1 (current) |
 |---|---|
-| Version | 1.0 |
+| Version | 1.1 |
 | Build | 1 |
 
-Increment **Build** for each upload; increment **Version** for user-visible releases.
+Increment **Build** for each upload to App Store Connect; increment **Version** for user-visible releases.
+
+**Submitting 1.1 while 1.0 is in review:** upload build 1.1 (1), attach to a new version in Connect, or replace the build on the pending version if Apple has not started review yet. Paste **What's New** from `listing.md`.
 
 ---
 
@@ -65,8 +67,9 @@ Simulator: `Cmd+S` after `Window → Physical Size` for clean frames.
 4. **Pricing:** Free (or your choice)
 5. **App Privacy:** No data collected (matches `PrivacyInfo.xcprivacy`)
 6. **Age Rating:** complete questionnaire (typically 4+)
-7. **Version 1.0:**
+7. **Version 1.1** (or 1.0 for first release):
    - Paste copy from `listing.md`
+   - **What's New:** paste v1.1 section from `listing.md` when updating an existing app
    - Privacy Policy URL (hosted HTML)
    - Support URL
    - Screenshots
@@ -102,7 +105,7 @@ Copy for display names and descriptions is in `Audiopig/Audiopig.storekit` local
 ### Subscription metadata
 
 - **Subscription display name:** AudioPig Plus
-- **Description:** Unlocks Find Paragraph Breaks (smart silence analysis)
+- **Description:** Unlocks Smart Rewind (silence analysis) and on-device subtitles
 - **Review screenshot:** capture the paywall from Simulator or device (required for subscription review)
 
 ### Sandbox testing (physical device)
@@ -122,7 +125,7 @@ Copy for display names and descriptions is in `Audiopig/Audiopig.storekit` local
 1. After upload processes, enable **Internal Testing** for your team
 2. Install via TestFlight on your phone
 3. Complete IAP setup (see **In-App Purchases** above) before Sandbox testing on TestFlight builds
-4. Smoke-test: import → playback → background audio → Watch remote playback
+4. Smoke-test: import → playback → Smart Rewind → subtitles (iOS 26 device) → background audio → Watch remote playback
 5. Sandbox IAP: Plus trial, restore, and tip purchase on the TestFlight build
 6. Fix issues, increment build number, re-archive, re-upload
 
@@ -132,7 +135,7 @@ Copy for display names and descriptions is in `Audiopig/Audiopig.storekit` local
 
 - Release manually or automatically per Connect settings
 - Monitor crash reports in Xcode Organizer and App Store Connect
-- Plan v1.1: per-book speed, tests, optional formats
+- Update hosted privacy policy if permissions change (`support-site/` → GitHub Pages)
 
 ---
 

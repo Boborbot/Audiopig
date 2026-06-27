@@ -71,6 +71,28 @@ final class WatchLibraryViewModel: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
 
+        if let snapshot = coordinator.snapshot,
+           snapshot.bookID == id,
+           snapshot.source == .remote {
+            switch snapshot.playbackState {
+            case .playing, .loading:
+                WatchHaptics.play()
+                return true
+            case .paused, .finished, .idle:
+                let result = await coordinator.send(.play)
+                connectionState = client.connectionState
+                if result.success {
+                    WatchHaptics.play()
+                    return true
+                }
+                errorMessage = result.errorMessage ?? client.connectionErrorMessage
+                WatchHaptics.error()
+                return false
+            case .failed:
+                break
+            }
+        }
+
         let result = await coordinator.send(.loadBook(bookID: id, autoPlay: true))
         connectionState = client.connectionState
 

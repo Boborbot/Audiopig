@@ -3,7 +3,7 @@
 //  Audiopig
 //
 //  Hour-based achievements that unlock alternate app icons.
-//  Each tier requires cumulative hours listened across finished audiobooks.
+//  Each tier requires cumulative hours listened across all audiobooks.
 //
 
 import Foundation
@@ -18,6 +18,8 @@ enum AppIconTier: Int, CaseIterable, Identifiable {
     case h500  = 5
     case h1000 = 7
     case h1500 = 8
+    case h2000 = 9
+    case h2500 = 10
 
     var id: Int { rawValue }
 
@@ -27,7 +29,7 @@ enum AppIconTier: Int, CaseIterable, Identifiable {
         return false
     }
 
-    /// Hours of finished-book listening required to unlock this tier.
+    /// Hours of listening required to unlock this tier.
     var requiredHours: Int {
         switch self {
         case .original: return 0
@@ -39,6 +41,8 @@ enum AppIconTier: Int, CaseIterable, Identifiable {
         case .h500:  return 500
         case .h1000: return 1000
         case .h1500: return 1500
+        case .h2000: return 2000
+        case .h2500: return 2500
         }
     }
 
@@ -82,7 +86,7 @@ enum AppIconTier: Int, CaseIterable, Identifiable {
         case .original:
             return "The classic Audiopig icon."
         default:
-            return "You've listened to over \(requiredHours) hours of finished audiobooks!"
+            return "You've listened for over \(requiredHours) hours!"
         }
     }
 }

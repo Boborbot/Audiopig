@@ -154,6 +154,35 @@ enum DS {
 
         /// Monospace speed / numeric label in controls.
         static let controlLabel: SwiftUI.Font = .system(.callout, design: .rounded, weight: .semibold)
+
+        /// Subtitle line in the player — active lines are larger and semibold.
+        static func subtitle(_ style: SubtitleFont, active: Bool) -> SwiftUI.Font {
+            switch style {
+            case .newYork:
+                // Preserves the original split: New York on the active line, SF Pro on context lines.
+                if active {
+                    return .system(.title2, design: .serif).weight(.semibold)
+                }
+                return listBody
+            case .sanFrancisco:
+                return active
+                    ? .system(.title2, design: .default).weight(.semibold)
+                    : .system(.body, design: .default)
+            case .sfRounded:
+                return active
+                    ? .system(.title2, design: .rounded).weight(.semibold)
+                    : .system(.body, design: .rounded)
+            case .charter:
+                if active {
+                    return .custom("Charter-Bold", size: 0, relativeTo: .title2)
+                }
+                return .custom("Charter-Roman", size: 0, relativeTo: .body)
+            case .sfMono:
+                return active
+                    ? .system(.title2, design: .monospaced).weight(.semibold)
+                    : .system(.body, design: .monospaced)
+            }
+        }
     }
 
     // MARK: - Spacing (4-pt grid)
@@ -179,6 +208,34 @@ enum DS {
         /// Space reserved above the tab bar when `MiniPlayerView` is visible.
         /// Pill intrinsic height (62 pt) + 6 pt floating gap above the tab bar.
         static let miniPlayerClearance: CGFloat = 68
+
+        private static let playerAccessoryPillVerticalPadding: CGFloat = 9
+        private static let playerSpeedPillHorizontalPadding: CGFloat = 14
+        /// How far icon pills sit between a minimal capsule and the speed pill width (0…1).
+        private static let playerIconPillWidthBlend: CGFloat = 0.42
+
+        /// Shared height for all five player accessory pills.
+        static var playerAccessoryPillHeight: CGFloat {
+            let calloutSize = UIFont.preferredFont(forTextStyle: .callout).pointSize
+            let font = UIFont.monospacedDigitSystemFont(ofSize: calloutSize, weight: .semibold)
+            let textSize = (WatchSpeedRange.widestLabel as NSString).size(withAttributes: [.font: font])
+            return ceil(textSize.height) + playerAccessoryPillVerticalPadding * 2
+        }
+
+        /// Width for the speed pill — fits the widest valid label (e.g. `0.25×`), nothing wider.
+        static var playerSpeedPillWidth: CGFloat {
+            let calloutSize = UIFont.preferredFont(forTextStyle: .callout).pointSize
+            let font = UIFont.monospacedDigitSystemFont(ofSize: calloutSize, weight: .semibold)
+            let textSize = (WatchSpeedRange.widestLabel as NSString).size(withAttributes: [.font: font])
+            return ceil(textSize.width) + playerSpeedPillHorizontalPadding * 2
+        }
+
+        /// Icon pill width — wider than a tight circle, narrower than the speed pill.
+        static var playerIconPillWidth: CGFloat {
+            let height = playerAccessoryPillHeight
+            let speed = playerSpeedPillWidth
+            return ceil(height + (speed - height) * playerIconPillWidthBlend)
+        }
     }
 
     // MARK: - Corner Radius

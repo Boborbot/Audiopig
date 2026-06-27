@@ -102,6 +102,25 @@ extension View {
             .padding(.vertical, verticalPadding)
             .background(Capsule().fill(Color(UIColor.secondarySystemBackground)))
     }
+
+    /// Fixed-size capsule for the five player accessory controls — sized to the widest speed label, nothing larger.
+    func playerAccessoryPill(isActive: Bool = false, style: PlayerAccessoryPillStyle = .icon) -> some View {
+        let height = DS.Layout.playerAccessoryPillHeight
+        let width = style == .speed ? DS.Layout.playerSpeedPillWidth : DS.Layout.playerIconPillWidth
+        return self
+            .font(DS.Typography.controlLabel)
+            .foregroundStyle(isActive ? DS.Color.coral : DS.Color.primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(width: width, height: height)
+            .background(Capsule().fill(Color(UIColor.secondarySystemBackground)))
+            .fixedSize(horizontal: true, vertical: true)
+    }
+}
+
+enum PlayerAccessoryPillStyle {
+    case speed
+    case icon
 }
 
 // MARK: - Coral Navigation Banner
