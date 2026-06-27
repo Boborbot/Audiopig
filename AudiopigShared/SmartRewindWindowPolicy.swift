@@ -54,6 +54,16 @@ public enum SmartRewindWindowPolicy {
         scope == .far ? 60 : 5
     }
 
+    /// Full track span for the dual-thumb window slider (Now at 0, furthest bound at the upper end).
+    public static func trackUpperBound(for scope: SmartRewindScopeKind) -> TimeInterval {
+        startOffsetBounds(for: scope).upperBound
+    }
+
+    public static func snappedOffset(_ value: TimeInterval, step: TimeInterval) -> TimeInterval {
+        guard step > 0 else { return value }
+        return (value / step).rounded() * step
+    }
+
     public static func clampedStartOffset(
         _ start: TimeInterval,
         end: TimeInterval,

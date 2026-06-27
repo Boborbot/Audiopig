@@ -13,6 +13,7 @@ final class PaywallViewModel {
     enum Feature {
         case paragraphBreaks
         case subtitles
+        case eq
     }
 
     private(set) var isPurchasing = false
@@ -32,6 +33,8 @@ final class PaywallViewModel {
             return "Smart Rewind"
         case .subtitles:
             return "Live Subtitles"
+        case .eq:
+            return "Speech EQ"
         }
     }
 
@@ -41,6 +44,19 @@ final class PaywallViewModel {
             return "Look Far and Look Near scan silence in the minutes before you drifted off so you can jump back to a natural break."
         case .subtitles:
             return "Generate on-device subtitles near where you are listening, fill gaps in partial transcriptions, or transcribe an entire book in the background."
+        case .eq:
+            return "Shape dialogue with speech-tuned EQ presets so narrators stay clear in noisy environments."
+        }
+    }
+
+    private var premiumFeature: PremiumFeature {
+        switch feature {
+        case .paragraphBreaks:
+            return .paragraphBreaks
+        case .subtitles:
+            return .subtitles
+        case .eq:
+            return .eq
         }
     }
 
@@ -69,7 +85,7 @@ final class PaywallViewModel {
 
         do {
             try await monetization.purchasePlus()
-            return monetization.hasAccess(to: feature == .subtitles ? .subtitles : .paragraphBreaks)
+            return monetization.hasAccess(to: premiumFeature)
         } catch MonetizationError.userCancelled {
             return false
         } catch {
@@ -85,7 +101,7 @@ final class PaywallViewModel {
 
         do {
             try await monetization.restorePurchases()
-            return monetization.hasAccess(to: feature == .subtitles ? .subtitles : .paragraphBreaks)
+            return monetization.hasAccess(to: premiumFeature)
         } catch {
             errorMessage = error.localizedDescription
             return false

@@ -94,9 +94,21 @@ Device: _______________   iOS: _______________   Date: _______________
 - [ ] After subscribing or starting trial, analysis runs on tap
 - [ ] Results list shows plausible break points
 - [ ] Tap result → seeks correctly
-- [ ] Long press Look Far / Look Near → scope popover; adjust window; Look Again works
+- [ ] Long press Look Far / Look Near → scope sheet; adjust window with range slider; Look works
 - [ ] Cancel mid-analysis works
-- [ ] Settings → Playback → Smart Rewind offset pickers persist after relaunch
+- [ ] Settings → Playback → Smart Rewind range sliders persist after relaunch
+
+---
+
+## Audio Enhancement
+
+- [ ] Settings → Playback → Speech EQ preset picker (Plus or trial)
+- [ ] Without Plus: EQ presets show paywall; Voice Boost levels remain free
+- [ ] Player sheet → Audio Enhancement: EQ and Voice Boost match settings
+- [ ] Per-book EQ / Voice Boost saved when universal audio enhancement is off
+- [ ] Universal audio enhancement toggle applies defaults to books without saved settings
+- [ ] Playback with EQ preset sounds different from Off (subjective check on narration)
+- [ ] Voice Boost Off vs Strong is audibly different on a quiet passage
 
 ---
 
@@ -178,7 +190,7 @@ Coffee ($2.99), Lunch ($6.99), and Today's Rent ($14.99).
 - [ ] Feed a Student tips show prices and thank-you on purchase
 - [ ] Apple Watch settings: artwork skip gestures toggle
 - [ ] Subtitles section copy visible; auto-generate toggle persists
-- [ ] About section displays version 1.1
+- [ ] About section displays version 1.1.1
 
 ---
 

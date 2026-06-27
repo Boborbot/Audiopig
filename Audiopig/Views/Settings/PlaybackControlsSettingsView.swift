@@ -7,15 +7,17 @@ import SwiftUI
 
 struct PlaybackControlsSettingsView: View {
     @Bindable var settings: AppSettings
+    @Bindable var monetizationViewModel: SettingsMonetizationViewModel
     var onWatchSettingsChanged: (() -> Void)?
+    var onAudioEnhancementSettingsChanged: (() -> Void)?
 
     @State private var activeSpeedField: SpeedSettingField?
 
+    private var hasEQAccess: Bool {
+        monetizationViewModel.hasAccess(to: .eq)
+    }
+
     private static let skipIntervalOptions: [TimeInterval] = [5, 10, 15, 30, 45, 60]
-    private static let smartRewindFarStartOptions: [TimeInterval] = stride(from: 5, through: 60, by: 5).map { TimeInterval($0 * 60) }
-    private static let smartRewindFarEndOptions: [TimeInterval] = stride(from: 1, through: 30, by: 1).map { TimeInterval($0 * 60) }
-    private static let smartRewindNearStartOptions: [TimeInterval] = [30, 45, 60, 90, 120, 180, 240, 300, 420, 600, 900]
-    private static let smartRewindNearEndOptions: [TimeInterval] = [0, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300]
 
     var body: some View {
         List {
@@ -53,37 +55,22 @@ struct PlaybackControlsSettingsView: View {
             }
 
             Section {
-                Picker("Look Far — from", selection: $settings.smartRewindFarStartOffset) {
-                    ForEach(Self.smartRewindFarStartOptions, id: \.self) { seconds in
-                        Text(smartRewindOffsetLabel(seconds)).tag(seconds)
-                    }
-                }
-                .tint(DS.Color.coral)
+                VStack(spacing: DS.Spacing.md) {
+                    SmartRewindScopeSettingsBubble(
+                        title: "Look Far",
+                        scopeKind: .far,
+                        startOffset: $settings.smartRewindFarStartOffset,
+                        endOffset: $settings.smartRewindFarEndOffset
+                    )
 
-                Picker("Look Far — to", selection: $settings.smartRewindFarEndOffset) {
-                    ForEach(Self.smartRewindFarEndOptions, id: \.self) { seconds in
-                        Text(smartRewindOffsetLabel(seconds)).tag(seconds)
-                    }
+                    SmartRewindScopeSettingsBubble(
+                        title: "Look Near",
+                        scopeKind: .near,
+                        startOffset: $settings.smartRewindNearStartOffset,
+                        endOffset: $settings.smartRewindNearEndOffset
+                    )
                 }
-                .tint(DS.Color.coral)
-
-                Picker("Look Near — from", selection: $settings.smartRewindNearStartOffset) {
-                    ForEach(Self.smartRewindNearStartOptions, id: \.self) { seconds in
-                        Text(smartRewindOffsetLabel(seconds)).tag(seconds)
-                    }
-                }
-                .tint(DS.Color.coral)
-
-                Picker("Look Near — to", selection: $settings.smartRewindNearEndOffset) {
-                    ForEach(Self.smartRewindNearEndOptions, id: \.self) { seconds in
-                        if seconds == 0 {
-                            Text("Now").tag(seconds)
-                        } else {
-                            Text(smartRewindOffsetLabel(seconds)).tag(seconds)
-                        }
-                    }
-                }
-                .tint(DS.Color.coral)
+                .settingsPanelRow()
             } header: {
                 Text("Smart Rewind")
                     .sectionTitle()
@@ -92,9 +79,32 @@ struct PlaybackControlsSettingsView: View {
                     .font(DS.Typography.caption)
                     .foregroundStyle(DS.Color.tertiary)
             }
+
+            Section {
+                AudioEnhancementControls(
+                    eqPresetID: $settings.defaultEQPresetID,
+                    voiceBoostLevel: $settings.defaultVoiceBoostLevel,
+                    scopeLabel: "Default",
+                    hasEQAccess: hasEQAccess,
+                    onSettingsChanged: onAudioEnhancementSettingsChanged
+                )
+                .settingsPanelRow()
+            } header: {
+                Text("Audio Enhancement")
+                    .sectionTitle()
+            } footer: {
+                Text(
+                    hasEQAccess
+                        ? "Defaults apply when a book has no saved EQ or Voice Boost settings."
+                        : "Speech EQ presets are included with AudioPig Plus. Voice Boost is free."
+                )
+                .font(DS.Typography.caption)
+                .foregroundStyle(DS.Color.tertiary)
+            }
         }
         .scrollContentBackground(.hidden)
         .background(DS.Color.canvas.ignoresSafeArea())
+        .miniPlayerScrollClearance()
         .navigationTitle("Playback Controls")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $activeSpeedField) { field in
@@ -135,13 +145,20 @@ struct PlaybackControlsSettingsView: View {
             return $settings.speedPreset3
         }
     }
+}
 
-    private func smartRewindOffsetLabel(_ seconds: TimeInterval) -> String {
-        if seconds >= 60 {
-            let minutes = Int(seconds / 60)
-            return minutes == 1 ? "1 min ago" : "\(minutes) min ago"
-        }
-        return "\(Int(seconds))s ago"
+// MARK: - Settings Panel Row
+
+private extension View {
+    func settingsPanelRow() -> some View {
+        listRowInsets(EdgeInsets(
+            top: DS.Spacing.xs,
+            leading: DS.Spacing.md,
+            bottom: DS.Spacing.xs,
+            trailing: DS.Spacing.md
+        ))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 }
 

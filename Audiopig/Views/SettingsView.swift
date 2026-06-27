@@ -10,6 +10,7 @@ struct SettingsView: View {
     var statsViewModel: StatsViewModel
     @Bindable var monetizationViewModel: SettingsMonetizationViewModel
     var onWatchSettingsChanged: (() -> Void)?
+    var onAudioEnhancementSettingsChanged: (() -> Void)?
 
     @State private var isDeleteStatsConfirmationPresented = false
     @State private var isDeleteStatsFinalConfirmationPresented = false
@@ -21,12 +22,14 @@ struct SettingsView: View {
         settings: AppSettings,
         statsViewModel: StatsViewModel,
         monetizationViewModel: SettingsMonetizationViewModel,
-        onWatchSettingsChanged: (() -> Void)? = nil
+        onWatchSettingsChanged: (() -> Void)? = nil,
+        onAudioEnhancementSettingsChanged: (() -> Void)? = nil
     ) {
         _settings = Bindable(wrappedValue: settings)
         self.statsViewModel = statsViewModel
         _monetizationViewModel = Bindable(wrappedValue: monetizationViewModel)
         self.onWatchSettingsChanged = onWatchSettingsChanged
+        self.onAudioEnhancementSettingsChanged = onAudioEnhancementSettingsChanged
     }
 
     var body: some View {
@@ -57,7 +60,9 @@ struct SettingsView: View {
                     NavigationLink {
                         PlaybackControlsSettingsView(
                             settings: settings,
-                            onWatchSettingsChanged: onWatchSettingsChanged
+                            monetizationViewModel: monetizationViewModel,
+                            onWatchSettingsChanged: onWatchSettingsChanged,
+                            onAudioEnhancementSettingsChanged: onAudioEnhancementSettingsChanged
                         )
                     } label: {
                         Label("Playback Controls", systemImage: "playpause")
@@ -270,7 +275,7 @@ struct SettingsView: View {
             Text(Brand.plusName)
                 .sectionTitle()
         } footer: {
-            Text("Smart Rewind and on-device subtitles are included with Plus. Core playback stays free.")
+            Text("Smart Rewind, Speech EQ, and on-device subtitles are included with Plus. Core playback stays free.")
                 .font(DS.Typography.caption)
                 .foregroundStyle(DS.Color.tertiary)
         }

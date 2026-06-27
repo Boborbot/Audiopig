@@ -40,4 +40,14 @@ final class SmartRewindWindowPolicyTests: XCTestCase {
         XCTAssertEqual(SmartRewindWindowPolicy.formatOffsetLabel(120), "2 min ago")
         XCTAssertEqual(SmartRewindWindowPolicy.formatOffsetLabel(45), "45s ago")
     }
+
+    func test_snappedOffset_roundsToStep() {
+        XCTAssertEqual(SmartRewindWindowPolicy.snappedOffset(125, step: 60), 120)
+        XCTAssertEqual(SmartRewindWindowPolicy.snappedOffset(47, step: 5), 45)
+    }
+
+    func test_trackUpperBound_matchesStartOffsetMaximum() {
+        XCTAssertEqual(SmartRewindWindowPolicy.trackUpperBound(for: .far), 60 * 60)
+        XCTAssertEqual(SmartRewindWindowPolicy.trackUpperBound(for: .near), 15 * 60)
+    }
 }

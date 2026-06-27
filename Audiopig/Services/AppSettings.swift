@@ -11,6 +11,16 @@ import Foundation
 import Observation
 import SwiftUI
 
+private func migratedVoiceBoostLevel(levelKey: String, legacyEnabledKey: String) -> VoiceBoostLevel {
+    if UserDefaults.standard.object(forKey: levelKey) != nil {
+        return VoiceBoostLevel.validated(UserDefaults.standard.integer(forKey: levelKey))
+    }
+    let legacyEnabled = UserDefaults.standard.bool(forKey: legacyEnabledKey)
+    let level = VoiceBoostLevel.migrated(fromLegacyEnabled: legacyEnabled)
+    UserDefaults.standard.set(level.rawValue, forKey: levelKey)
+    return level
+}
+
 // MARK: - AppAppearance
 
 /// The user's preferred color scheme override.
@@ -111,6 +121,13 @@ final class AppSettings {
         static let subtitleLocaleIdentifier = "settings.subtitleLocaleIdentifier"
         static let subtitlesAutoGenerateOnImport = "settings.subtitlesAutoGenerateOnImport"
         static let subtitleFont = "settings.subtitleFont"
+        static let defaultEQPresetID = "settings.defaultEQPresetID"
+        static let defaultVoiceBoostLevel = "settings.defaultVoiceBoostLevel"
+        static let defaultVoiceBoostEnabled = "settings.defaultVoiceBoostEnabled"
+        static let universalAudioEnhancementEnabled = "settings.universalAudioEnhancementEnabled"
+        static let universalEQPresetID = "settings.universalEQPresetID"
+        static let universalVoiceBoostLevel = "settings.universalVoiceBoostLevel"
+        static let universalVoiceBoostEnabled = "settings.universalVoiceBoostEnabled"
     }
 
     // MARK: - Backing Stores (not observed individually)
@@ -329,6 +346,40 @@ final class AppSettings {
         return font
     }()
 
+    @ObservationIgnored
+    private var _defaultEQPresetID: String = {
+        UserDefaults.standard.string(forKey: Keys.defaultEQPresetID) ?? SpeechEQPreset.off.id
+    }()
+
+    @ObservationIgnored
+    private var _defaultVoiceBoostLevel: VoiceBoostLevel = {
+        migratedVoiceBoostLevel(
+            levelKey: "settings.defaultVoiceBoostLevel",
+            legacyEnabledKey: "settings.defaultVoiceBoostEnabled"
+        )
+    }()
+
+    @ObservationIgnored
+    private var _universalAudioEnhancementEnabled: Bool = {
+        if UserDefaults.standard.bool(forKey: Keys.universalAudioEnhancementEnabled) {
+            UserDefaults.standard.set(false, forKey: Keys.universalAudioEnhancementEnabled)
+        }
+        return false
+    }()
+
+    @ObservationIgnored
+    private var _universalEQPresetID: String = {
+        UserDefaults.standard.string(forKey: Keys.universalEQPresetID) ?? SpeechEQPreset.off.id
+    }()
+
+    @ObservationIgnored
+    private var _universalVoiceBoostLevel: VoiceBoostLevel = {
+        migratedVoiceBoostLevel(
+            levelKey: "settings.universalVoiceBoostLevel",
+            legacyEnabledKey: "settings.universalVoiceBoostEnabled"
+        )
+    }()
+
     // MARK: - Observable Properties
 
     /// Default playback rate applied when an audiobook is first loaded. Range [0.25, 4.0].
@@ -429,6 +480,85 @@ final class AppSettings {
     var speedPresets: [Float] {
         let presets = [speedPreset1, speedPreset2, speedPreset3]
         return presets.sorted()
+    }
+
+    /// Default EQ preset for books without a per-book value.
+    var defaultEQPresetID: String {
+        get {
+            access(keyPath: \.defaultEQPresetID)
+            return _defaultEQPresetID
+        }
+        set {
+            let validated = SpeechEQPreset.validated(newValue).id
+            withMutation(keyPath: \.defaultEQPresetID) {
+                _defaultEQPresetID = validated
+                UserDefaults.standard.set(validated, forKey: Keys.defaultEQPresetID)
+            }
+        }
+    }
+
+    /// Default Voice Boost level for books without a per-book value.
+    var defaultVoiceBoostLevel: VoiceBoostLevel {
+        get {
+            access(keyPath: \.defaultVoiceBoostLevel)
+            return _defaultVoiceBoostLevel
+        }
+        set {
+            let validated = VoiceBoostLevel.validated(newValue.rawValue)
+            withMutation(keyPath: \.defaultVoiceBoostLevel) {
+                _defaultVoiceBoostLevel = validated
+                UserDefaults.standard.set(validated.rawValue, forKey: Keys.defaultVoiceBoostLevel)
+            }
+        }
+    }
+
+    /// When enabled, EQ preset and Voice Boost are global across all books.
+    var universalAudioEnhancementEnabled: Bool {
+        get {
+            access(keyPath: \.universalAudioEnhancementEnabled)
+            return _universalAudioEnhancementEnabled
+        }
+        set {
+            withMutation(keyPath: \.universalAudioEnhancementEnabled) {
+                _universalAudioEnhancementEnabled = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.universalAudioEnhancementEnabled)
+            }
+            if newValue {
+                if SpeechEQPreset.preset(for: universalEQPresetID) == nil {
+                    universalEQPresetID = defaultEQPresetID
+                }
+            }
+        }
+    }
+
+    /// Active EQ preset when universal audio enhancement is on.
+    var universalEQPresetID: String {
+        get {
+            access(keyPath: \.universalEQPresetID)
+            return _universalEQPresetID
+        }
+        set {
+            let validated = SpeechEQPreset.validated(newValue).id
+            withMutation(keyPath: \.universalEQPresetID) {
+                _universalEQPresetID = validated
+                UserDefaults.standard.set(validated, forKey: Keys.universalEQPresetID)
+            }
+        }
+    }
+
+    /// Active Voice Boost level when universal audio enhancement is on.
+    var universalVoiceBoostLevel: VoiceBoostLevel {
+        get {
+            access(keyPath: \.universalVoiceBoostLevel)
+            return _universalVoiceBoostLevel
+        }
+        set {
+            let validated = VoiceBoostLevel.validated(newValue.rawValue)
+            withMutation(keyPath: \.universalVoiceBoostLevel) {
+                _universalVoiceBoostLevel = validated
+                UserDefaults.standard.set(validated.rawValue, forKey: Keys.universalVoiceBoostLevel)
+            }
+        }
     }
 
     /// Seconds used for the skip-forward action.

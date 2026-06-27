@@ -21,14 +21,14 @@ Step-by-step from a clean build to App Store Connect. Assumes Apple Developer Pr
 
 In Xcode → Audiopig target → General (all targets should match):
 
-| Field | v1.1 (current) |
+| Field | v1.1.1 (current) |
 |---|---|
-| Version | 1.1 |
-| Build | 1 |
+| Version | 1.1.1 |
+| Build | 2 |
 
 Increment **Build** for each upload to App Store Connect; increment **Version** for user-visible releases.
 
-**Submitting 1.1 while 1.0 is in review:** upload build 1.1 (1), attach to a new version in Connect, or replace the build on the pending version if Apple has not started review yet. Paste **What's New** from `listing.md`.
+**Submitting 1.1.1:** upload build 1.1.1 (2), attach to a new version in Connect. Paste **What's New** from `listing.md` (v1.1.1 section).
 
 ---
 
@@ -67,9 +67,9 @@ Simulator: `Cmd+S` after `Window → Physical Size` for clean frames.
 4. **Pricing:** Free (or your choice)
 5. **App Privacy:** No data collected (matches `PrivacyInfo.xcprivacy`)
 6. **Age Rating:** complete questionnaire (typically 4+)
-7. **Version 1.1** (or 1.0 for first release):
+7. **Version 1.1.1** (or 1.0 for first release):
    - Paste copy from `listing.md`
-   - **What's New:** paste v1.1 section from `listing.md` when updating an existing app
+   - **What's New:** paste v1.1.1 section from `listing.md` when updating an existing app
    - Privacy Policy URL (hosted HTML)
    - Support URL
    - Screenshots

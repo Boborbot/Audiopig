@@ -18,6 +18,12 @@ final class Audiobook {
     /// Last playback speed used for this book when universal speed is disabled.
     /// When `nil`, the app's default playback speed is used until the user changes speed for this book.
     var lastPlaybackSpeed: Float? = nil
+    /// Last EQ preset used for this book when universal audio enhancement is disabled.
+    var lastEQPresetID: String? = nil
+    /// Last Voice Boost level for this book when universal audio enhancement is disabled.
+    var lastVoiceBoostLevel: Int? = nil
+    /// Legacy per-book Voice Boost on/off. Migrated to `lastVoiceBoostLevel` on read.
+    var lastVoiceBoostEnabled: Bool? = nil
     /// Last time this book was opened or had playback position saved. Used for Watch recent list.
     var lastPlayedAt: Date? = nil
     /// When the book was added to the library. `nil` for legacy records until backfilled from file metadata.
@@ -101,6 +107,9 @@ final class Audiobook {
         duration: TimeInterval,
         currentPlaybackTime: TimeInterval = 0,
         lastPlaybackSpeed: Float? = nil,
+        lastEQPresetID: String? = nil,
+        lastVoiceBoostLevel: Int? = nil,
+        lastVoiceBoostEnabled: Bool? = nil,
         isManuallyFinished: Bool = false,
         coverArtwork: Data? = nil,
         fileURL: URL,
@@ -115,6 +124,9 @@ final class Audiobook {
         self.duration = duration
         self.currentPlaybackTime = currentPlaybackTime
         self.lastPlaybackSpeed = lastPlaybackSpeed
+        self.lastEQPresetID = lastEQPresetID
+        self.lastVoiceBoostLevel = lastVoiceBoostLevel
+        self.lastVoiceBoostEnabled = lastVoiceBoostEnabled
         self.isManuallyFinished = isManuallyFinished
         self.coverArtwork = coverArtwork
         self.fileURL = fileURL

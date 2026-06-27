@@ -39,6 +39,8 @@ final class PlayerViewModel {
 
     private(set) var playbackState: PlaybackState = .idle
     private(set) var playbackSpeed: Float = 1.0
+    private(set) var activeEQPresetID: String = SpeechEQPreset.off.id
+    private(set) var voiceBoostLevel: VoiceBoostLevel = .off
 
     /// Elapsed time string, e.g. "1:04:32". Updated from engine every 0.5 s.
     private(set) var displayCurrentTime: String = "0:00"
@@ -68,6 +70,9 @@ final class PlayerViewModel {
 
     /// Controls the playback speed sheet presented from PlayerView.
     var isSpeedSheetPresented: Bool = false
+
+    /// Controls the EQ and Voice Boost sheet presented from PlayerView.
+    var isEQSheetPresented: Bool = false
 
     /// Controls the Plus paywall sheet when lull detection is tapped without access.
     var isPaywallPresented: Bool = false
@@ -306,6 +311,18 @@ final class PlayerViewModel {
         settings.speedPresets.isEmpty ? Self.defaultSpeedPresets : settings.speedPresets
     }
 
+    var speechEQPresets: [SpeechEQPreset] {
+        SpeechEQPreset.all
+    }
+
+    var activeSpeechEQPreset: SpeechEQPreset {
+        SpeechEQPreset.validated(activeEQPresetID)
+    }
+
+    var isAudioEnhancementActive: Bool {
+        activeEQPresetID != SpeechEQPreset.off.id || voiceBoostLevel.isEnabled
+    }
+
     static func formatSpeedLabel(_ speed: Float) -> String {
         WatchSpeedRange.formatLabel(speed)
     }
@@ -514,6 +531,7 @@ final class PlayerViewModel {
 
             try? audioEngine.setPlaybackSpeed(desiredSpeed)
             playbackSpeed = audioEngine.playbackSpeed
+            applyAudioEnhancement(enhancementForLoad(of: audiobook))
             if autoPlay { try? audioEngine.play() }
         } catch {
             playbackState = .failed(message: "Could not load \"\(audiobook.title)\".")
@@ -622,6 +640,83 @@ final class PlayerViewModel {
             try? modelContext.save()
         }
         publishWatchSnapshot(immediate: true, includeArtwork: false)
+    }
+
+    func setEQPreset(_ presetID: String) {
+        let preset = SpeechEQPreset.validated(presetID)
+        if preset.id != SpeechEQPreset.off.id, !monetization.hasAccess(to: .eq) {
+            presentEQPaywall()
+            return
+        }
+        try? audioEngine.setEQPreset(preset.id)
+        activeEQPresetID = audioEngine.activeEQPresetID
+        if let audiobook {
+            audiobook.lastEQPresetID = preset.id
+            try? modelContext.save()
+        }
+    }
+
+    func setVoiceBoostLevel(_ level: VoiceBoostLevel) {
+        try? audioEngine.setVoiceBoostLevel(level)
+        voiceBoostLevel = audioEngine.voiceBoostLevel
+        if let audiobook {
+            audiobook.lastVoiceBoostLevel = level.rawValue
+            audiobook.lastVoiceBoostEnabled = nil
+            try? modelContext.save()
+        }
+    }
+
+    private func perBookVoiceBoostLevel(for audiobook: Audiobook) -> VoiceBoostLevel? {
+        if let raw = audiobook.lastVoiceBoostLevel {
+            return VoiceBoostLevel.validated(raw)
+        }
+        if let legacyEnabled = audiobook.lastVoiceBoostEnabled {
+            let level = VoiceBoostLevel.migrated(fromLegacyEnabled: legacyEnabled)
+            audiobook.lastVoiceBoostLevel = level.rawValue
+            audiobook.lastVoiceBoostEnabled = nil
+            try? modelContext.save()
+            return level
+        }
+        return nil
+    }
+
+    func presentEQSheet() {
+        isEQSheetPresented = true
+    }
+
+    var hasEQAccess: Bool {
+        monetization.hasAccess(to: .eq)
+    }
+
+    func refreshAudioEnhancementFromSettings() {
+        guard let audiobook else { return }
+        applyAudioEnhancement(enhancementForLoad(of: audiobook))
+    }
+
+    private func applyAudioEnhancement(_ enhancement: AudioEnhancementSettings) {
+        try? audioEngine.setEQPreset(enhancement.eqPresetID)
+        try? audioEngine.setVoiceBoostLevel(enhancement.voiceBoostLevel)
+        activeEQPresetID = audioEngine.activeEQPresetID
+        voiceBoostLevel = audioEngine.voiceBoostLevel
+    }
+
+    private func enhancementForLoad(of audiobook: Audiobook) -> AudioEnhancementSettings {
+        let resolved = AudioEnhancementResolver.resolve(
+            universalEnabled: false,
+            universalEQPresetID: settings.universalEQPresetID,
+            universalVoiceBoostLevel: settings.universalVoiceBoostLevel,
+            perBookEQPresetID: audiobook.lastEQPresetID,
+            perBookVoiceBoostLevel: perBookVoiceBoostLevel(for: audiobook),
+            defaultEQPresetID: settings.defaultEQPresetID,
+            defaultVoiceBoostLevel: settings.defaultVoiceBoostLevel
+        )
+        guard monetization.hasAccess(to: .eq) else {
+            return AudioEnhancementSettings(
+                eqPresetID: SpeechEQPreset.off.id,
+                voiceBoostLevel: resolved.voiceBoostLevel
+            )
+        }
+        return resolved
     }
 
     func adjustSpeed(by delta: Float) {
@@ -933,20 +1028,19 @@ final class PlayerViewModel {
         }
 
         let resolvedPlayhead = playhead ?? audioEngine.currentTime
-        let hasActiveCue = SubtitleCueResolver.hasActiveCue(at: resolvedPlayhead, cues: subtitleCues)
 
-        if !hasActiveCue {
-            if activeGenerationScope == .nearPlayhead {
-                subtitlePresentation = .loading(subtitleProgressMessage ?? "Generating subtitles…")
-            } else if isScrubbing {
-                subtitlePresentation = .ready
-            } else {
-                subtitlePresentation = .needsGeneration
-            }
+        if SubtitleCueResolver.resolveDisplayCueIndex(at: resolvedPlayhead, cues: subtitleCues) != nil {
+            subtitlePresentation = .ready
             return
         }
 
-        subtitlePresentation = .ready
+        if activeGenerationScope == .nearPlayhead {
+            subtitlePresentation = .loading(subtitleProgressMessage ?? "Generating subtitles…")
+        } else if isScrubbing {
+            subtitlePresentation = .ready
+        } else {
+            subtitlePresentation = .needsGeneration
+        }
     }
 
     private func updateSubtitleDisplay(at time: TimeInterval) {
@@ -955,13 +1049,12 @@ final class PlayerViewModel {
             return
         }
 
-        guard SubtitleCueResolver.hasActiveCue(at: time, cues: subtitleCues) else {
+        let window = SubtitleCueResolver.visibleWindow(at: time, cues: subtitleCues)
+        guard !window.cues.isEmpty else {
             subtitleLines = []
             return
         }
-
-        let window = SubtitleCueResolver.visibleWindow(at: time, cues: subtitleCues)
-        subtitleLines = window.cues.enumerated().map { index, cue in
+        let newLines = window.cues.enumerated().map { index, cue in
             SubtitleLineItem(
                 orderIndex: cue.orderIndex,
                 text: cue.text,
@@ -969,10 +1062,17 @@ final class PlayerViewModel {
                 isActive: window.activeIndex == index
             )
         }
+        guard newLines != subtitleLines else { return }
+        subtitleLines = newLines
     }
 
     private func presentSubtitlesPaywall() {
         paywallFeature = .subtitles
+        isPaywallPresented = true
+    }
+
+    private func presentEQPaywall() {
+        paywallFeature = .eq
         isPaywallPresented = true
     }
 

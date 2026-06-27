@@ -33,24 +33,12 @@ struct SmartRewindScopeSheet: View {
         VStack(spacing: DS.Spacing.lg) {
             header
 
-            VStack(spacing: DS.Spacing.md) {
-                offsetSlider(
-                    label: "From",
-                    value: startBinding,
-                    step: SmartRewindWindowPolicy.startSliderStep(for: scopeKind),
-                    valueLabel: SmartRewindWindowPolicy.formatOffsetLabel(startOffset)
-                )
-
-                offsetSlider(
-                    label: "To",
-                    value: endBinding,
-                    step: SmartRewindWindowPolicy.endSliderStep(for: scopeKind),
-                    valueLabel: SmartRewindWindowPolicy.formatOffsetLabel(
-                        endOffset,
-                        allowsNow: scopeKind == .near
-                    )
-                )
-            }
+            SmartRewindOffsetControls(
+                title: title,
+                scopeKind: scopeKind,
+                startOffset: $startOffset,
+                endOffset: $endOffset
+            )
             .padding(.horizontal, DS.Spacing.md)
 
             Button(action: runLook) {
@@ -88,69 +76,6 @@ struct SmartRewindScopeSheet: View {
         )
         dismiss()
         onLook(offsets)
-    }
-
-    private var startBinding: Binding<Double> {
-        Binding(
-            get: { startOffset },
-            set: { newValue in
-                startOffset = SmartRewindWindowPolicy.clampedStartOffset(
-                    newValue,
-                    end: endOffset,
-                    for: scopeKind
-                )
-            }
-        )
-    }
-
-    private var endBinding: Binding<Double> {
-        Binding(
-            get: { endOffset },
-            set: { newValue in
-                endOffset = SmartRewindWindowPolicy.clampedEndOffset(
-                    newValue,
-                    start: startOffset,
-                    for: scopeKind
-                )
-            }
-        )
-    }
-
-    private func offsetSlider(
-        label: String,
-        value: Binding<Double>,
-        step: TimeInterval,
-        valueLabel: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-            HStack {
-                Text(label)
-                    .font(DS.Typography.caption)
-                    .foregroundStyle(DS.Color.secondary)
-                Spacer()
-                Text(valueLabel)
-                    .font(DS.Typography.controlLabel.monospacedDigit())
-                    .foregroundStyle(DS.Color.coral)
-            }
-
-            Slider(
-                value: value,
-                in: sliderRange(for: label == "From"),
-                step: step
-            )
-            .tint(DS.Color.coral)
-            .accessibilityLabel("\(title), \(label.lowercased())")
-            .accessibilityValue(valueLabel)
-        }
-    }
-
-    private func sliderRange(for isStart: Bool) -> ClosedRange<Double> {
-        if isStart {
-            let bounds = SmartRewindWindowPolicy.startOffsetBounds(for: scopeKind)
-            return Double(bounds.lowerBound)...Double(bounds.upperBound)
-        }
-        let bounds = SmartRewindWindowPolicy.endOffsetBounds(for: scopeKind)
-        return Double(bounds.lowerBound)...Double(bounds.upperBound)
     }
 }
 

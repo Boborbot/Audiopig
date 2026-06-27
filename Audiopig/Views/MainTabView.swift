@@ -12,8 +12,9 @@
 //    only the home-indicator inset below it varies, and that is already handled by the
 //    ZStack respecting its parent's safe area.
 //  - Tab content reads `\.miniPlayerClearance` from the environment and applies
-//    `.miniPlayerScrollClearance()` on its scroll views so the last row rests above
-//    the mini player instead of scrolling underneath it.
+//    `.miniPlayerScrollClearance()` on its scroll views (or NavigationStack roots
+//    for nested settings) so the last row rests above the mini player instead of
+//    scrolling underneath it.
 //  - The full PlayerView sheet is owned here so it persists across tab switches.
 //
 
@@ -57,10 +58,14 @@ struct MainTabView: View {
                 SettingsView(
                     settings: appSettings,
                     statsViewModel: statsViewModel,
-                    monetizationViewModel: settingsMonetizationViewModel
-                ) {
-                    viewModel.syncWatchSettings()
-                }
+                    monetizationViewModel: settingsMonetizationViewModel,
+                    onWatchSettingsChanged: {
+                        viewModel.syncWatchSettings()
+                    },
+                    onAudioEnhancementSettingsChanged: {
+                        viewModel.playerViewModel.refreshAudioEnhancementFromSettings()
+                    }
+                )
                     .tabItem { Label("Settings", systemImage: "gearshape") }
             }
             .environment(

@@ -54,6 +54,9 @@ struct PlayerView: View {
         .sheet(isPresented: $viewModel.isSpeedSheetPresented) {
             PlaybackSpeedSheet(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.isEQSheetPresented) {
+            AudioEnhancementSheet(viewModel: viewModel)
+        }
         .sheet(item: $smartRewindScopeSheet) { range in
             SmartRewindScopeSheet(
                 title: range == .far ? "Look Far" : "Look Near",
@@ -450,11 +453,12 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Bottom Row (speed | chapters | bookmarks | sleep timer)
+    // MARK: - Bottom Row (speed | EQ | subtitles | chapters | bookmarks | sleep timer)
 
     private var bottomRow: some View {
         HStack(spacing: DS.Spacing.sm) {
             speedMenu
+            eqButton
             subtitlesButton
             chaptersButton
             bookmarksButton
@@ -507,6 +511,23 @@ struct PlayerView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Playback speed, \(viewModel.speedLabel)")
+    }
+
+    // MARK: - EQ Button
+
+    private var eqButton: some View {
+        Button {
+            viewModel.presentEQSheet()
+        } label: {
+            Image(systemName: "slider.vertical.3")
+                .playerAccessoryPill(isActive: viewModel.isAudioEnhancementActive)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            viewModel.isAudioEnhancementActive
+                ? "Equalizer, \(viewModel.activeSpeechEQPreset.label)"
+                : "Equalizer"
+        )
     }
 
     // MARK: - Chapters Button

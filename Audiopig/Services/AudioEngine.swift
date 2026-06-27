@@ -48,6 +48,7 @@ final class AudioEngine: AudioEngineProtocol {
     // MARK: - Private Playback State
 
     private let player: AVPlayer = AVPlayer()
+    private let eqTapProcessor = AudioEQTapProcessor()
     private(set) var resolvedChapters: [ResolvedChapter] = []
     private var fileGlobalOffsets: [URL: TimeInterval] = [:]
     private var currentChapterIndex: Int = 0
@@ -55,6 +56,9 @@ final class AudioEngine: AudioEngineProtocol {
     private var _loadedDuration: TimeInterval = 0
     private var _playbackSpeed: Float = 1.0
     var shouldAutoAdvanceAtChapterEnd: Bool = true
+
+    var activeEQPresetID: String { eqTapProcessor.activeEQPresetID }
+    var voiceBoostLevel: VoiceBoostLevel { eqTapProcessor.voiceBoostLevel }
 
     // MARK: - Private Observers
 
@@ -157,6 +161,8 @@ final class AudioEngine: AudioEngineProtocol {
         _loadedAudiobookID = nil
         _loadedDuration = 0
         _playbackSpeed = 1.0
+        eqTapProcessor.setEQPreset(SpeechEQPreset.off.id)
+        eqTapProcessor.setVoiceBoostLevel(.off)
         _currentTime.send(0)
         _playbackState.send(.idle)
         _nowPlayingTitle = ""
@@ -257,6 +263,16 @@ final class AudioEngine: AudioEngineProtocol {
         updateNowPlayingInfo(elapsedTime: _currentTime.value)
     }
 
+    func setEQPreset(_ presetID: String) throws {
+        guard _loadedAudiobookID != nil else { throw AudioEngineError.noLoadedAudiobook }
+        eqTapProcessor.setEQPreset(presetID)
+    }
+
+    func setVoiceBoostLevel(_ level: VoiceBoostLevel) throws {
+        guard _loadedAudiobookID != nil else { throw AudioEngineError.noLoadedAudiobook }
+        eqTapProcessor.setVoiceBoostLevel(level)
+    }
+
     // MARK: - Private — Chapter Loading
 
     /// Sets up the AVPlayerItem and returns immediately without blocking on readiness.
@@ -297,6 +313,9 @@ final class AudioEngine: AudioEngineProtocol {
         player.pause()
 
         let item = AVPlayerItem(url: chapter.fileURL)
+        if let audioMix = eqTapProcessor.makeAudioMix(for: chapter.fileURL) {
+            item.audioMix = audioMix
+        }
         player.replaceCurrentItem(with: item)
 
         // Snap the UI to the target global time immediately and refresh Now Playing.

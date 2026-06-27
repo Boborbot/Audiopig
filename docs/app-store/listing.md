@@ -30,6 +30,14 @@ Local audiobooks, beautifully
 ## Promotional Text (170 characters max, editable without new version)
 
 ```
+v1.1.1: Speech EQ for clearer narration, Smart Rewind range slider, and smoother subtitle scrolling. Core player free — try Plus free for 7 days.
+```
+
+(147 characters)
+
+**v1.1 alternate:**
+
+```
 v1.1: Smart Rewind, on-device subtitles (iOS 26+), and chapter editing. Core player free — try Plus free for 7 days.
 ```
 
@@ -38,7 +46,17 @@ v1.1: Smart Rewind, on-device subtitles (iOS 26+), and chapter editing. Core pla
 **v1.0 alternate (if still on 1.0 in review):**
 
 ```
-Core player free. Try Smart Rewind and subtitles free for 7 days with AudioPig Plus. Your library stays on your device.
+Core player free. Try Smart Rewind, Speech EQ, and subtitles free for 7 days with AudioPig Plus. Your library stays on your device.
+```
+
+---
+
+## What's New (v1.1.1 — paste into App Store Connect)
+
+```
+• Speech EQ — narration-tuned presets plus free Voice Boost levels for quiet passages
+• Smart Rewind — set Look Far and Look Near windows with an intuitive dual-thumb range slider
+• Subtitles — smoother auto-scroll when following playback; manual scroll pauses follow until you return
 ```
 
 ---
@@ -86,7 +104,7 @@ MOTIVATION WITHOUT THE NOISE
 • Celebrate finished books — optionally remove them when you're done
 
 FREE TO START. PLUS WHEN YOU NEED IT.
-Core playback, library, bookmarks, chapter editing, stats, and Apple Watch remote control are free. AudioPig Plus unlocks Smart Rewind and on-device subtitles (~$3.99/mo after a 7-day trial). Optional "Feed a Student" tips ($2.99 / $6.99 / $14.99) support indie development.
+Core playback, library, bookmarks, chapter editing, stats, and Apple Watch remote control are free. AudioPig Plus unlocks Smart Rewind, Speech EQ, and on-device subtitles (~$3.99/mo after a 7-day trial). Optional "Feed a Student" tips ($2.99 / $6.99 / $14.99) support indie development.
 
 NO ACCOUNT. NO CLOUD.
 AudioPig does not collect your data. Your audiobooks and listening history stay on your iPhone. Purchases are processed by Apple.
