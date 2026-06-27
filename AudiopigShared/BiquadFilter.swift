@@ -30,6 +30,11 @@ public struct BiquadFilter: Sendable {
         z2 = 0
     }
 
+    public mutating func mergeDelayState(from other: BiquadFilter) {
+        z1 = other.z1
+        z2 = other.z2
+    }
+
     public mutating func configure(
         kind: BiquadFilterKind,
         sampleRate: Float,

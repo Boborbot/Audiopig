@@ -122,6 +122,7 @@ final class AppSettings {
         static let subtitlesAutoGenerateOnImport = "settings.subtitlesAutoGenerateOnImport"
         static let subtitleFont = "settings.subtitleFont"
         static let defaultEQPresetID = "settings.defaultEQPresetID"
+        static let rememberedDefaultEQPresetID = "settings.rememberedDefaultEQPresetID"
         static let defaultVoiceBoostLevel = "settings.defaultVoiceBoostLevel"
         static let defaultVoiceBoostEnabled = "settings.defaultVoiceBoostEnabled"
         static let universalAudioEnhancementEnabled = "settings.universalAudioEnhancementEnabled"
@@ -352,6 +353,17 @@ final class AppSettings {
     }()
 
     @ObservationIgnored
+    private var _rememberedDefaultEQPresetID: String = {
+        if let stored = UserDefaults.standard.string(forKey: Keys.rememberedDefaultEQPresetID) {
+            return SpeechEQPreset.validated(stored).id
+        }
+        let defaultID = UserDefaults.standard.string(forKey: Keys.defaultEQPresetID)
+            ?? SpeechEQPreset.off.id
+        let validated = SpeechEQPreset.validated(defaultID).id
+        return validated == SpeechEQPreset.off.id ? SpeechEQPreset.clearSpeech.id : validated
+    }()
+
+    @ObservationIgnored
     private var _defaultVoiceBoostLevel: VoiceBoostLevel = {
         migratedVoiceBoostLevel(
             levelKey: "settings.defaultVoiceBoostLevel",
@@ -493,6 +505,26 @@ final class AppSettings {
             withMutation(keyPath: \.defaultEQPresetID) {
                 _defaultEQPresetID = validated
                 UserDefaults.standard.set(validated, forKey: Keys.defaultEQPresetID)
+                if validated != SpeechEQPreset.off.id {
+                    _rememberedDefaultEQPresetID = validated
+                    UserDefaults.standard.set(validated, forKey: Keys.rememberedDefaultEQPresetID)
+                }
+            }
+        }
+    }
+
+    /// Last non-off EQ preset chosen in playback defaults. Used when re-enabling the EQ toggle.
+    var rememberedDefaultEQPresetID: String {
+        get {
+            access(keyPath: \.rememberedDefaultEQPresetID)
+            return _rememberedDefaultEQPresetID
+        }
+        set {
+            let validated = SpeechEQPreset.validated(newValue).id
+            guard validated != SpeechEQPreset.off.id else { return }
+            withMutation(keyPath: \.rememberedDefaultEQPresetID) {
+                _rememberedDefaultEQPresetID = validated
+                UserDefaults.standard.set(validated, forKey: Keys.rememberedDefaultEQPresetID)
             }
         }
     }

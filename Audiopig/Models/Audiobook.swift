@@ -20,6 +20,8 @@ final class Audiobook {
     var lastPlaybackSpeed: Float? = nil
     /// Last EQ preset used for this book when universal audio enhancement is disabled.
     var lastEQPresetID: String? = nil
+    /// Whether EQ is active for this book. `nil` = legacy; migrate from `lastEQPresetID`.
+    var lastEQEnabled: Bool? = nil
     /// Last Voice Boost level for this book when universal audio enhancement is disabled.
     var lastVoiceBoostLevel: Int? = nil
     /// Legacy per-book Voice Boost on/off. Migrated to `lastVoiceBoostLevel` on read.
@@ -108,6 +110,7 @@ final class Audiobook {
         currentPlaybackTime: TimeInterval = 0,
         lastPlaybackSpeed: Float? = nil,
         lastEQPresetID: String? = nil,
+        lastEQEnabled: Bool? = nil,
         lastVoiceBoostLevel: Int? = nil,
         lastVoiceBoostEnabled: Bool? = nil,
         isManuallyFinished: Bool = false,
@@ -125,6 +128,7 @@ final class Audiobook {
         self.currentPlaybackTime = currentPlaybackTime
         self.lastPlaybackSpeed = lastPlaybackSpeed
         self.lastEQPresetID = lastEQPresetID
+        self.lastEQEnabled = lastEQEnabled
         self.lastVoiceBoostLevel = lastVoiceBoostLevel
         self.lastVoiceBoostEnabled = lastVoiceBoostEnabled
         self.isManuallyFinished = isManuallyFinished

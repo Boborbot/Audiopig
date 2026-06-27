@@ -651,7 +651,28 @@ final class PlayerViewModel {
         try? audioEngine.setEQPreset(preset.id)
         activeEQPresetID = audioEngine.activeEQPresetID
         if let audiobook {
-            audiobook.lastEQPresetID = preset.id
+            if preset.id == SpeechEQPreset.off.id {
+                audiobook.lastEQEnabled = false
+            } else {
+                audiobook.lastEQPresetID = preset.id
+                audiobook.lastEQEnabled = true
+            }
+            try? modelContext.save()
+        }
+    }
+
+    var rememberedEQPresetID: String {
+        if let id = audiobook?.lastEQPresetID, id != SpeechEQPreset.off.id {
+            return SpeechEQPreset.validated(id).id
+        }
+        return settings.rememberedDefaultEQPresetID
+    }
+
+    func setRememberedEQPresetID(_ presetID: String) {
+        let validated = SpeechEQPreset.validated(presetID).id
+        guard validated != SpeechEQPreset.off.id else { return }
+        if let audiobook {
+            audiobook.lastEQPresetID = validated
             try? modelContext.save()
         }
     }
@@ -664,6 +685,30 @@ final class PlayerViewModel {
             audiobook.lastVoiceBoostEnabled = nil
             try? modelContext.save()
         }
+    }
+
+    private func perBookEQPresetID(for audiobook: Audiobook) -> String? {
+        migrateLegacyEQStateIfNeeded(for: audiobook)
+        if audiobook.lastEQEnabled == false {
+            return SpeechEQPreset.off.id
+        }
+        if let id = audiobook.lastEQPresetID, id != SpeechEQPreset.off.id {
+            return SpeechEQPreset.validated(id).id
+        }
+        return nil
+    }
+
+    private func migrateLegacyEQStateIfNeeded(for audiobook: Audiobook) {
+        guard audiobook.lastEQEnabled == nil else { return }
+        guard let id = audiobook.lastEQPresetID else { return }
+
+        if id == SpeechEQPreset.off.id {
+            audiobook.lastEQEnabled = false
+            audiobook.lastEQPresetID = nil
+        } else {
+            audiobook.lastEQEnabled = true
+        }
+        try? modelContext.save()
     }
 
     private func perBookVoiceBoostLevel(for audiobook: Audiobook) -> VoiceBoostLevel? {
@@ -705,7 +750,7 @@ final class PlayerViewModel {
             universalEnabled: false,
             universalEQPresetID: settings.universalEQPresetID,
             universalVoiceBoostLevel: settings.universalVoiceBoostLevel,
-            perBookEQPresetID: audiobook.lastEQPresetID,
+            perBookEQPresetID: perBookEQPresetID(for: audiobook),
             perBookVoiceBoostLevel: perBookVoiceBoostLevel(for: audiobook),
             defaultEQPresetID: settings.defaultEQPresetID,
             defaultVoiceBoostLevel: settings.defaultVoiceBoostLevel

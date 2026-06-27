@@ -9,7 +9,6 @@ import Foundation
 public struct VoiceBoostProcessor: Sendable {
     private var envelope: Float = 0
     private var sampleRate: Float = 44_100
-    private var maxBoost: Float = VoiceBoostLevel.strong.maxBoost
 
     public init() {}
 
@@ -18,16 +17,15 @@ public struct VoiceBoostProcessor: Sendable {
         reset()
     }
 
-    public mutating func setMaxBoost(_ boost: Float) {
-        maxBoost = max(1, boost)
-        reset()
-    }
-
     public mutating func reset() {
         envelope = 0
     }
 
-    public mutating func process(_ input: Float) -> Float {
+    public mutating func mergeEnvelope(from other: VoiceBoostProcessor) {
+        envelope = other.envelope
+    }
+
+    public mutating func process(_ input: Float, maxBoost: Float) -> Float {
         guard maxBoost > 1 else { return input }
 
         let absSample = abs(input)
@@ -36,9 +34,9 @@ public struct VoiceBoostProcessor: Sendable {
         let coeff = absSample > envelope ? attack : release
         envelope = coeff * envelope + (1 - coeff) * absSample
 
-        // Lift only quieter passages; leave normal and loud material mostly untouched.
-        let quietThreshold: Float = 0.16
-        let fadeThreshold: Float = 0.30
+        // Lift quieter passages; leave normal and loud material mostly untouched.
+        let quietThreshold: Float = 0.22
+        let fadeThreshold: Float = 0.48
 
         var gain: Float = 1
         if envelope < quietThreshold {
@@ -46,7 +44,7 @@ public struct VoiceBoostProcessor: Sendable {
             gain = 1 + (maxBoost - 1) * quietness
         } else if envelope < fadeThreshold {
             let fade = (fadeThreshold - envelope) / (fadeThreshold - quietThreshold)
-            gain = 1 + (maxBoost - 1) * fade * 0.35
+            gain = 1 + (maxBoost - 1) * fade * 0.50
         }
 
         var sample = input * gain

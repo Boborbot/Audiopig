@@ -13,6 +13,7 @@ struct AudioEnhancementSheet: View {
             VStack(alignment: .leading, spacing: DS.Spacing.md) {
                 AudioEnhancementControls(
                     eqPresetID: eqPresetBinding,
+                    rememberedEQPresetID: rememberedEQPresetBinding,
                     voiceBoostLevel: voiceBoostBinding,
                     hasEQAccess: viewModel.hasEQAccess
                 )
@@ -38,6 +39,13 @@ struct AudioEnhancementSheet: View {
         Binding(
             get: { viewModel.activeEQPresetID },
             set: { viewModel.setEQPreset($0) }
+        )
+    }
+
+    private var rememberedEQPresetBinding: Binding<String> {
+        Binding(
+            get: { viewModel.rememberedEQPresetID },
+            set: { viewModel.setRememberedEQPresetID($0) }
         )
     }
 

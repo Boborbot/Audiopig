@@ -32,6 +32,14 @@ private struct ChannelEnhancementState: Sendable {
         voiceBoost.reset()
     }
 
+    mutating func mergeStatefulFields(from other: ChannelEnhancementState) {
+        voiceBoost.mergeEnvelope(from: other.voiceBoost)
+        let filterCount = min(eqFilters.count, other.eqFilters.count)
+        for index in 0..<filterCount {
+            eqFilters[index].mergeDelayState(from: other.eqFilters[index])
+        }
+    }
+
     mutating func process(_ input: Float, voiceBoostLevel: VoiceBoostLevel, bypassEQ: Bool) -> Float {
         var sample = input
         if !bypassEQ {
@@ -40,7 +48,7 @@ private struct ChannelEnhancementState: Sendable {
             }
         }
         if voiceBoostLevel.isEnabled {
-            sample = voiceBoost.process(sample)
+            sample = voiceBoost.process(sample, maxBoost: voiceBoostLevel.maxBoost)
         }
         return sample
     }
@@ -73,8 +81,13 @@ public final class AudioEnhancementProcessor: @unchecked Sendable {
     public func setVoiceBoostLevel(_ level: VoiceBoostLevel) {
         lock.lock()
         defer { lock.unlock() }
+        let wasEnabled = voiceBoostLevel.isEnabled
         voiceBoostLevel = level
-        reconfigureChannelsLocked()
+        if wasEnabled && !level.isEnabled {
+            for index in channels.indices {
+                channels[index].voiceBoost.reset()
+            }
+        }
     }
 
     public func process(bufferList: UnsafeMutablePointer<AudioBufferList>, frameCount: Int) {
@@ -100,7 +113,10 @@ public final class AudioEnhancementProcessor: @unchecked Sendable {
         }
 
         lock.lock()
-        channels = localChannels
+        let mergeCount = min(channels.count, localChannels.count)
+        for index in 0..<mergeCount {
+            channels[index].mergeStatefulFields(from: localChannels[index])
+        }
         lock.unlock()
     }
 
@@ -110,7 +126,6 @@ public final class AudioEnhancementProcessor: @unchecked Sendable {
         }
         for index in channels.indices {
             channels[index].configure(preset: preset, sampleRate: sampleRate)
-            channels[index].voiceBoost.setMaxBoost(voiceBoostLevel.maxBoost)
             if !voiceBoostLevel.isEnabled {
                 channels[index].voiceBoost.reset()
             }

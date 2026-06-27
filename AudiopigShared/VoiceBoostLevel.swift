@@ -25,18 +25,17 @@ public enum VoiceBoostLevel: Int, CaseIterable, Sendable, Identifiable, Hashable
 
     public var isEnabled: Bool { self != .off }
 
-    /// Max gain multiplier applied to quiet narration. Strong matches the original single-level boost.
+    /// Max gain multiplier applied to quiet narration (~3 dB steps through Strong).
     public var maxBoost: Float {
-        let fullBoost: Float = 1.28
         switch self {
         case .off:
             return 1
         case .light:
-            return 1 + (fullBoost - 1) * 0.15
+            return 1.375
         case .balanced:
-            return 1 + (fullBoost - 1) * 0.60
+            return 1.90
         case .strong:
-            return fullBoost
+            return 2.86
         }
     }
 

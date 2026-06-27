@@ -230,4 +230,17 @@ public struct SpeechEQPreset: Sendable, Identifiable, Equatable {
     public static func validated(_ id: String) -> SpeechEQPreset {
         preset(for: id) ?? .off
     }
+
+    /// Restores the last non-off preset when EQ is turned back on.
+    public static func restoredEnabledID(
+        remembered rememberedID: String,
+        fallback: String = clearSpeech.id
+    ) -> String {
+        let remembered = validated(rememberedID).id
+        if remembered != off.id {
+            return remembered
+        }
+        let fallbackPreset = validated(fallback).id
+        return fallbackPreset == off.id ? clearSpeech.id : fallbackPreset
+    }
 }

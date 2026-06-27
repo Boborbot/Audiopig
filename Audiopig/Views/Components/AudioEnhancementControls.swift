@@ -9,6 +9,7 @@ import SwiftUI
 
 struct AudioEnhancementControls: View {
     @Binding var eqPresetID: String
+    @Binding var rememberedEQPresetID: String
     @Binding var voiceBoostLevel: VoiceBoostLevel
     var scopeLabel: String?
     var isDisabled: Bool = false
@@ -63,7 +64,12 @@ struct AudioEnhancementControls: View {
             )
             .opacity(hasEQAccess ? 1 : 0.45)
         }
-        .onChange(of: eqPresetID) { _, _ in onSettingsChanged?() }
+        .onChange(of: eqPresetID) { _, newValue in
+            if newValue != SpeechEQPreset.off.id {
+                rememberedEQPresetID = newValue
+            }
+            onSettingsChanged?()
+        }
         .onChange(of: voiceBoostLevel) { _, _ in onSettingsChanged?() }
     }
 
@@ -86,10 +92,11 @@ struct AudioEnhancementControls: View {
             get: { isEQEnabled },
             set: { enabled in
                 if enabled {
-                    if eqPresetID == SpeechEQPreset.off.id {
-                        eqPresetID = SpeechEQPreset.clearSpeech.id
-                    }
+                    eqPresetID = SpeechEQPreset.restoredEnabledID(remembered: rememberedEQPresetID)
                 } else {
+                    if eqPresetID != SpeechEQPreset.off.id {
+                        rememberedEQPresetID = eqPresetID
+                    }
                     eqPresetID = SpeechEQPreset.off.id
                 }
             }

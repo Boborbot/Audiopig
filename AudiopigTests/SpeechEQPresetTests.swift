@@ -25,6 +25,30 @@ final class SpeechEQPresetTests: XCTestCase {
         XCTAssertEqual(SpeechEQPreset.validated("not-a-preset").id, "off")
     }
 
+    func testRestoredEnabledIDReturnsRememberedPreset() {
+        XCTAssertEqual(
+            SpeechEQPreset.restoredEnabledID(remembered: "warmVoice"),
+            "warmVoice"
+        )
+    }
+
+    func testRestoredEnabledIDFallsBackWhenRememberedIsOff() {
+        XCTAssertEqual(
+            SpeechEQPreset.restoredEnabledID(remembered: SpeechEQPreset.off.id),
+            SpeechEQPreset.clearSpeech.id
+        )
+    }
+
+    func testRestoredEnabledIDUsesCustomFallback() {
+        XCTAssertEqual(
+            SpeechEQPreset.restoredEnabledID(
+                remembered: SpeechEQPreset.off.id,
+                fallback: SpeechEQPreset.podcast.id
+            ),
+            SpeechEQPreset.podcast.id
+        )
+    }
+
     func testMusicalScorePresetsAreGroupedTogether() {
         let scoreIDs = Set(SpeechEQPreset.presets(in: .musicalScores).map(\.id))
         XCTAssertEqual(scoreIDs, ["clearNarration", "cinematicMode", "bassBoost"])
@@ -144,25 +168,46 @@ final class BiquadFilterTests: XCTestCase {
         XCTAssertLessThan(abs(lowOutput), 0.2)
     }
 
-    func testVoiceBoostIncreasesQuietSignalModerately() {
+    func testVoiceBoostStrongIsBoldOnQuietPassage() {
         var boost = VoiceBoostProcessor()
         boost.setSampleRate(44_100)
-        boost.setMaxBoost(VoiceBoostLevel.strong.maxBoost)
 
         var output: Float = 0
         for _ in 0..<512 {
-            output = boost.process(0.05)
+            output = boost.process(0.08, maxBoost: VoiceBoostLevel.strong.maxBoost)
         }
-        XCTAssertGreaterThan(abs(output), 0.05)
-        XCTAssertLessThan(abs(output), 0.12)
+        XCTAssertGreaterThan(abs(output), 0.12)
+        XCTAssertLessThan(abs(output), 0.25)
+    }
+
+    func testVoiceBoostLevelsIncreaseMonotonically() {
+        let quietInput: Float = 0.08
+        let settleFrames = 512
+
+        func settledOutput(for level: VoiceBoostLevel) -> Float {
+            var boost = VoiceBoostProcessor()
+            boost.setSampleRate(44_100)
+            var output: Float = 0
+            for _ in 0..<settleFrames {
+                output = boost.process(quietInput, maxBoost: level.maxBoost)
+            }
+            return abs(output)
+        }
+
+        let light = settledOutput(for: .light)
+        let balanced = settledOutput(for: .balanced)
+        let strong = settledOutput(for: .strong)
+
+        XCTAssertGreaterThan(light, quietInput)
+        XCTAssertGreaterThan(balanced, light)
+        XCTAssertGreaterThan(strong, balanced)
     }
 
     func testVoiceBoostOffPassesThrough() {
         var boost = VoiceBoostProcessor()
         boost.setSampleRate(44_100)
-        boost.setMaxBoost(VoiceBoostLevel.off.maxBoost)
 
-        let output = boost.process(0.05)
+        let output = boost.process(0.05, maxBoost: VoiceBoostLevel.off.maxBoost)
         XCTAssertEqual(output, 0.05)
     }
 }
