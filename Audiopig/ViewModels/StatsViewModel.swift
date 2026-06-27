@@ -26,11 +26,31 @@ final class StatsViewModel {
     /// Total seconds listened across **finished** books only.
     private(set) var finishedListenedSeconds: TimeInterval = 0
 
+    /// Average daily listening since the first tracked listen.
+    private(set) var averageDailyListenedSeconds: TimeInterval = 0
+
+    /// Per-book listening breakdown for the trailing seven days.
+    private(set) var weeklyBookListeningSlices: [StatsListeningHistory.WeeklyBookSlice] = []
+
+    /// Aggregate weekly listening used by the pie chart total label.
+    private(set) var weeklyBookListeningTotalSeconds: TimeInterval = 0
+
+    /// True when widget weekly totals include listening not yet split by book.
+    private(set) var weeklyBookListeningIsPartial = false
+
     // MARK: - Formatted helpers
 
     /// Human-readable total listening time, e.g. "42 h 17 m" or "38 min".
     var totalListenedFormatted: String {
         formatDuration(totalListenedSeconds)
+    }
+
+    var averageDailyListenedFormatted: String {
+        formatDuration(averageDailyListenedSeconds)
+    }
+
+    var weeklyBookListeningTotalFormatted: String {
+        formatDuration(weeklyBookListeningTotalSeconds)
     }
 
     // MARK: - Dependencies
@@ -59,6 +79,36 @@ final class StatsViewModel {
         totalListenedSeconds = totals.totalListenedSeconds
         finishedBooksCount = totals.finishedBooksCount
         finishedListenedSeconds = totals.finishedListenedSeconds
+
+        let firstListen = earliestFirstListenDate(
+            audiobooks: audiobooks,
+            records: records
+        )
+        if let firstListen {
+            StatsListeningHistory.adoptEarlierFirstListenDateIfNeeded(firstListen)
+        }
+        averageDailyListenedSeconds = StatsListeningHistory.averageDailySeconds(
+            totalListenedSeconds: totals.totalListenedSeconds,
+            firstListen: firstListen
+        )
+
+        let trackedByBook = StatsListeningHistory.weeklySecondsByBookID()
+        let widgetWeeklyTotal = WidgetWeeklyListeningSnapshot.load().totalSeconds
+        weeklyBookListeningSlices = StatsListeningHistory.makeWeeklySlices(
+            secondsByBookID: trackedByBook,
+            weeklyTotalSeconds: widgetWeeklyTotal,
+            titleForBook: { bookID in
+                titleForWeeklyBook(
+                    bookID: bookID,
+                    audiobooks: audiobooks,
+                    records: records
+                )
+            }
+        )
+        weeklyBookListeningTotalSeconds = widgetWeeklyTotal
+        weeklyBookListeningIsPartial = weeklyBookListeningSlices.contains {
+            $0.title == "Unknown"
+        }
     }
 
     /// Permanently removes all reading stats from SwiftData.
@@ -69,11 +119,46 @@ final class StatsViewModel {
         let audiobooks = (try? modelContext.fetch(FetchDescriptor<Audiobook>())) ?? []
         audiobooks.forEach { $0.accumulatedListeningSeconds = 0 }
 
+        StatsListeningHistory.clearAll()
         try? modelContext.save()
         refresh()
     }
 
     // MARK: - Private helpers
+
+    private func earliestFirstListenDate(
+        audiobooks: [Audiobook],
+        records: [FinishedRecord]
+    ) -> Date? {
+        let bookAddedDates = audiobooks
+            .filter { $0.accumulatedListeningSeconds > 0 }
+            .map(\.effectiveAddedAt)
+            .filter { $0 != .distantPast }
+
+        let finishedListeningDates = records
+            .filter { $0.listenedSeconds > 0 }
+            .map(\.finishedAt)
+
+        return StatsListeningHistory.earliestFirstListenDate(
+            trackedFirstListen: StatsListeningHistory.firstListenDate(),
+            bookAddedDates: bookAddedDates,
+            finishedListeningDates: finishedListeningDates
+        )
+    }
+
+    private func titleForWeeklyBook(
+        bookID: UUID,
+        audiobooks: [Audiobook],
+        records: [FinishedRecord]
+    ) -> String {
+        if let title = audiobooks.first(where: { $0.id == bookID })?.title, !title.isEmpty {
+            return title
+        }
+        if let title = records.first(where: { $0.audiobookID == bookID })?.title, !title.isEmpty {
+            return title
+        }
+        return "Unknown"
+    }
 
     private static func bookInput(from audiobook: Audiobook) -> ListeningStatsBookInput {
         ListeningStatsBookInput(

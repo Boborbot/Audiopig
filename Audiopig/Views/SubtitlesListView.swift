@@ -73,36 +73,50 @@ struct SubtitlesListView: View {
     }
 
     private var coverageSection: some View {
-        Section {
+        Group {
             if viewModel.hasSavedSubtitles {
-                LabeledContent("Saved lines") {
-                    Text("\(viewModel.subtitleCoverageSummary.cueCount)")
-                        .foregroundStyle(DS.Color.secondary)
+                Section {
+                    SubtitleCoverageCardView(
+                        timeline: viewModel.subtitleCoverageTimeline,
+                        formatTime: PlayerViewModel.formatTime
+                    )
+                    .listRowInsets(EdgeInsets(
+                        top: DS.Spacing.sm,
+                        leading: DS.Spacing.md,
+                        bottom: DS.Spacing.sm,
+                        trailing: DS.Spacing.md
+                    ))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                } header: {
+                    Text("Saved Transcription")
                 }
-                LabeledContent("Book coverage") {
-                    Text(coverageLabel)
-                        .foregroundStyle(DS.Color.secondary)
-                }
-                if viewModel.subtitleCoverageSummary.uncoveredWindowCount > 0 {
-                    LabeledContent("Sections to fill") {
-                        Text("\(viewModel.subtitleCoverageSummary.uncoveredWindowCount)")
+
+                Section {
+                    LabeledContent("Saved lines") {
+                        Text("\(viewModel.subtitleCoverageSummary.cueCount)")
                             .foregroundStyle(DS.Color.secondary)
                     }
-                }
-                LabeledContent("Storage on device") {
-                    Text(viewModel.subtitleCoverageSummary.formattedStorageSize)
-                        .foregroundStyle(DS.Color.secondary)
+                    LabeledContent("Storage on device") {
+                        Text(viewModel.subtitleCoverageSummary.formattedStorageSize)
+                            .foregroundStyle(DS.Color.secondary)
+                    }
+                } footer: {
+                    Text("Subtitles are saved on this device. Transcribed sections are tracked by ten-minute windows — whole-book transcription fills any gaps in partial files.")
+                        .font(DS.Typography.caption)
                 }
             } else {
-                Text("No subtitles saved yet. Generate near your position from the player, or transcribe the entire book below.")
-                    .font(DS.Typography.caption)
-                    .foregroundStyle(DS.Color.secondary)
+                Section {
+                    Text("No subtitles saved yet. Generate near your position from the player, or transcribe the entire book below.")
+                        .font(DS.Typography.caption)
+                        .foregroundStyle(DS.Color.secondary)
+                } header: {
+                    Text("Saved Transcription")
+                } footer: {
+                    Text("Subtitles are saved on this device. Transcribed sections are tracked by ten-minute windows — whole-book transcription fills any gaps in partial files.")
+                        .font(DS.Typography.caption)
+                }
             }
-        } header: {
-            Text("Saved Transcription")
-        } footer: {
-            Text("Subtitles are saved on this device. Transcribed sections are tracked by ten-minute windows — whole-book transcription fills any gaps in partial files.")
-                .font(DS.Typography.caption)
         }
     }
 
@@ -243,12 +257,6 @@ struct SubtitlesListView: View {
             get: { viewModel.transcribeAsYouGoEnabled },
             set: { viewModel.transcribeAsYouGoEnabled = $0 }
         )
-    }
-
-    private var coverageLabel: String {
-        let fraction = viewModel.subtitleCoverageSummary.coverageFraction
-        let percent = Int((fraction * 100).rounded())
-        return "\(percent)%"
     }
 
     private var exportErrorBinding: Binding<Bool> {

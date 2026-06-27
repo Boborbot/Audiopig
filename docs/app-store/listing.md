@@ -30,6 +30,14 @@ Local audiobooks, beautifully
 ## Promotional Text (170 characters max, editable without new version)
 
 ```
+v1.1.2: Stronger Voice Boost levels, EQ remembers your preset when toggled back on, and playback polish. Core player free — try Plus free for 7 days.
+```
+
+(149 characters)
+
+**v1.1.1 alternate:**
+
+```
 v1.1.1: Speech EQ for clearer narration, Smart Rewind range slider, and smoother subtitle scrolling. Core player free — try Plus free for 7 days.
 ```
 
@@ -47,6 +55,16 @@ v1.1: Smart Rewind, on-device subtitles (iOS 26+), and chapter editing. Core pla
 
 ```
 Core player free. Try Smart Rewind, Speech EQ, and subtitles free for 7 days with AudioPig Plus. Your library stays on your device.
+```
+
+---
+
+## What's New (v1.1.2 — paste into App Store Connect)
+
+```
+• Voice Boost — clearer Off / Light / Balanced / Strong steps that are easy to hear on quiet narration
+• Equalizer — turning EQ back on restores your last preset instead of resetting to Clear Speech
+• Playback — audio enhancement level changes apply reliably while a book is playing
 ```
 
 ---

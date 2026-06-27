@@ -12,6 +12,8 @@ struct AudioEnhancementControls: View {
     @Binding var rememberedEQPresetID: String
     @Binding var voiceBoostLevel: VoiceBoostLevel
     var scopeLabel: String?
+    var voiceBoostSectionTitle: String = "Voice Boost"
+    var equalizerSectionTitle: String = "Equalizer"
     var isDisabled: Bool = false
     var hasEQAccess: Bool = true
     var onSettingsChanged: (() -> Void)?
@@ -33,7 +35,7 @@ struct AudioEnhancementControls: View {
                     .accessibilityAddTraits(.isHeader)
             }
 
-            sectionHeader(title: "Voice Boost", value: voiceBoostLevel.label)
+            sectionHeader(title: voiceBoostSectionTitle, value: voiceBoostLevel.label)
 
             VoiceBoostLevelPicker(
                 activeLevel: voiceBoostLevel,
@@ -42,7 +44,7 @@ struct AudioEnhancementControls: View {
             )
 
             sectionHeader(
-                title: "Equalizer",
+                title: equalizerSectionTitle,
                 value: isEQEnabled ? activePreset.label : "Off"
             )
 

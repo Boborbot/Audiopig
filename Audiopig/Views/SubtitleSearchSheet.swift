@@ -22,10 +22,6 @@ struct SubtitleSearchSheet: View {
         viewModel.subtitleSearchResults(matching: searchText)
     }
 
-    private var coveragePercent: Int {
-        Int((viewModel.subtitleCoverageSummary.coverageFraction * 100).rounded())
-    }
-
     var body: some View {
         NavigationStack {
             List {
@@ -57,7 +53,7 @@ struct SubtitleSearchSheet: View {
             }
         }
         .sheetGlass()
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
 
@@ -65,13 +61,20 @@ struct SubtitleSearchSheet: View {
 
     private var coverageIndicatorSection: some View {
         Section {
-            Text("\(coveragePercent)%")
-                .font(.system(size: 44, weight: .semibold, design: .rounded))
-                .foregroundStyle(DS.Color.coral)
-                .monospacedDigit()
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, DS.Spacing.lg)
+            if viewModel.hasSavedSubtitles {
+                SubtitleCoverageCardView(
+                    timeline: viewModel.subtitleCoverageTimeline,
+                    formatTime: PlayerViewModel.formatTime
+                )
+                .listRowInsets(EdgeInsets(
+                    top: DS.Spacing.sm,
+                    leading: DS.Spacing.md,
+                    bottom: DS.Spacing.sm,
+                    trailing: DS.Spacing.md
+                ))
                 .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
         }
     }
 

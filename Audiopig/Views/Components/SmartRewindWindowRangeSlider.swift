@@ -11,8 +11,9 @@ struct SmartRewindWindowRangeSlider: View {
     @Binding var startOffset: TimeInterval
     @Binding var endOffset: TimeInterval
 
-    private let thumbSize: CGFloat = 28
+    private let thumbSize: CGFloat = 20
     private let trackHeight: CGFloat = 4
+    private let selectionHeight: CGFloat = 6
 
     @State private var activeDrag: ActiveDrag?
 
@@ -31,21 +32,35 @@ struct SmartRewindWindowRangeSlider: View {
             timestampLabels
 
             GeometryReader { geometry in
-                let width = geometry.size.width
-                let startX = xPosition(for: startOffset, trackWidth: width)
-                let endX = xPosition(for: endOffset, trackWidth: width)
-                let trackY = (geometry.size.height - trackHeight) / 2
+                let inset = DS.Spacing.sm
+                let trackWidth = max(1, geometry.size.width - inset * 2)
+                // startOffset = far edge (left); endOffset = near edge (right)
+                let farThumbX = xPosition(for: startOffset, trackWidth: trackWidth) + inset
+                let nearThumbX = xPosition(for: endOffset, trackWidth: trackWidth) + inset
+                let trackY = (geometry.size.height - selectionHeight) / 2
+                let centerY = geometry.size.height / 2
 
                 ZStack(alignment: .topLeading) {
-                    trackBackground(width: width, y: trackY)
-                    selectionFill(from: endX, to: startX, y: trackY)
-                    thumb(at: endX, y: trackY)
-                        .highPriorityGesture(endThumbGesture(trackWidth: width))
-                    thumb(at: startX, y: trackY)
-                        .highPriorityGesture(startThumbGesture(trackWidth: width))
+                    trackSegments(
+                        trackWidth: trackWidth,
+                        inset: inset,
+                        farThumbX: farThumbX,
+                        nearThumbX: nearThumbX,
+                        y: trackY
+                    )
+                    thumb(at: nearThumbX, centerY: centerY)
+                        .highPriorityGesture(nearThumbGesture(trackWidth: trackWidth))
+                    thumb(at: farThumbX, centerY: centerY)
+                        .highPriorityGesture(farThumbGesture(trackWidth: trackWidth))
                 }
             }
-            .frame(height: 44)
+            .frame(height: 36)
+            .padding(.horizontal, DS.Spacing.sm)
+            .padding(.vertical, DS.Spacing.sm)
+            .background {
+                RoundedRectangle(cornerRadius: DS.Radius.input, style: .continuous)
+                    .fill(DS.Color.secondarySurface)
+            }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Search window")
             .accessibilityValue(accessibilityValue)
@@ -96,33 +111,56 @@ struct SmartRewindWindowRangeSlider: View {
         "\(startLabel) to \(endLabel)"
     }
 
-    private func trackBackground(width: CGFloat, y: CGFloat) -> some View {
-        Capsule()
-            .fill(DS.Color.separator.opacity(0.45))
-            .frame(width: max(0, width - thumbSize), height: trackHeight)
-            .offset(x: thumbSize / 2, y: y)
+    private func trackSegments(
+        trackWidth: CGFloat,
+        inset: CGFloat,
+        farThumbX: CGFloat,
+        nearThumbX: CGFloat,
+        y: CGFloat
+    ) -> some View {
+        let trackEnd = inset + trackWidth
+        let leadingWidth = max(0, farThumbX - inset)
+        let selectionWidth = max(0, nearThumbX - farThumbX)
+        let trailingWidth = max(0, trackEnd - nearThumbX)
+        let barY = y + (selectionHeight - trackHeight) / 2
+
+        return ZStack(alignment: .topLeading) {
+            if leadingWidth > 0 {
+                Capsule()
+                    .fill(Color(UIColor.systemGray4))
+                    .frame(width: leadingWidth, height: trackHeight)
+                    .offset(x: inset, y: barY)
+            }
+
+            if selectionWidth > 0 {
+                Capsule()
+                    .fill(DS.Color.coral)
+                    .frame(width: selectionWidth, height: selectionHeight)
+                    .offset(x: farThumbX, y: y)
+            }
+
+            if trailingWidth > 0 {
+                Capsule()
+                    .fill(Color(UIColor.systemGray4))
+                    .frame(width: trailingWidth, height: trackHeight)
+                    .offset(x: nearThumbX, y: barY)
+            }
+        }
     }
 
-    private func selectionFill(from endX: CGFloat, to startX: CGFloat, y: CGFloat) -> some View {
-        Capsule()
-            .fill(DS.Color.coral)
-            .frame(width: max(0, startX - endX), height: trackHeight)
-            .offset(x: endX, y: y)
-    }
-
-    private func thumb(at x: CGFloat, y: CGFloat) -> some View {
+    private func thumb(at x: CGFloat, centerY: CGFloat) -> some View {
         Circle()
-            .fill(DS.Color.canvasSurface)
+            .fill(Color.white)
             .overlay {
                 Circle()
-                    .strokeBorder(DS.Color.coral, lineWidth: 2)
+                    .strokeBorder(Color.black.opacity(0.06), lineWidth: 0.5)
             }
-            .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+            .shadow(color: .black.opacity(0.18), radius: 1.5, x: 0, y: 1)
             .frame(width: thumbSize, height: thumbSize)
-            .offset(x: x - thumbSize / 2, y: y - (thumbSize - trackHeight) / 2)
+            .offset(x: x - thumbSize / 2, y: centerY - thumbSize / 2)
     }
 
-    private func startThumbGesture(trackWidth: CGFloat) -> some Gesture {
+    private func farThumbGesture(trackWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { drag in
                 applyDrag(
@@ -136,7 +174,7 @@ struct SmartRewindWindowRangeSlider: View {
             }
     }
 
-    private func endThumbGesture(trackWidth: CGFloat) -> some Gesture {
+    private func nearThumbGesture(trackWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { drag in
                 applyDrag(

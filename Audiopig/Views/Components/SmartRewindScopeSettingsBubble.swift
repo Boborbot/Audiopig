@@ -26,8 +26,6 @@ struct SmartRewindScopeSettingsBubble: View {
                 endOffset: $endOffset
             )
         }
-        .padding(DS.Spacing.md)
-        .floatingPanel()
     }
 }
 

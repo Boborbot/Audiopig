@@ -229,6 +229,22 @@ final class PlayerViewModel {
         )
     }
 
+    var subtitleCoverageTimeline: SubtitleCoverageTimeline {
+        _ = savedSubtitleSegmentCount
+        guard let audiobook else {
+            return SubtitleCoverageTimeline(
+                bookDuration: 0,
+                runs: [],
+                coverageFraction: 0,
+                uncoveredWindowCount: 0
+            )
+        }
+        return SubtitleCoverageTimelineMapper.timeline(
+            segments: subtitleSegments,
+            bookDuration: audiobook.duration
+        )
+    }
+
     var hasUncoveredSubtitleWindows: Bool {
         _ = savedSubtitleSegmentCount
         guard let audiobook else { return false }
@@ -1996,7 +2012,7 @@ final class PlayerViewModel {
         guard delta <= maxDelta else { return }
 
         audiobook.accumulatedListeningSeconds += delta
-        WidgetSnapshotWriter.recordListeningDelta(delta)
+        WidgetSnapshotWriter.recordListeningDelta(delta, bookID: audiobook.id)
     }
 
     private func resetListeningSample() {

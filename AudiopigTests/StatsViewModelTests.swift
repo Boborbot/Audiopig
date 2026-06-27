@@ -119,4 +119,29 @@ final class StatsViewModelTests: XCTestCase {
         XCTAssertTrue(audiobook.isManuallyFinished)
         XCTAssertEqual(viewModel.totalListenedSeconds, 0, accuracy: 0.01)
     }
+
+    func testRefreshComputesAverageDailyFromEarliestLibraryDate() throws {
+        let addedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let audiobook = Audiobook(
+            title: "Long Listener",
+            author: "Author",
+            duration: 36_000,
+            currentPlaybackTime: 600,
+            fileURL: URL(fileURLWithPath: "/tmp/book.m4b")
+        )
+        audiobook.accumulatedListeningSeconds = 10 * 3_600
+        audiobook.addedAt = addedAt
+        context.insert(audiobook)
+        try context.save()
+
+        StatsListeningHistory.adoptEarlierFirstListenDateIfNeeded(.now)
+
+        let viewModel = StatsViewModel(modelContext: context)
+        StatsViewModelTestRetention.viewModels.append(viewModel)
+        viewModel.refresh()
+
+        XCTAssertEqual(viewModel.totalListenedSeconds, 10 * 3_600, accuracy: 0.01)
+        XCTAssertLessThan(viewModel.averageDailyListenedSeconds, viewModel.totalListenedSeconds)
+        XCTAssertGreaterThan(viewModel.averageDailyListenedSeconds, 0)
+    }
 }

@@ -33,8 +33,9 @@ enum WidgetSnapshotWriter {
         reloadWidgets()
     }
 
-    static func recordListeningDelta(_ delta: TimeInterval) {
+    static func recordListeningDelta(_ delta: TimeInterval, bookID: UUID) {
         WidgetListeningSnapshot.addTodayListening(delta)
+        StatsListeningHistory.recordListening(delta, bookID: bookID)
         reloadWidgetsIfNeeded()
     }
 

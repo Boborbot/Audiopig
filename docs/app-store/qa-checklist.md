@@ -109,6 +109,8 @@ Device: _______________   iOS: _______________   Date: _______________
 - [ ] Universal audio enhancement toggle applies defaults to books without saved settings
 - [ ] Playback with EQ preset sounds different from Off (subjective check on narration)
 - [ ] Voice Boost Off vs Strong is audibly different on a quiet passage
+- [ ] Voice Boost Light → Balanced → Strong each step louder on a quiet passage (while playing)
+- [ ] EQ: pick a preset (e.g. Warm Voice), toggle EQ off, toggle on → same preset returns (not Clear Speech)
 
 ---
 
@@ -190,7 +192,7 @@ Coffee ($2.99), Lunch ($6.99), and Today's Rent ($14.99).
 - [ ] Feed a Student tips show prices and thank-you on purchase
 - [ ] Apple Watch settings: artwork skip gestures toggle
 - [ ] Subtitles section copy visible; auto-generate toggle persists
-- [ ] About section displays version 1.1.1
+- [ ] About section displays version 1.1.2
 
 ---
 

@@ -148,3 +148,4 @@ See `docs/app-store/` for:
 | 13 | App Store v1.0 stabilization, legal URLs on GitHub Pages, iPad full-screen player layout |
 | 14 | v1.1 — Smart Rewind, on-device subtitles, chapter editing, 2000h/2500h icons, Sher Pig and Pig Sawyer secret icons |
 | 15 | v1.1.1 — Speech EQ & Voice Boost, Smart Rewind range slider, subtitle follow-scroll polish |
+| 16 | v1.1.2 — Voice Boost ladder retune, EQ preset restore on re-enable, enhancement tap race fix |

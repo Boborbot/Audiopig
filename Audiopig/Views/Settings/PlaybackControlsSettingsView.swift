@@ -85,7 +85,8 @@ struct PlaybackControlsSettingsView: View {
                     eqPresetID: $settings.defaultEQPresetID,
                     rememberedEQPresetID: $settings.rememberedDefaultEQPresetID,
                     voiceBoostLevel: $settings.defaultVoiceBoostLevel,
-                    scopeLabel: "Default",
+                    voiceBoostSectionTitle: "Default Voice Boost",
+                    equalizerSectionTitle: "Default Equalizer",
                     hasEQAccess: hasEQAccess,
                     onSettingsChanged: onAudioEnhancementSettingsChanged
                 )
