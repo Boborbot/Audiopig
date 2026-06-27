@@ -8,7 +8,9 @@ import SwiftUI
 struct PlayerView: View {
     @Bindable var viewModel: PlayerViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var paywallViewModel: PaywallViewModel?
+    @State private var smartRewindScopeSheet: SmartRewindRange?
 
     private var usesFullScreenPresentation: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
@@ -43,11 +45,24 @@ struct PlayerView: View {
         .sheet(isPresented: $viewModel.isBookmarksPresented) {
             BookmarksListView(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.isSubtitlesPresented) {
+            SubtitlesListView(viewModel: viewModel)
+        }
         .sheet(item: $viewModel.pendingNewBookmark) { bookmark in
             BookmarkEditView(viewModel: viewModel, bookmark: bookmark)
         }
         .sheet(isPresented: $viewModel.isSpeedSheetPresented) {
             PlaybackSpeedSheet(viewModel: viewModel)
+        }
+        .sheet(item: $smartRewindScopeSheet) { range in
+            SmartRewindScopeSheet(
+                title: range == .far ? "Look Far" : "Look Near",
+                scopeKind: range.scopeKind,
+                defaultOffsets: viewModel.defaultSmartRewindOffsets(for: range)
+            ) { offsets in
+                smartRewindScopeSheet = nil
+                viewModel.analyzeSmartRewind(range, customOffsets: offsets)
+            }
         }
         .sheet(isPresented: $viewModel.isPaywallPresented, onDismiss: { paywallViewModel = nil }) {
             if let paywallViewModel {
@@ -166,19 +181,32 @@ struct PlayerView: View {
     // MARK: - Artwork
 
     private func artworkSection(width: CGFloat, height: CGFloat) -> some View {
-        Group {
-            if let uiImage = viewModel.coverImage {
-                PlayerCoverArt(
-                    image: uiImage,
-                    containerWidth: width,
-                    containerHeight: height
-                )
-            } else {
-                artworkPlaceholder(width: width, height: height)
+        ZStack {
+            Group {
+                if let uiImage = viewModel.coverImage {
+                    PlayerCoverArt(
+                        image: uiImage,
+                        containerWidth: width,
+                        containerHeight: height
+                    )
+                } else {
+                    artworkPlaceholder(width: width, height: height)
+                }
+            }
+            .saturation(viewModel.isSubtitlesVisible ? 0.55 : 1.0)
+            .brightness(viewModel.isSubtitlesVisible ? -0.08 : 0)
+            .animation(DS.Animation.fade, value: viewModel.isSubtitlesVisible)
+
+            if viewModel.isSubtitlesVisible {
+                SubtitlesPanel(viewModel: viewModel, style: .artworkOverlay)
+                    .artworkSubtitlesScrim()
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
         }
+        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.coverArt, style: .continuous))
         .scaleEffect(viewModel.playbackState == .playing ? 1.0 : 0.94)
         .animation(DS.Animation.reveal, value: viewModel.playbackState == .playing)
+        .animation(DS.Animation.fade, value: viewModel.isSubtitlesVisible)
     }
 
     private func artworkPlaceholder(width: CGFloat, height: CGFloat) -> some View {
@@ -312,6 +340,11 @@ struct PlayerView: View {
                     }
                 }
             )
+            .onChange(of: viewModel.scrubPosition) { _, _ in
+                if viewModel.isScrubbing {
+                    viewModel.previewSubtitlesAtScrubPosition()
+                }
+            }
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
                     .onEnded { _ in
@@ -422,11 +455,44 @@ struct PlayerView: View {
     private var bottomRow: some View {
         HStack(spacing: DS.Spacing.sm) {
             speedMenu
+            subtitlesButton
             chaptersButton
             bookmarksButton
             sleepTimerMenu
         }
-        .padding(.horizontal, DS.Spacing.md)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var subtitlesButton: some View {
+        let isTranscribing = viewModel.isSubtitleTranscriptionActive
+        let isActive = viewModel.isSubtitlesVisible || isTranscribing
+
+        return Button {
+            viewModel.toggleSubtitles()
+        } label: {
+            Image(systemName: viewModel.isSubtitlesVisible ? "captions.bubble.fill" : "captions.bubble")
+                .contentTransition(.symbolEffect(.replace))
+                .symbolEffect(
+                    .variableColor.iterative.dimInactiveLayers,
+                    options: .repeating.speed(0.35),
+                    isActive: isTranscribing && !reduceMotion
+                )
+                .playerAccessoryPill(isActive: isActive)
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.5)
+                .onEnded { _ in
+                    Haptics.subtle()
+                    viewModel.isSubtitlesPresented = true
+                }
+        )
+        .accessibilityLabel(viewModel.isSubtitlesVisible ? "Hide subtitles" : "Show subtitles")
+        .accessibilityHint(
+            isTranscribing
+                ? "Transcription in progress. Long press for subtitles options."
+                : "Long press for subtitles options"
+        )
     }
 
     // MARK: - Speed Button
@@ -436,7 +502,8 @@ struct PlayerView: View {
             viewModel.isSpeedSheetPresented = true
         } label: {
             Text(viewModel.speedLabel)
-                .pillAppearance()
+                .monospacedDigit()
+                .playerAccessoryPill(style: .speed)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Playback speed, \(viewModel.speedLabel)")
@@ -449,7 +516,7 @@ struct PlayerView: View {
             viewModel.isChaptersPresented = true
         } label: {
             Image(systemName: "list.bullet")
-                .pillAppearance()
+                .playerAccessoryPill()
         }
         .buttonStyle(.plain)
         .disabled(viewModel.chapters.isEmpty)
@@ -460,15 +527,17 @@ struct PlayerView: View {
 
     private var bookmarksButton: some View {
         Button {
+            Haptics.subtle()
             viewModel.addBookmarkForEditing()
         } label: {
             Image(systemName: "bookmark")
-                .pillAppearance()
+                .playerAccessoryPill()
         }
         .buttonStyle(.plain)
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.5)
                 .onEnded { _ in
+                    Haptics.subtle()
                     viewModel.isBookmarksPresented = true
                 }
         )
@@ -507,7 +576,10 @@ struct PlayerView: View {
                     Text(viewModel.sleepTimerLabel)
                 }
             }
-            .pillAppearance(isActive: viewModel.sleepTimerOption != .off)
+            .playerAccessoryPill(
+                isActive: viewModel.sleepTimerOption != .off,
+                style: viewModel.sleepTimerOption == .off ? .icon : .speed
+            )
         }
         .accessibilityLabel(viewModel.sleepTimerOption == .off
             ? "Sleep timer, off"
@@ -524,15 +596,19 @@ struct PlayerView: View {
         switch viewModel.lullAnalysisState {
         case .idle:
             HStack(spacing: DS.Spacing.sm) {
-                smartRewindTriggerButton(
+                SmartRewindTriggerButton(
                     title: "Look Far",
-                    range: .far,
-                    pillPadding: pillPadding
+                    pillPadding: pillPadding,
+                    isEnabled: viewModel.isActive,
+                    onTap: { viewModel.analyzeSmartRewind(.far) },
+                    onLongPress: { smartRewindScopeSheet = .far }
                 )
-                smartRewindTriggerButton(
+                SmartRewindTriggerButton(
                     title: "Look Near",
-                    range: .near,
-                    pillPadding: pillPadding
+                    pillPadding: pillPadding,
+                    isEnabled: viewModel.isActive,
+                    onTap: { viewModel.analyzeSmartRewind(.near) },
+                    onLongPress: { smartRewindScopeSheet = .near }
                 )
             }
             .frame(maxWidth: .infinity)
@@ -594,24 +670,6 @@ struct PlayerView: View {
                 }
             }
         }
-    }
-
-    private func smartRewindTriggerButton(
-        title: String,
-        range: SmartRewindRange,
-        pillPadding: CGFloat
-    ) -> some View {
-        Button {
-            viewModel.analyzeSmartRewind(range)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "waveform.and.magnifyingglass")
-                Text(title)
-            }
-            .pillAppearance(verticalPadding: pillPadding)
-        }
-        .buttonStyle(.plain)
-        .disabled(!viewModel.isActive)
     }
 }
 

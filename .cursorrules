@@ -21,3 +21,6 @@
 - App strictly plays local, DRM-free audiobooks (m4b, mp3).
 - Always handle iOS audio edge cases: background playback, lock screen metadata, interruptions (phone calls), and route changes (headphones disconnected).
 - Never break a working AVPlayer instance during UI refactoring.
+
+## Subtitles
+- Display uses active cues; planning uses persisted segments. See `.cursor/rules/subtitles.mdc` and `docs/subtitles-architecture.md` before editing the subtitle pipeline.

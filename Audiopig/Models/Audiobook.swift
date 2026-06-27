@@ -58,7 +58,41 @@ final class Audiobook {
     @Relationship(deleteRule: .cascade, inverse: \Bookmark.audiobook)
     var bookmarks: [Bookmark]
 
+    @Relationship(deleteRule: .cascade, inverse: \SubtitleCue.audiobook)
+    var subtitleCues: [SubtitleCue]
+
+    @Relationship(deleteRule: .cascade, inverse: \SubtitleTranscriptionSegment.audiobook)
+    var subtitleTranscriptionSegments: [SubtitleTranscriptionSegment]
+
+    /// Raw `SubtitleGenerationStatus` value for SwiftData storage.
+    var subtitleGenerationStatusRaw: String = SubtitleGenerationStatus.notGenerated.rawValue
+    /// BCP-47 locale used for on-device transcription, e.g. `en-US`.
+    var subtitleLocaleIdentifier: String?
+    /// Raw `SubtitleGenerationScope` value (`nearPlayhead` or `wholeBook`).
+    var subtitleGenerationScopeRaw: String?
+    /// Whole-book mode resume checkpoint on the global timeline.
+    var subtitleLastCoveredEndTime: TimeInterval = 0
+    /// When true, near-playhead transcription starts automatically as the listener approaches saved coverage.
+    var subtitlesTranscribeAsYouGo: Bool = false
+
     var folder: Folder?
+
+    var subtitleGenerationStatus: SubtitleGenerationStatus {
+        get { SubtitleGenerationStatus(rawValue: subtitleGenerationStatusRaw) ?? .notGenerated }
+        set { subtitleGenerationStatusRaw = newValue.rawValue }
+    }
+
+    var subtitleGenerationScope: SubtitleGenerationScope? {
+        get {
+            guard let raw = subtitleGenerationScopeRaw else { return nil }
+            return SubtitleGenerationScope(rawValue: raw)
+        }
+        set { subtitleGenerationScopeRaw = newValue?.rawValue }
+    }
+
+    var hasSubtitleCoverage: Bool {
+        subtitleGenerationStatus == .partial || subtitleGenerationStatus == .complete
+    }
 
     init(
         id: UUID = UUID(),
@@ -71,7 +105,9 @@ final class Audiobook {
         coverArtwork: Data? = nil,
         fileURL: URL,
         chapters: [Chapter] = [],
-        bookmarks: [Bookmark] = []
+        bookmarks: [Bookmark] = [],
+        subtitleCues: [SubtitleCue] = [],
+        subtitleTranscriptionSegments: [SubtitleTranscriptionSegment] = []
     ) {
         self.id = id
         self.title = title
@@ -84,5 +120,7 @@ final class Audiobook {
         self.fileURL = fileURL
         self.chapters = chapters
         self.bookmarks = bookmarks
+        self.subtitleCues = subtitleCues
+        self.subtitleTranscriptionSegments = subtitleTranscriptionSegments
     }
 }

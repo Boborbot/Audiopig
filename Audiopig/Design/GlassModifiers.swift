@@ -107,6 +107,40 @@ extension View {
     }
 }
 
+// MARK: - Artwork Subtitles Overlay
+
+/// Frosted scrim that sits on cover art so subtitle text stays readable.
+private struct ArtworkSubtitlesScrimModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: DS.Radius.coverArt, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: DS.Radius.coverArt, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.black.opacity(0.15),
+                                    Color.black.opacity(0.45),
+                                    Color.black.opacity(0.55),
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
+            }
+    }
+}
+
+extension View {
+    /// Glass scrim for subtitle content layered on cover art.
+    func artworkSubtitlesScrim() -> some View {
+        modifier(ArtworkSubtitlesScrimModifier())
+    }
+}
+
 // MARK: - Sheet Glass Background
 
 /// Used as the background of half / full sheets (chapters, bookmarks, merge).

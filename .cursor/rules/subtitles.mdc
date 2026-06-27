@@ -1,0 +1,59 @@
+---
+description: Subtitle transcription — two-layer model (display vs planning). Read before editing the pipeline.
+globs: Audiopig/AudiopigShared/Subtitle*.swift,Audiopig/Audiopig/Services/Subtitle*.swift,Audiopig/Audiopig/Models/Subtitle*.swift,Audiopig/Audiopig/Protocols/Subtitle*.swift,Audiopig/Audiopig/Views/Subtitles*.swift,Audiopig/Audiopig/Views/Components/SubtitlesPanel.swift,Audiopig/AudiopigTests/Subtitle*.swift,Audiopig/Audiopig/ViewModels/PlayerViewModel.swift
+alwaysApply: false
+---
+
+# Subtitles pipeline
+
+**Read first:** [docs/subtitles-architecture.md](../docs/subtitles-architecture.md)
+
+## Two laws
+
+1. **Display** — “Is there a line at the playhead?” → `SubtitleCueResolver.hasActiveCue` only
+2. **Planning** — “Should we run ASR?” → `SubtitleSegmentPlanner` + persisted segments only
+
+Never use window-overlap or nearest-cue heuristics for the wrong layer.
+
+## Forbidden
+
+```swift
+// ❌ Window overlap for “show text now”
+SubtitleCueResolver.hasCoverage(in: window, cues: cues)
+
+// ❌ Nearest cue for overlay when not in an active cue
+SubtitleCueResolver.visibleWindow(at: time, cues: cues) // without hasActiveCue guard
+
+// ❌ Cue-based planning in ViewModel
+if !subtitleCues.isEmpty { /* skip transcription */ }
+
+// ❌ New planner logic in PlayerViewModel — belongs in AudiopigShared
+```
+
+## Required
+
+- Segment recorded on **every** completed ASR window (`SubtitleStore.insertSegment`), even when cues are empty
+- Near-playhead: one window per pass; `nil` queue = success, not failure
+- Whole-book: `SubtitleSegmentPlanner.uncoveredWindows` — fills gaps in patchy files
+- Async persists check `subtitleGenerationEpoch`
+- Planner changes need tests in `AudiopigTests/Subtitle*Tests.swift`
+- Generation and overlay require Plus (`PremiumFeature.subtitles`)
+
+## Ownership
+
+| Concern | Location |
+|---------|----------|
+| Active cue / visible lines | `SubtitleCueResolver` |
+| Segment algebra / queue | `SubtitleSegmentPlanner` |
+| Window sizes | `SubtitleWindowPlanner` |
+| ASR jobs | `SubtitleGenerationOrchestrator` |
+| Persistence | `SubtitleStore` |
+| UI state / paywall | `PlayerViewModel` |
+| Layout only | `SubtitlesPanel`, `SubtitlesListView` |
+
+## Before merge
+
+- [ ] Display paths use `hasActiveCue`
+- [ ] Planning paths use segments
+- [ ] `Subtitle*Tests` green
+- [ ] Project builds

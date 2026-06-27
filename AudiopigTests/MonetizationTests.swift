@@ -19,7 +19,7 @@ final class MonetizationTests: XCTestCase {
     func test_plusGated_containsPremiumFeatures() {
         XCTAssertEqual(
             PremiumFeature.plusGated,
-            [.paragraphBreaks, .watchArtworkView]
+            [.paragraphBreaks, .watchArtworkView, .subtitles]
         )
     }
 
@@ -37,6 +37,18 @@ final class MonetizationTests: XCTestCase {
 
     func test_hasPremiumAccess_deniesWatchArtworkViewWithoutEntitlement() {
         XCTAssertFalse(hasPremiumAccess(to: .watchArtworkView, hasPlusEntitlement: false))
+    }
+
+    func test_subtitles_requiresPlusAccess() {
+        XCTAssertTrue(PremiumFeature.subtitles.requiresPlusAccess)
+    }
+
+    func test_hasPremiumAccess_grantsSubtitlesWhenEntitled() {
+        XCTAssertTrue(hasPremiumAccess(to: .subtitles, hasPlusEntitlement: true))
+    }
+
+    func test_hasPremiumAccess_deniesSubtitlesWithoutEntitlement() {
+        XCTAssertFalse(hasPremiumAccess(to: .subtitles, hasPlusEntitlement: false))
     }
 
     func test_productIdentifiers_plusMonthly() {

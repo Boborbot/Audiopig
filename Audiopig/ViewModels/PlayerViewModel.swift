@@ -43,9 +43,6 @@ final class PlayerViewModel {
     /// Elapsed time string, e.g. "1:04:32". Updated from engine every 0.5 s.
     private(set) var displayCurrentTime: String = "0:00"
 
-    /// Remaining time string, e.g. "-2:11:05". Updated from engine every 0.5 s.
-    private(set) var displayRemainingTime: String = "-0:00"
-
     /// Whether the slider and time labels are scoped to the whole book or the active chapter.
     private(set) var playbackDisplayMode: PlaybackDisplayMode = .entireBook
 
@@ -106,6 +103,151 @@ final class PlayerViewModel {
     /// sheet directly from PlayerView (separate from the list-edit flow).
     var pendingNewBookmark: Bookmark? = nil
 
+    // MARK: - Subtitles
+
+    enum SubtitlePresentation: Equatable {
+        case hidden
+        case unavailable
+        case needsGeneration
+        case loading(String)
+        case ready
+        case partial(String)
+        case failed(String)
+    }
+
+    struct SubtitleLineItem: Identifiable, Equatable {
+        var id: String { "\(orderIndex)-\(startTime)" }
+        let orderIndex: Int
+        let text: String
+        let startTime: TimeInterval
+        let isActive: Bool
+    }
+
+    struct SubtitleSearchResultItem: Identifiable, Equatable {
+        var id: String { "\(orderIndex)-\(startTime)" }
+        let orderIndex: Int
+        let text: String
+        let startTime: TimeInterval
+        let chapterTitle: String?
+    }
+
+    struct SubtitleSearchResults: Equatable {
+        let items: [SubtitleSearchResultItem]
+        let totalCount: Int
+    }
+
+    /// Whether the subtitles panel is shown in the player.
+    var isSubtitlesVisible: Bool = false
+
+    private(set) var subtitlePresentation: SubtitlePresentation = .hidden
+    private(set) var subtitleLines: [SubtitleLineItem] = []
+    /// Controls the subtitles management sheet (long-press on the captions button).
+    var isSubtitlesPresented: Bool = false
+
+    enum WholeBookSubtitleJobState: Equatable {
+        case idle
+        case preparing
+        case running(completed: Int, total: Int, message: String)
+        case paused(completed: Int, total: Int)
+        case failed(String)
+
+        var isActive: Bool {
+            switch self {
+            case .idle, .failed: return false
+            case .preparing, .running, .paused: return true
+            }
+        }
+    }
+
+    private(set) var wholeBookJobState: WholeBookSubtitleJobState = .idle
+
+    /// Which Plus feature triggered the paywall sheet.
+    private(set) var paywallFeature: PaywallViewModel.Feature = .paragraphBreaks
+
+    @ObservationIgnored
+    private var subtitleCues: [SubtitleCueTiming] = []
+
+    @ObservationIgnored
+    private var subtitleSegments: [SubtitleTranscriptionSegmentTiming] = []
+
+    /// Observable cue count so subtitle sheets refresh when cues are added or removed.
+    private(set) var savedSubtitleCueCount: Int = 0
+
+    /// Observable segment count so coverage metrics refresh after transcription jobs.
+    private(set) var savedSubtitleSegmentCount: Int = 0
+
+    @ObservationIgnored
+    private var subtitleGenerationTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var activeGenerationScope: SubtitleGenerationScope?
+
+    @ObservationIgnored
+    private var subtitleProgressMessage: String?
+
+    @ObservationIgnored
+    private var subtitleOrchestrator: SubtitleGenerationOrchestrator?
+
+    /// Bumped when a near-playhead job is cancelled or superseded so stale task handlers no-op.
+    @ObservationIgnored
+    private var subtitleGenerationEpoch: UInt64 = 0
+
+    @ObservationIgnored
+    private var autoTranscribeBlockedUntilPlayhead: TimeInterval = -.infinity
+
+    @ObservationIgnored
+    private var lastAppliedEngineTime: TimeInterval?
+
+    @ObservationIgnored
+    private var isAppInForeground = true
+
+    var subtitleCoverageSummary: SubtitleCoverageSummary {
+        _ = savedSubtitleCueCount
+        _ = savedSubtitleSegmentCount
+        guard let audiobook else {
+            return SubtitleCoverageSummary(
+                cueCount: 0,
+                bookDuration: 0,
+                coveredWindowCount: 0,
+                totalWindowCount: 0,
+                uncoveredWindowCount: 0,
+                transcribedDurationFraction: 0,
+                estimatedStorageBytes: 0
+            )
+        }
+        return SubtitleCoverageCalculator.summary(
+            cues: subtitleCues,
+            segments: subtitleSegments,
+            bookDuration: audiobook.duration
+        )
+    }
+
+    var hasUncoveredSubtitleWindows: Bool {
+        _ = savedSubtitleSegmentCount
+        guard let audiobook else { return false }
+        return !SubtitleSegmentPlanner.uncoveredWindows(
+            bookDuration: audiobook.duration,
+            segments: subtitleSegments
+        ).isEmpty
+    }
+
+    var hasSavedSubtitles: Bool { savedSubtitleCueCount > 0 }
+
+    /// True while any subtitle transcription job is running (near-playhead or whole-book).
+    var isSubtitleTranscriptionActive: Bool {
+        activeGenerationScope != nil || wholeBookJobState.isActive
+    }
+
+    /// Per-book preference: auto-generate the next section as the listener approaches saved coverage.
+    var transcribeAsYouGoEnabled: Bool {
+        get { audiobook?.subtitlesTranscribeAsYouGo ?? false }
+        set {
+            guard let audiobook else { return }
+            audiobook.subtitlesTranscribeAsYouGo = newValue
+            try? modelContext.save()
+        }
+    }
+
     // MARK: - Sleep Timer
 
     private(set) var sleepTimerOption: SleepTimerOption = .off
@@ -116,6 +258,9 @@ final class PlayerViewModel {
     // MARK: - Lull Analysis State
 
     private(set) var lullAnalysisState: LullAnalysisState = .idle
+
+    @ObservationIgnored
+    private var smartRewindSessionOffsets: SmartRewindWindowOffsets?
 
     @ObservationIgnored
     private let lullDetector = LullDetector()
@@ -179,6 +324,9 @@ final class PlayerViewModel {
     /// The current skip-backward interval as an integer, used to pick the matching SF Symbol.
     var skipBackwardIntervalSeconds: Int { Int(settings.skipBackwardInterval) }
 
+    /// Typeface for on-screen subtitles in the player overlay.
+    var subtitleFont: SubtitleFont { settings.subtitleFont }
+
     /// True whenever an audiobook is loaded into the engine (even while loading/paused).
     var isActive: Bool { audiobook != nil }
 
@@ -235,8 +383,7 @@ final class PlayerViewModel {
     /// Left timestamp: elapsed by default; tap toggles to speed-adjusted remaining.
     var scrubDisplayLeftTime: String {
         if showsRemainingOnLeft {
-            let adjusted = contentRemainingInterval() / Double(max(playbackSpeed, Self.minPlaybackSpeed))
-            return "-\(Self.formatTime(adjusted))"
+            return formatSpeedAdjustedRemaining(contentRemainingInterval())
         }
         return scrubDisplayCurrentTime
     }
@@ -253,21 +400,9 @@ final class PlayerViewModel {
         }
     }
 
+    /// Right timestamp: content remaining divided by playback speed (wall-clock time left).
     var scrubDisplayRemainingTime: String {
-        guard isScrubbing else { return displayRemainingTime }
-        switch playbackDisplayMode {
-        case .entireBook:
-            let t = scrubPosition * audioEngine.duration
-            return "-\(Self.formatTime(max(0, audioEngine.duration - t)))"
-        case .currentChapter:
-            let chaps = chapters
-            guard !chaps.isEmpty else {
-                let t = scrubPosition * audioEngine.duration
-                return "-\(Self.formatTime(max(0, audioEngine.duration - t)))"
-            }
-            let chapterDuration = chaps[currentChapterIndex].duration
-            return "-\(Self.formatTime(max(0, chapterDuration - scrubPosition * chapterDuration)))"
-        }
+        formatSpeedAdjustedRemaining(contentRemainingInterval())
     }
 
     // MARK: - Private
@@ -275,7 +410,7 @@ final class PlayerViewModel {
     /// Called once when playback naturally reaches the end of the loaded book.
     @ObservationIgnored
     var onNaturalFinish: ((Audiobook) -> Void)?
-    var onPlaybackPositionSaved: (() -> Void)?
+    var onPlaybackPositionSaved: ((_ isPeriodicSave: Bool) -> Void)?
     var onAudiobookLoaded: (() -> Void)?
 
     @ObservationIgnored
@@ -286,6 +421,8 @@ final class PlayerViewModel {
     private let settings: AppSettings
     private let watchBridge: (any WatchConnectivityBridgeProtocol)?
     private let monetization: any MonetizationServiceProtocol
+    private let subtitleStore: any SubtitleStoreProtocol
+    private let subtitleTranscriptionService: any SubtitleTranscriptionServiceProtocol
 
     @ObservationIgnored
     private var watchRevision: UInt64 = 0
@@ -316,13 +453,17 @@ final class PlayerViewModel {
         modelContext: ModelContext,
         appSettings: AppSettings,
         watchBridge: (any WatchConnectivityBridgeProtocol)? = nil,
-        monetization: any MonetizationServiceProtocol
+        monetization: any MonetizationServiceProtocol,
+        subtitleStore: any SubtitleStoreProtocol,
+        subtitleTranscriptionService: any SubtitleTranscriptionServiceProtocol = SubtitleTranscriptionService()
     ) {
         self.audioEngine = audioEngine
         self.modelContext = modelContext
         self.settings = appSettings
         self.watchBridge = watchBridge
         self.monetization = monetization
+        self.subtitleStore = subtitleStore
+        self.subtitleTranscriptionService = subtitleTranscriptionService
         self.playbackDisplayMode = PlaybackDisplayMode(scope: appSettings.playbackTimelineScope)
         self.audioEngine.setNowPlayingTimelineScope(appSettings.playbackTimelineScope.nowPlayingScope)
         observeEngine()
@@ -334,12 +475,35 @@ final class PlayerViewModel {
     // MARK: - Lifecycle
 
     func loadAudiobook(_ audiobook: Audiobook, autoPlay: Bool = false) async {
+        if audioEngine.loadedAudiobookID == audiobook.id {
+            switch audioEngine.playbackState {
+            case .playing, .paused, .finished, .idle:
+                resumeLoadedAudiobook(audiobook, autoPlay: autoPlay)
+                return
+            case .loading, .failed:
+                break
+            }
+        }
+
         lullAnalysisState = .idle
+        smartRewindSessionOffsets = nil
+        cancelSubtitleGeneration()
+        wholeBookJobState = .idle
+        autoTranscribeBlockedUntilPlayhead = -.infinity
+        lastAppliedEngineTime = nil
+        isSubtitlesVisible = false
+        subtitlePresentation = .hidden
+        subtitleLines = []
+        subtitleCues = []
+        subtitleSegments = []
+        savedSubtitleCueCount = 0
+        savedSubtitleSegmentCount = 0
         didReportNaturalFinish = false
         resetListeningSample()
         self.audiobook = audiobook
         self.chapters = audiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
         self.bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
+        reloadSubtitleData(for: audiobook)
         self.coverImage = CoverArtCache.shared.image(for: audiobook)
         audiobook.lastPlayedAt = .now
         try? modelContext.save()
@@ -362,6 +526,32 @@ final class PlayerViewModel {
             coverImage: self.coverImage
         )
         publishWatchSnapshot(immediate: true, includeArtwork: true)
+        publishWatchChaptersIfNeeded()
+        onAudiobookLoaded?()
+    }
+
+    /// Re-selects a book that is already loaded without tearing down playback.
+    private func resumeLoadedAudiobook(_ audiobook: Audiobook, autoPlay: Bool) {
+        self.audiobook = audiobook
+        self.chapters = audiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
+        self.bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
+        reloadSubtitleData(for: audiobook)
+        self.coverImage = CoverArtCache.shared.image(for: audiobook)
+        audiobook.lastPlayedAt = .now
+        try? modelContext.save()
+
+        if autoPlay, audioEngine.playbackState != .playing {
+            try? audioEngine.play()
+        }
+
+        WidgetSnapshotWriter.updateLastPlayed(
+            title: audiobook.title,
+            author: audiobook.author,
+            audiobookID: audiobook.id,
+            progress: widgetProgress(for: audiobook),
+            coverImage: self.coverImage
+        )
+        publishWatchSnapshot(immediate: true, includeArtwork: false)
         publishWatchChaptersIfNeeded()
         onAudiobookLoaded?()
     }
@@ -451,24 +641,664 @@ final class PlayerViewModel {
         }
     }
 
-    // MARK: - Lull Analysis
+    // MARK: - Chapter Editing
 
-    func makePaywallViewModel() -> PaywallViewModel {
-        PaywallViewModel(monetization: monetization)
+    struct ChapterEditDraft: Identifiable, Equatable {
+        let id: UUID
+        var title: String
     }
 
-    func analyzeSmartRewind(_ range: SmartRewindRange) {
+    func makeChapterEditDrafts() -> [ChapterEditDraft] {
+        chapters.map { ChapterEditDraft(id: $0.id, title: $0.title) }
+    }
+
+    func saveChapterEdits(_ drafts: [ChapterEditDraft]) {
+        guard let audiobook, !drafts.isEmpty else { return }
+
+        let existingByID = Dictionary(uniqueKeysWithValues: chapters.map { ($0.id, $0) })
+        let orderedChapters: [Chapter] = drafts.compactMap { existingByID[$0.id] }
+        guard orderedChapters.count == drafts.count else { return }
+
+        let draftIDs = Set(drafts.map(\.id))
+        for chapter in chapters where !draftIDs.contains(chapter.id) {
+            audiobook.chapters.removeAll { $0.id == chapter.id }
+            modelContext.delete(chapter)
+        }
+
+        let usesStackedTimeline = ChapterTimelineEditor.usesStackedTimeline(
+            fileURLs: orderedChapters.map(\.fileURL)
+        )
+        let stackedStartTimes = usesStackedTimeline
+            ? ChapterTimelineEditor.stackedStartTimes(durations: orderedChapters.map(\.duration))
+            : []
+
+        for (index, draft) in drafts.enumerated() {
+            let chapter = orderedChapters[index]
+            chapter.title = ChapterTimelineEditor.sanitizedTitle(
+                draft.title,
+                fallback: "Chapter \(index + 1)"
+            )
+            chapter.orderIndex = index
+            if usesStackedTimeline {
+                chapter.startTime = stackedStartTimes[index]
+            }
+        }
+
+        if usesStackedTimeline {
+            audiobook.duration = ChapterTimelineEditor.totalDuration(
+                durations: orderedChapters.map(\.duration)
+            )
+        }
+
+        if let primaryChapterURL = orderedChapters.first?.fileURL {
+            audiobook.fileURL = primaryChapterURL
+        }
+
+        if audiobook.currentPlaybackTime > audiobook.duration {
+            audiobook.currentPlaybackTime = audiobook.duration
+        }
+
+        try? modelContext.save()
+        self.chapters = audiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
+
+        if audioEngine.loadedAudiobookID == audiobook.id {
+            audioEngine.updateResolvedChapters(from: audiobook)
+            applyEngineTime(audioEngine.currentTime)
+        }
+
+        publishWatchChaptersIfNeeded()
+        publishWatchSnapshot(immediate: true, includeArtwork: false)
+    }
+
+    // MARK: - Subtitles
+
+    var subtitlesSupported: Bool {
+        subtitleTranscriptionService.isSupported
+    }
+
+    func toggleSubtitles() {
+        guard audiobook != nil else { return }
+        if isSubtitlesVisible {
+            isSubtitlesVisible = false
+            subtitlePresentation = .hidden
+            if activeGenerationScope == .nearPlayhead {
+                cancelSubtitleGeneration()
+            }
+            return
+        }
+
+        guard monetization.hasAccess(to: .subtitles) else {
+            presentSubtitlesPaywall()
+            return
+        }
+
+        isSubtitlesVisible = true
+        refreshSubtitlePresentation()
+        updateSubtitleDisplay(at: audioEngine.currentTime)
+    }
+
+    /// Closes the subtitles overlay without starting generation.
+    func dismissSubtitlesWithoutGenerating() {
+        isSubtitlesVisible = false
+        subtitlePresentation = .hidden
+        subtitleLines = []
+        if activeGenerationScope == .nearPlayhead {
+            cancelSubtitleGeneration()
+            audiobook?.subtitleGenerationStatus = subtitleCues.isEmpty ? .notGenerated : .partial
+            try? modelContext.save()
+        }
+    }
+
+    /// Updates subtitle preview while the user drags the scrubber.
+    func previewSubtitlesAtScrubPosition() {
+        guard isScrubbing, isSubtitlesVisible else { return }
+        let time = scrubTargetTime(for: scrubPosition)
+        updateSubtitleDisplay(at: time)
+        refreshSubtitlePresentation(at: time)
+    }
+
+    func generateSubtitlesNearPlayhead() {
+        startSubtitleGeneration(scope: .nearPlayhead)
+    }
+
+    func generateSubtitlesWholeBook() {
+        startSubtitleGeneration(scope: .wholeBook)
+    }
+
+    func pauseWholeBookTranscription() {
+        guard activeGenerationScope == .wholeBook else { return }
+        Task { await subtitleOrchestrator?.pause() }
+        if case .running(let completed, let total, _) = wholeBookJobState {
+            wholeBookJobState = .paused(completed: completed, total: total)
+        }
+    }
+
+    func resumeWholeBookTranscription() {
+        guard activeGenerationScope == .wholeBook else { return }
+        Task { await subtitleOrchestrator?.resume() }
+        if case .paused(let completed, let total) = wholeBookJobState {
+            wholeBookJobState = .running(
+                completed: completed,
+                total: total,
+                message: "Transcribing entire book…"
+            )
+        }
+    }
+
+    func cancelWholeBookTranscription() {
+        guard activeGenerationScope == .wholeBook else { return }
+        subtitleGenerationTask?.cancel()
+        Task { await subtitleOrchestrator?.cancel() }
+        subtitleGenerationTask = nil
+        subtitleOrchestrator = nil
+        activeGenerationScope = nil
+        wholeBookJobState = .idle
+        if let audiobook {
+            audiobook.subtitleGenerationStatus = subtitleCues.isEmpty ? .notGenerated : .partial
+            try? modelContext.save()
+        }
+        refreshSubtitlePresentation()
+    }
+
+    func exportSubtitles(format: SubtitleExportFormat) throws -> URL? {
+        guard let audiobook else { return nil }
+        return try SubtitleExportService.export(
+            audiobook: audiobook,
+            cues: subtitleCues,
+            format: format
+        )
+    }
+
+    /// Removes all saved subtitle cues for the current book and resets generation state.
+    func deleteSavedTranscription() {
+        guard let audiobook else { return }
+
+        if activeGenerationScope == .wholeBook {
+            cancelWholeBookTranscription()
+        } else {
+            cancelSubtitleGeneration()
+        }
+
+        try? subtitleStore.deleteAllCues(for: audiobook)
+        try? subtitleStore.deleteAllSegments(for: audiobook)
+        subtitleCues = []
+        subtitleSegments = []
+        subtitleLines = []
+        savedSubtitleCueCount = 0
+        savedSubtitleSegmentCount = 0
+        audiobook.subtitleGenerationStatus = .notGenerated
+        audiobook.subtitleLastCoveredEndTime = 0
+        audiobook.subtitleGenerationScope = nil
+        try? modelContext.save()
+        refreshSubtitlePresentation()
+        updateSubtitleDisplay(at: audioEngine.currentTime)
+    }
+
+    func seekToSubtitle(at startTime: TimeInterval) {
+        endScrubbingForTransport()
+        resetListeningSample()
+        Task {
+            try? await audioEngine.seek(to: startTime)
+            syncDisplayFromEngine()
+            publishWatchSnapshot(immediate: true, includeArtwork: false)
+        }
+    }
+
+    func seekToSubtitleFromSearch(at startTime: TimeInterval) {
+        isSubtitlesPresented = false
+        seekToSubtitle(at: startTime)
+    }
+
+    func subtitleSearchResults(matching query: String) -> SubtitleSearchResults {
+        let search = SubtitleSearch.search(query: query, in: subtitleCues)
+        let items = search.matches.map { cue in
+            SubtitleSearchResultItem(
+                orderIndex: cue.orderIndex,
+                text: cue.text,
+                startTime: cue.startTime,
+                chapterTitle: chapterTitle(at: cue.startTime)
+            )
+        }
+        return SubtitleSearchResults(items: items, totalCount: search.totalCount)
+    }
+
+    private func chapterTitle(at time: TimeInterval) -> String? {
+        let summaries = chapters.map {
+            WatchChapterSummary(
+                id: $0.id,
+                title: $0.title,
+                startTime: $0.startTime,
+                duration: $0.duration,
+                orderIndex: $0.orderIndex
+            )
+        }
+        return ChapterProgressCalculator.chapterTitle(at: time, chapters: summaries)
+    }
+
+    func retrySubtitleGeneration() {
+        generateSubtitlesNearPlayhead()
+    }
+
+    func makePaywallViewModel() -> PaywallViewModel {
+        PaywallViewModel(monetization: monetization, feature: paywallFeature)
+    }
+
+    private func reloadSubtitleData(for audiobook: Audiobook) {
+        let loaded = (try? subtitleStore.sortedCues(for: audiobook.id)) ?? []
+        subtitleCues = loaded.sorted {
+            if $0.startTime != $1.startTime { return $0.startTime < $1.startTime }
+            return $0.orderIndex < $1.orderIndex
+        }
+        savedSubtitleCueCount = subtitleCues.count
+
+        var segments = (try? subtitleStore.sortedSegments(for: audiobook.id)) ?? []
+        if segments.isEmpty, !subtitleCues.isEmpty {
+            let inferred = SubtitleSegmentPlanner.inferredSegmentsFromLegacyCues(
+                cues: subtitleCues,
+                bookDuration: audiobook.duration
+            )
+            try? subtitleStore.insertInferredSegments(inferred, audiobook: audiobook)
+            segments = (try? subtitleStore.sortedSegments(for: audiobook.id)) ?? inferred
+        }
+        subtitleSegments = segments
+        savedSubtitleSegmentCount = subtitleSegments.count
+    }
+
+    private func refreshSubtitlePresentation(at playhead: TimeInterval? = nil) {
+        guard isSubtitlesVisible else {
+            subtitlePresentation = .hidden
+            return
+        }
+
+        guard subtitlesSupported else {
+            subtitlePresentation = .unavailable
+            return
+        }
+
+        // Whole-book progress is shown in the subtitles sheet, not on the artwork overlay.
+        if wholeBookJobState.isActive || activeGenerationScope == .wholeBook {
+            subtitlePresentation = subtitleCues.isEmpty ? .needsGeneration : .ready
+            return
+        }
+
+        switch audiobook?.subtitleGenerationStatus {
+        case .inProgress where activeGenerationScope == .nearPlayhead:
+            subtitlePresentation = .loading(subtitleProgressMessage ?? "Generating subtitles…")
+            return
+        case .failed where activeGenerationScope == .nearPlayhead:
+            subtitlePresentation = .failed(subtitleProgressMessage ?? "Subtitle generation failed.")
+            return
+        case .complete, .partial, .failed, .inProgress, .notGenerated, .none:
+            break
+        }
+
+        let resolvedPlayhead = playhead ?? audioEngine.currentTime
+        let hasActiveCue = SubtitleCueResolver.hasActiveCue(at: resolvedPlayhead, cues: subtitleCues)
+
+        if !hasActiveCue {
+            if activeGenerationScope == .nearPlayhead {
+                subtitlePresentation = .loading(subtitleProgressMessage ?? "Generating subtitles…")
+            } else if isScrubbing {
+                subtitlePresentation = .ready
+            } else {
+                subtitlePresentation = .needsGeneration
+            }
+            return
+        }
+
+        subtitlePresentation = .ready
+    }
+
+    private func updateSubtitleDisplay(at time: TimeInterval) {
+        guard isSubtitlesVisible else {
+            subtitleLines = []
+            return
+        }
+
+        guard SubtitleCueResolver.hasActiveCue(at: time, cues: subtitleCues) else {
+            subtitleLines = []
+            return
+        }
+
+        let window = SubtitleCueResolver.visibleWindow(at: time, cues: subtitleCues)
+        subtitleLines = window.cues.enumerated().map { index, cue in
+            SubtitleLineItem(
+                orderIndex: cue.orderIndex,
+                text: cue.text,
+                startTime: cue.startTime,
+                isActive: window.activeIndex == index
+            )
+        }
+    }
+
+    private func presentSubtitlesPaywall() {
+        paywallFeature = .subtitles
+        isPaywallPresented = true
+    }
+
+    private func startSubtitleGeneration(scope: SubtitleGenerationScope) {
+        guard let audiobook else { return }
+        guard subtitlesSupported else {
+            if scope == .nearPlayhead { subtitlePresentation = .unavailable }
+            return
+        }
+        guard monetization.hasAccess(to: .subtitles) else {
+            presentSubtitlesPaywall()
+            return
+        }
+        if scope == .wholeBook, case .playing = playbackState {
+            pause()
+        }
+
+        reloadSubtitleData(for: audiobook)
+
+        if scope == .wholeBook {
+            if !hasUncoveredSubtitleWindows {
+                wholeBookJobState = .idle
+                audiobook.subtitleGenerationStatus = .complete
+                audiobook.subtitleLastCoveredEndTime = audiobook.duration
+                try? modelContext.save()
+                return
+            }
+        }
+
+        cancelSubtitleGeneration()
+        let generationID = subtitleGenerationEpoch
+        activeGenerationScope = scope
+        audiobook.subtitleGenerationScope = scope
+        audiobook.subtitleGenerationStatus = .inProgress
+
+        if scope == .wholeBook {
+            wholeBookJobState = .preparing
+        } else {
+            isSubtitlesVisible = true
+            subtitlePresentation = .loading("Preparing subtitles…")
+        }
+        try? modelContext.save()
+
+        let bookID = audiobook.id
+        let playhead = audioEngine.currentTime
+        let bookDuration = audiobook.duration
+        let locale = settings.subtitleLocaleIdentifier ?? Locale.current.identifier
+        audiobook.subtitleLocaleIdentifier = locale
+        let resolvedChapters = chapters.map { ResolvedChapter(from: $0) }
+        let existingSegments = subtitleSegments
+
+        let orchestrator = SubtitleGenerationOrchestrator(
+            transcriptionService: subtitleTranscriptionService
+        )
+        subtitleOrchestrator = orchestrator
+
+        subtitleGenerationTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await orchestrator.generate(
+                    scope: scope,
+                    playhead: playhead,
+                    bookDuration: bookDuration,
+                    chapters: resolvedChapters,
+                    existingSegments: existingSegments,
+                    localeIdentifier: locale,
+                    onWindowComplete: { [weak self] window, cues in
+                        await self?.persistSubtitleWindow(
+                            window: window,
+                            cues: cues,
+                            bookID: bookID,
+                            generationID: generationID
+                        )
+                    },
+                    onProgress: { [weak self] progress in
+                        Task { @MainActor in
+                            guard let self, generationID == self.subtitleGenerationEpoch else { return }
+                            self.handleSubtitleGenerationProgress(progress, scope: scope)
+                        }
+                    }
+                )
+                await MainActor.run {
+                    guard generationID == self.subtitleGenerationEpoch else { return }
+                    self.finishSubtitleGeneration(success: true, scope: scope, bookDuration: bookDuration)
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    guard generationID == self.subtitleGenerationEpoch else { return }
+                    self.handleSubtitleGenerationCancelled(scope: scope)
+                }
+            } catch {
+                await MainActor.run {
+                    guard generationID == self.subtitleGenerationEpoch else { return }
+                    self.handleSubtitleGenerationFailure(error, scope: scope, bookDuration: bookDuration)
+                }
+            }
+        }
+    }
+
+    private func handleSubtitleGenerationProgress(
+        _ progress: SubtitleGenerationProgress,
+        scope: SubtitleGenerationScope
+    ) {
+        subtitleProgressMessage = progress.message
+        switch scope {
+        case .wholeBook:
+            let total = progress.totalWindows ?? 1
+            wholeBookJobState = .running(
+                completed: progress.completedWindows,
+                total: max(total, 1),
+                message: progress.message
+            )
+        case .nearPlayhead:
+            refreshSubtitlePresentation()
+        }
+    }
+
+    private func handleSubtitleGenerationCancelled(scope: SubtitleGenerationScope) {
+        subtitleProgressMessage = nil
+        activeGenerationScope = nil
+        subtitleGenerationTask = nil
+        subtitleOrchestrator = nil
+
+        switch scope {
+        case .wholeBook:
+            wholeBookJobState = .idle
+            audiobook?.subtitleGenerationStatus = subtitleCues.isEmpty ? .notGenerated : .partial
+        case .nearPlayhead:
+            audiobook?.subtitleGenerationStatus = subtitleCues.isEmpty ? .notGenerated : .partial
+            refreshSubtitlePresentation()
+        }
+        try? modelContext.save()
+    }
+
+    private func handleSubtitleGenerationFailure(
+        _ error: Error,
+        scope: SubtitleGenerationScope,
+        bookDuration: TimeInterval
+    ) {
+        subtitleProgressMessage = error.localizedDescription
+        activeGenerationScope = nil
+        subtitleGenerationTask = nil
+        subtitleOrchestrator = nil
+
+        switch scope {
+        case .wholeBook:
+            wholeBookJobState = .failed(error.localizedDescription)
+            audiobook?.subtitleGenerationStatus = subtitleCues.isEmpty ? .failed : .partial
+        case .nearPlayhead:
+            audiobook?.subtitleGenerationStatus = subtitleCues.isEmpty ? .failed : .partial
+            refreshSubtitlePresentation()
+            if audiobook?.subtitlesTranscribeAsYouGo == true {
+                autoTranscribeBlockedUntilPlayhead = audioEngine.currentTime + SubtitleWindowPlanner.defaultWindowDuration
+            }
+        }
+        try? modelContext.save()
+        _ = bookDuration
+    }
+
+    @MainActor
+    private func persistSubtitleWindow(
+        window: SubtitleTimeWindow,
+        cues: [SubtitleCueTiming],
+        bookID: UUID,
+        generationID: UInt64
+    ) async {
+        guard generationID == subtitleGenerationEpoch else { return }
+        guard let audiobook, audiobook.id == bookID else { return }
+        try? subtitleStore.insertSegment(window: window, audiobook: audiobook)
+        try? subtitleStore.insertCues(cues, audiobook: audiobook)
+        reloadSubtitleData(for: audiobook)
+        audiobook.subtitleLastCoveredEndTime = max(audiobook.subtitleLastCoveredEndTime, window.globalEnd)
+        audiobook.subtitleGenerationStatus = .partial
+        try? modelContext.save()
+        refreshSubtitlePresentation()
+        updateSubtitleDisplay(at: audioEngine.currentTime)
+    }
+
+    private func finishSubtitleGeneration(
+        success: Bool,
+        scope: SubtitleGenerationScope,
+        bookDuration: TimeInterval
+    ) {
+        guard let audiobook else { return }
+        activeGenerationScope = nil
+        subtitleGenerationTask = nil
+        subtitleOrchestrator = nil
+        subtitleProgressMessage = nil
+
+        if success {
+            let wholeBookComplete = !hasUncoveredSubtitleWindows
+            if wholeBookComplete {
+                audiobook.subtitleGenerationStatus = .complete
+                audiobook.subtitleLastCoveredEndTime = bookDuration
+            } else if subtitleCues.isEmpty, subtitleSegments.isEmpty {
+                audiobook.subtitleGenerationStatus = .failed
+            } else {
+                audiobook.subtitleGenerationStatus = .partial
+            }
+
+            switch scope {
+            case .wholeBook:
+                wholeBookJobState = wholeBookComplete ? .idle : .idle
+            case .nearPlayhead:
+                refreshSubtitlePresentation()
+            }
+        } else {
+            audiobook.subtitleGenerationStatus = subtitleCues.isEmpty ? .failed : .partial
+            if scope == .nearPlayhead {
+                refreshSubtitlePresentation()
+            }
+        }
+
+        try? modelContext.save()
+        updateSubtitleDisplay(at: audioEngine.currentTime)
+    }
+
+    private func cancelSubtitleGeneration() {
+        subtitleGenerationEpoch &+= 1
+        let scope = activeGenerationScope
+        let orchestrator = subtitleOrchestrator
+        subtitleGenerationTask?.cancel()
+        subtitleGenerationTask = nil
+        subtitleOrchestrator = nil
+        activeGenerationScope = nil
+        if scope == .wholeBook {
+            wholeBookJobState = .idle
+        }
+        if orchestrator != nil {
+            Task { await orchestrator?.cancel() }
+        }
+    }
+
+    /// Re-anchors near-playhead generation when the listener jumps while subtitles are visible.
+    private func handleSubtitlesPlayheadJump(to time: TimeInterval, from previous: TimeInterval) {
+        guard isSubtitlesVisible, let audiobook else { return }
+        guard previous != time else { return }
+
+        guard subtitlesSupported, monetization.hasAccess(to: .subtitles) else { return }
+        guard !wholeBookJobState.isActive else { return }
+
+        let hasActiveCue = SubtitleCueResolver.hasActiveCue(at: time, cues: subtitleCues)
+
+        if hasActiveCue {
+            if activeGenerationScope == .nearPlayhead {
+                cancelSubtitleGeneration()
+                audiobook.subtitleGenerationStatus = subtitleCues.isEmpty ? .notGenerated : .partial
+                try? modelContext.save()
+            }
+            refreshSubtitlePresentation(at: time)
+            updateSubtitleDisplay(at: time)
+            return
+        }
+
+        if activeGenerationScope == .nearPlayhead {
+            cancelSubtitleGeneration()
+        }
+        startSubtitleGeneration(scope: .nearPlayhead)
+    }
+
+    private func maybeTriggerTranscribeAsYouGo(at time: TimeInterval) {
+        guard isAppInForeground,
+              isSubtitlesVisible,
+              let audiobook,
+              audiobook.subtitlesTranscribeAsYouGo,
+              subtitlesSupported,
+              monetization.hasAccess(to: .subtitles),
+              activeGenerationScope == nil,
+              !wholeBookJobState.isActive,
+              case .playing = playbackState,
+              time >= autoTranscribeBlockedUntilPlayhead
+        else { return }
+
+        guard SubtitleSegmentPlanner.shouldAutoGenerateNearPlayhead(
+            playhead: time,
+            bookDuration: audiobook.duration,
+            segments: subtitleSegments,
+            cues: subtitleCues
+        ) else { return }
+
+        autoTranscribeBlockedUntilPlayhead = time + SubtitleWindowPlanner.defaultWindowDuration
+        startSubtitleGeneration(scope: .nearPlayhead)
+    }
+
+    private func suspendNearPlayheadSubtitleGenerationForBackground() {
+        guard activeGenerationScope == .nearPlayhead else { return }
+        cancelSubtitleGeneration()
+        audiobook?.subtitleGenerationStatus = subtitleCues.isEmpty ? .notGenerated : .partial
+        try? modelContext.save()
+    }
+
+    // MARK: - Lull Analysis
+
+    func defaultSmartRewindOffsets(for range: SmartRewindRange) -> SmartRewindWindowOffsets {
+        switch range {
+        case .far:
+            SmartRewindWindowOffsets(
+                startOffset: settings.smartRewindFarStartOffset,
+                endOffset: settings.smartRewindFarEndOffset
+            )
+        case .near:
+            SmartRewindWindowOffsets(
+                startOffset: settings.smartRewindNearStartOffset,
+                endOffset: settings.smartRewindNearEndOffset
+            )
+        }
+    }
+
+    func analyzeSmartRewind(
+        _ range: SmartRewindRange,
+        customOffsets: SmartRewindWindowOffsets? = nil
+    ) {
         guard case .idle = lullAnalysisState, audiobook != nil else { return }
         guard monetization.hasAccess(to: .paragraphBreaks) else {
+            paywallFeature = .paragraphBreaks
             isPaywallPresented = true
             return
         }
+        smartRewindSessionOffsets = customOffsets
         startSmartRewindAnalysis(range)
     }
 
     func lookAgainSmartRewind() {
         guard audiobook != nil else { return }
         guard monetization.hasAccess(to: .paragraphBreaks) else {
+            paywallFeature = .paragraphBreaks
             isPaywallPresented = true
             return
         }
@@ -478,10 +1308,12 @@ final class PlayerViewModel {
 
     func cancelLullAnalysis() {
         lullAnalysisState = .idle
+        smartRewindSessionOffsets = nil
     }
 
     func seekToLull(_ lull: LullResult) {
         lullAnalysisState = .idle
+        smartRewindSessionOffsets = nil
         endScrubbingForTransport()
         resetListeningSample()
         Task {
@@ -527,21 +1359,11 @@ final class PlayerViewModel {
     }
 
     private func smartRewindWindow(for range: SmartRewindRange) -> (from: TimeInterval, to: TimeInterval) {
-        let now = audioEngine.currentTime
-        switch range {
-        case .far:
-            let startOffset = settings.smartRewindFarStartOffset
-            let endOffset = settings.smartRewindFarEndOffset
-            let from = max(0, now - startOffset)
-            let to = max(from + 1, now - endOffset)
-            return (from, to)
-        case .near:
-            let startOffset = settings.smartRewindNearStartOffset
-            let endOffset = settings.smartRewindNearEndOffset
-            let from = max(0, now - startOffset)
-            let to = max(from + 1, now - endOffset)
-            return (from, to)
-        }
+        let offsets = smartRewindSessionOffsets ?? defaultSmartRewindOffsets(for: range)
+        return SmartRewindWindowPolicy.playbackWindow(
+            currentTime: audioEngine.currentTime,
+            offsets: offsets
+        )
     }
 
     private func lullAnalysisWindow() -> (from: TimeInterval, to: TimeInterval) {
@@ -570,6 +1392,17 @@ final class PlayerViewModel {
         bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
         try? modelContext.save()
         pendingNewBookmark = bookmark
+    }
+
+    /// Creates a bookmark at a subtitle line's timestamp, titled with that line's text.
+    func addBookmarkFromSubtitle(text: String, at startTime: TimeInterval) {
+        guard let audiobook else { return }
+        let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        let bookmark = Bookmark(title: title, note: "", timestamp: startTime, audiobook: audiobook)
+        audiobook.bookmarks.append(bookmark)
+        bookmarks = audiobook.bookmarks.sorted { $0.timestamp < $1.timestamp }
+        try? modelContext.save()
     }
 
     func deleteBookmark(_ bookmark: Bookmark) {
@@ -749,6 +1582,12 @@ final class PlayerViewModel {
 
     func beginScrubbing() {
         isScrubbing = true
+        if isSubtitlesVisible, activeGenerationScope == .nearPlayhead {
+            cancelSubtitleGeneration()
+            audiobook?.subtitleGenerationStatus = subtitleCues.isEmpty ? .notGenerated : .partial
+            try? modelContext.save()
+        }
+        previewSubtitlesAtScrubPosition()
     }
 
     func commitScrub() async {
@@ -766,7 +1605,12 @@ final class PlayerViewModel {
 
     /// Realigns the scrubber and time labels with the engine after a seek or stuck scrub.
     private func syncDisplayFromEngine() {
-        applyEngineTime(audioEngine.currentTime)
+        let previous = lastAppliedEngineTime
+        let time = audioEngine.currentTime
+        if let previous {
+            handleSubtitlesPlayheadJump(to: time, from: previous)
+        }
+        applyEngineTime(time)
     }
 
     private func contentRemainingInterval() -> TimeInterval {
@@ -788,6 +1632,16 @@ final class PlayerViewModel {
                 : max(0, audioEngine.currentTime - chaps[currentChapterIndex].startTime)
             return max(0, chapterDuration - chapterElapsed)
         }
+    }
+
+    /// Wall-clock duration at the current playback speed, e.g. "20:00" for 30:00 content at 1.5×.
+    func formatSpeedAdjustedDuration(_ contentDuration: TimeInterval) -> String {
+        let adjusted = contentDuration / Double(max(playbackSpeed, Self.minPlaybackSpeed))
+        return Self.formatTime(adjusted)
+    }
+
+    private func formatSpeedAdjustedRemaining(_ contentRemaining: TimeInterval) -> String {
+        "-\(formatSpeedAdjustedDuration(contentRemaining))"
     }
 
     private func scrubTargetTime(for position: Double) -> TimeInterval {
@@ -916,41 +1770,44 @@ final class PlayerViewModel {
     }
 
     private func applyEngineTime(_ time: TimeInterval) {
+        lastAppliedEngineTime = time
+
         let duration = audioEngine.duration
         let newIndex = resolveChapterIndex(for: time)
         if newIndex != currentChapterIndex { currentChapterIndex = newIndex }
 
+        if isSubtitlesVisible {
+            updateSubtitleDisplay(at: time)
+        }
+
+        maybeTriggerTranscribeAsYouGo(at: time)
+
         let newScrub: Double
         let newCurrent: String
-        let newRemaining: String
 
         switch playbackDisplayMode {
         case .entireBook:
             newScrub    = duration > 0 ? min(1, time / duration) : 0
             newCurrent  = Self.formatTime(time)
-            newRemaining = "-\(Self.formatTime(max(0, duration - time)))"
 
         case .currentChapter:
             if chapters.isEmpty {
                 newScrub    = duration > 0 ? min(1, time / duration) : 0
                 newCurrent  = Self.formatTime(time)
-                newRemaining = "-\(Self.formatTime(max(0, duration - time)))"
             } else {
                 let chapter = chapters[newIndex]
                 let elapsed = max(0, time - chapter.startTime)
                 let dur     = chapter.duration
                 newScrub    = dur > 0 ? min(1, elapsed / dur) : 0
                 newCurrent  = Self.formatTime(elapsed)
-                newRemaining = "-\(Self.formatTime(max(0, dur - elapsed)))"
             }
         }
 
         // scrubPosition drives the slider and must update every tick for smooth motion.
-        // The string labels only change once per second — skip the write when unchanged
-        // to avoid invalidating views that only read those labels.
+        // The elapsed label only changes once per second — skip the write when unchanged
+        // to avoid invalidating views that only read that label.
         scrubPosition = newScrub
-        if displayCurrentTime  != newCurrent   { displayCurrentTime  = newCurrent }
-        if displayRemainingTime != newRemaining { displayRemainingTime = newRemaining }
+        if displayCurrentTime != newCurrent { displayCurrentTime = newCurrent }
     }
 
     private func resolveChapterIndex(for time: TimeInterval) -> Int {
@@ -1026,7 +1883,7 @@ final class PlayerViewModel {
         )
     }
 
-    private func savePlaybackPosition() {
+    private func savePlaybackPosition(isPeriodicSave: Bool = false) {
         guard let audiobook else { return }
         audiobook.currentPlaybackTime = audioEngine.currentTime
         audiobook.lastPlayedAt = .now
@@ -1037,14 +1894,14 @@ final class PlayerViewModel {
             audiobookID: audiobook.id,
             progress: widgetProgress(for: audiobook, at: audioEngine.currentTime)
         )
-        onPlaybackPositionSaved?()
+        onPlaybackPositionSaved?(isPeriodicSave)
     }
 
     private func startPositionSaveTimer() {
         guard positionSaveTimer == nil else { return }
         positionSaveTimer = Timer.publish(every: 5, on: .main, in: .common)
             .autoconnect()
-            .sink { [weak self] _ in self?.savePlaybackPosition() }
+            .sink { [weak self] _ in self?.savePlaybackPosition(isPeriodicSave: true) }
     }
 
     private func stopPositionSaveTimer() {
@@ -1054,8 +1911,30 @@ final class PlayerViewModel {
 
     private func installBackgroundObserver() {
         NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
-            .sink { [weak self] _ in self?.savePlaybackPosition() }
+            .sink { [weak self] _ in
+                self?.handleAppWillResignActive()
+            }
             .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                self?.handleAppDidBecomeActive()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleAppWillResignActive() {
+        isAppInForeground = false
+        savePlaybackPosition()
+        suspendNearPlayheadSubtitleGenerationForBackground()
+    }
+
+    private func handleAppDidBecomeActive() {
+        isAppInForeground = true
+        if isSubtitlesVisible {
+            refreshSubtitlePresentation()
+            updateSubtitleDisplay(at: audioEngine.currentTime)
+        }
     }
 
     private func observeSkipIntervalSettings() {

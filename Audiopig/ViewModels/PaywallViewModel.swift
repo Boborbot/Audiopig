@@ -10,19 +10,38 @@ import Observation
 @Observable
 final class PaywallViewModel {
 
+    enum Feature {
+        case paragraphBreaks
+        case subtitles
+    }
+
     private(set) var isPurchasing = false
     private(set) var errorMessage: String?
 
     private let monetization: any MonetizationServiceProtocol
+    private let feature: Feature
 
-    init(monetization: any MonetizationServiceProtocol) {
+    init(monetization: any MonetizationServiceProtocol, feature: Feature = .paragraphBreaks) {
         self.monetization = monetization
+        self.feature = feature
     }
 
-    var headline: String { "Smart Rewind" }
+    var headline: String {
+        switch feature {
+        case .paragraphBreaks:
+            return "Smart Rewind"
+        case .subtitles:
+            return "Live Subtitles"
+        }
+    }
 
     var bodyCopy: String {
-        "Look Far and Look Near scan silence in the minutes before you drifted off so you can jump back to a natural break."
+        switch feature {
+        case .paragraphBreaks:
+            return "Look Far and Look Near scan silence in the minutes before you drifted off so you can jump back to a natural break."
+        case .subtitles:
+            return "Generate on-device subtitles near where you are listening, fill gaps in partial transcriptions, or transcribe an entire book in the background."
+        }
     }
 
     var primaryCTATitle: String {
@@ -50,7 +69,7 @@ final class PaywallViewModel {
 
         do {
             try await monetization.purchasePlus()
-            return monetization.hasAccess(to: .paragraphBreaks)
+            return monetization.hasAccess(to: feature == .subtitles ? .subtitles : .paragraphBreaks)
         } catch MonetizationError.userCancelled {
             return false
         } catch {
@@ -66,7 +85,7 @@ final class PaywallViewModel {
 
         do {
             try await monetization.restorePurchases()
-            return monetization.hasAccess(to: .paragraphBreaks)
+            return monetization.hasAccess(to: feature == .subtitles ? .subtitles : .paragraphBreaks)
         } catch {
             errorMessage = error.localizedDescription
             return false

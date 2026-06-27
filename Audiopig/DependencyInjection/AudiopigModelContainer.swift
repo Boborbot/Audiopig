@@ -20,7 +20,9 @@ private let log = Logger(subsystem: "com.audiopig", category: "ModelContainer")
 enum AudiopigModelContainer {
 
     private static let models: [any PersistentModel.Type] = [
-        Audiobook.self, Chapter.self, Bookmark.self, FinishedRecord.self, Folder.self
+        Audiobook.self, Chapter.self, Bookmark.self, SubtitleCue.self,
+        SubtitleTranscriptionSegment.self,
+        FinishedRecord.self, Folder.self
     ]
 
     static func make(isStoredInMemoryOnly: Bool = false) throws -> ModelContainer {

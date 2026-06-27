@@ -146,6 +146,28 @@ struct SettingsView: View {
                         .foregroundStyle(DS.Color.tertiary)
                 }
 
+                Section {
+                    Picker("Subtitle font", selection: $settings.subtitleFont) {
+                        ForEach(SubtitleFont.allCases) { font in
+                            Text(font.label)
+                                .font(DS.Typography.subtitle(font, active: false))
+                                .tag(font)
+                        }
+                    }
+
+                    Toggle(isOn: $settings.subtitlesAutoGenerateOnImport) {
+                        Label("Auto-generate on import", systemImage: "captions.bubble")
+                    }
+                    .tint(DS.Color.coral)
+                } header: {
+                    Text("Subtitles")
+                        .sectionTitle()
+                } footer: {
+                    Text("On-device subtitles require iOS 26. Generation uses Apple’s speech models (downloaded once per language). Auto-generate runs when playback is paused after import.")
+                        .font(DS.Typography.caption)
+                        .foregroundStyle(DS.Color.tertiary)
+                }
+
                 plusSection
                 TipJarSection(viewModel: monetizationViewModel)
 
@@ -248,7 +270,7 @@ struct SettingsView: View {
             Text(Brand.plusName)
                 .sectionTitle()
         } footer: {
-            Text("Smart Rewind is included with Plus. Core playback stays free.")
+            Text("Smart Rewind and on-device subtitles are included with Plus. Core playback stays free.")
                 .font(DS.Typography.caption)
                 .foregroundStyle(DS.Color.tertiary)
         }
