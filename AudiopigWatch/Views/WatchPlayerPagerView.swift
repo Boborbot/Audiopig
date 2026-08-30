@@ -5,9 +5,12 @@
 
 import SwiftUI
 
+/// Single-screen remote player. Avoids vertical `TabView` + multiple crown handlers,
+/// which have been crashing on device when opening from Recent Books.
 struct WatchPlayerPagerView: View {
     @ObservedObject var viewModel: WatchPlayerViewModel
     @Binding var selectedPage: Int
+    @Environment(\.scenePhase) private var scenePhase
 
     init(viewModel: WatchPlayerViewModel, selectedPage: Binding<Int>) {
         _viewModel = ObservedObject(wrappedValue: viewModel)
@@ -15,43 +18,14 @@ struct WatchPlayerPagerView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedPage) {
-            SpeedControlsView(viewModel: viewModel, isActive: selectedPage == 0)
-                .tag(0)
-
-            if viewModel.effectiveArtworkViewMode == .add {
-                ArtworkControlsView(viewModel: viewModel, isActive: selectedPage == 1)
-                    .tag(1)
+        MediaControlsView(viewModel: viewModel, isActive: true)
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    viewModel.handleSceneBecameActive()
+                }
             }
-
-            if viewModel.effectiveArtworkViewMode == .replaceStandardControls {
-                ArtworkControlsView(viewModel: viewModel, isActive: selectedPage == 1)
-                    .tag(1)
-            } else if viewModel.effectiveArtworkViewMode != .replaceStandardControls {
-                MediaControlsView(
-                    viewModel: viewModel,
-                    isActive: selectedPage == mediaControlsPageIndex
-                )
-                .tag(mediaControlsPageIndex)
+            .onAppear {
+                selectedPage = viewModel.mainControlsPageIndex
             }
-
-            ChapterListView(
-                viewModel: viewModel,
-                isActive: selectedPage == viewModel.chaptersPageIndex,
-                onChapterSelected: { selectedPage = viewModel.mainControlsPageIndex }
-            )
-            .tag(viewModel.chaptersPageIndex)
-        }
-        .tabViewStyle(.verticalPage)
-        .task {
-            await viewModel.refresh()
-        }
-        .onChange(of: viewModel.effectiveArtworkViewMode) { _, _ in
-            selectedPage = viewModel.mainControlsPageIndex
-        }
-    }
-
-    private var mediaControlsPageIndex: Int {
-        viewModel.effectiveArtworkViewMode == .add ? 2 : 1
     }
 }

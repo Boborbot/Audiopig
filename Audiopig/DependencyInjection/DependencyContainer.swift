@@ -20,6 +20,7 @@ final class DependencyContainer {
     let watchTransferService: any WatchTransferServiceProtocol
     let volumeController: SystemVolumeController
     let monetization: any MonetizationServiceProtocol
+    let wholeBookTranscriptionQueue: any WholeBookTranscriptionQueueServiceProtocol
 
     init(
         libraryManager: any LibraryManagerProtocol,
@@ -30,7 +31,8 @@ final class DependencyContainer {
         watchBridge: any WatchConnectivityBridgeProtocol,
         watchTransferService: any WatchTransferServiceProtocol,
         volumeController: SystemVolumeController,
-        monetization: any MonetizationServiceProtocol
+        monetization: any MonetizationServiceProtocol,
+        wholeBookTranscriptionQueue: any WholeBookTranscriptionQueueServiceProtocol
     ) {
         self.libraryManager = libraryManager
         self.audioEngine = audioEngine
@@ -41,6 +43,7 @@ final class DependencyContainer {
         self.watchTransferService = watchTransferService
         self.volumeController = volumeController
         self.monetization = monetization
+        self.wholeBookTranscriptionQueue = wholeBookTranscriptionQueue
     }
 
     /// Registers the global container. Call once during app launch after concrete services are wired.
@@ -53,7 +56,8 @@ final class DependencyContainer {
         watchBridge: any WatchConnectivityBridgeProtocol,
         watchTransferService: any WatchTransferServiceProtocol,
         volumeController: SystemVolumeController,
-        monetization: any MonetizationServiceProtocol
+        monetization: any MonetizationServiceProtocol,
+        wholeBookTranscriptionQueue: any WholeBookTranscriptionQueueServiceProtocol
     ) {
         shared = DependencyContainer(
             libraryManager: libraryManager,
@@ -64,7 +68,8 @@ final class DependencyContainer {
             watchBridge: watchBridge,
             watchTransferService: watchTransferService,
             volumeController: volumeController,
-            monetization: monetization
+            monetization: monetization,
+            wholeBookTranscriptionQueue: wholeBookTranscriptionQueue
         )
     }
 

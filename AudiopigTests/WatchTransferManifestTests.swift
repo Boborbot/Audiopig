@@ -65,6 +65,7 @@ final class WatchTransferManifestTests: XCTestCase {
             .syncLocalPlaybackPosition(bookID: bookID, time: 99.5),
             .acknowledgeLocalBooks(WatchLocalBooksPayload(books: [], usedBytes: 0, budgetBytes: 100)),
             .reportTransferIngestFailed(bookID: bookID, errorMessage: "Checksum mismatch"),
+            .requestChapters,
             .analyzeLulls,
             .seekToLull(endTime: 123.5)
         ]
@@ -95,6 +96,84 @@ final class WatchTransferManifestTests: XCTestCase {
         XCTAssertEqual(slim.books.count, 1)
         XCTAssertNil(slim.books[0].thumbnailJPEG)
         XCTAssertEqual(slim.usedBytes, payload.usedBytes)
+    }
+
+    func test_recentBooksPayloadSlimSyncCopyOmitsThumbnails() {
+        let book = WatchBookSummary(
+            id: UUID(),
+            title: "Recent",
+            author: "Author",
+            duration: 100,
+            currentPlaybackTime: 10,
+            lastPlayedAt: .now,
+            thumbnailJPEG: Data(repeating: 0xAB, count: 512)
+        )
+        let payload = WatchRecentBooksPayload(books: [book])
+        let slim = payload.slimSyncCopy()
+        XCTAssertNil(slim.books[0].thumbnailJPEG)
+    }
+
+    func test_recentBooksMessageReplyPayloadFitsBudget() {
+        let books = (0..<10).map { index in
+            WatchBookSummary(
+                id: UUID(),
+                title: "Book \(index)",
+                author: "Author",
+                duration: 100,
+                currentPlaybackTime: 10,
+                lastPlayedAt: .now,
+                thumbnailJPEG: Data(repeating: 0xCD, count: 8_192)
+            )
+        }
+        let payload = WatchRecentBooksPayload(books: books)
+        let reply = payload.messageReplyPayload(maxBytes: WatchApplicationContextBudget.messageMaxBytes)
+        XCTAssertLessThanOrEqual(
+            WatchApplicationContextBudget.encodedByteCount(reply),
+            WatchApplicationContextBudget.messageMaxBytes
+        )
+    }
+
+    func test_commandResultMessageReplyPayloadStripsArtworkAndChapters() throws {
+        let snapshot = WatchPlaybackSnapshot(
+            revision: 1,
+            bookID: UUID(),
+            title: "Title",
+            author: "Author",
+            chapterTitle: "Chapter",
+            playbackState: .playing,
+            playbackSpeed: 1,
+            skipForwardSeconds: 30,
+            skipBackwardSeconds: 15,
+            chapterIndex: 0,
+            chapterCount: 1,
+            chapterElapsed: 0,
+            chapterDuration: 100,
+            chapterProgress: 0,
+            globalCurrentTime: 0,
+            globalDuration: 100,
+            systemVolume: 0.5,
+            source: .remote,
+            artworkJPEG: Data(repeating: 0xAB, count: 50_000)
+        )
+        let chapters = WatchChaptersPayload(
+            bookID: snapshot.bookID!,
+            chapters: (0..<200).map { index in
+                WatchChapterSummary(
+                    id: UUID(),
+                    title: "Chapter \(index)",
+                    startTime: TimeInterval(index * 60),
+                    duration: 60,
+                    orderIndex: index
+                )
+            }
+        )
+        let result = WatchCommandResult.ok(snapshot: snapshot, chapters: chapters)
+        let trimmed = result.messageReplyPayload(maxBytes: WatchApplicationContextBudget.messageMaxBytes)
+        XCTAssertLessThanOrEqual(
+            WatchApplicationContextBudget.encodedByteCount(trimmed),
+            WatchApplicationContextBudget.messageMaxBytes
+        )
+        XCTAssertNil(trimmed.snapshot?.artworkJPEG)
     }
 
     func test_overallPercentCombinesPhases() {

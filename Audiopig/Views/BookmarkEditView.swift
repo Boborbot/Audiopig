@@ -13,54 +13,58 @@ struct BookmarkEditView: View {
 
     @State private var draftTitle: String
     @State private var draftNote: String
-    @State private var draftTimestamp: String
-    @State private var timestampError: String? = nil
+    @State private var draftTimestamp: TimeInterval
+    @State private var dictation = SpeechDictationService()
+    @State private var activeDictationField: DictationField?
+    @State private var dictationBaseText = ""
+    @State private var dictationError: SpeechDictationError?
+
+    private var maxTimestamp: TimeInterval {
+        max(bookmark.audiobook?.duration ?? 0, bookmark.timestamp)
+    }
 
     init(viewModel: PlayerViewModel, bookmark: Bookmark) {
         self.viewModel = viewModel
         self.bookmark = bookmark
         _draftTitle = State(initialValue: bookmark.title)
-        _draftNote  = State(initialValue: bookmark.note)
-        _draftTimestamp = State(initialValue: PlayerViewModel.formatTime(bookmark.timestamp))
+        _draftNote = State(initialValue: bookmark.note)
+        _draftTimestamp = State(initialValue: bookmark.timestamp)
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Name (optional)", text: $draftTitle)
-                        .autocorrectionDisabled(false)
+                    dictationTextField(
+                        placeholder: "Name (optional)",
+                        text: $draftTitle,
+                        field: .name,
+                        axis: .horizontal
+                    )
                 } header: {
                     Text("Name")
                 }
 
                 Section {
-                    TextField("Note (optional)", text: $draftNote, axis: .vertical)
-                        .lineLimit(3...6)
-                        .autocorrectionDisabled(false)
+                    dictationTextField(
+                        placeholder: "Note (optional)",
+                        text: $draftNote,
+                        field: .note,
+                        axis: .vertical
+                    )
                 } header: {
                     Text("Note")
                 }
 
                 Section {
-                    VStack(alignment: .leading, spacing: DS.Spacing.xs) {
-                        TextField("0:00", text: $draftTimestamp)
-                            .keyboardType(.asciiCapable)
-                            .autocorrectionDisabled()
-                            .fontDesign(.monospaced)
-                            .onChange(of: draftTimestamp) {
-                                timestampError = nil
-                            }
-                        if let error = timestampError {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    }
+                    BookmarkTimestampRolodexPicker(
+                        timestamp: $draftTimestamp,
+                        maxTimestamp: maxTimestamp
+                    )
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                    .listRowBackground(Color.clear)
                 } header: {
                     Text("Timestamp")
-                } footer: {
-                    Text("Format: H:MM:SS or M:SS")
                 }
             }
             .navigationTitle("Edit Bookmark")
@@ -80,44 +84,125 @@ struct BookmarkEditView: View {
         .sheetGlass()
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .onDisappear {
+            stopDictation()
+        }
+        .alert(
+            "Dictation Unavailable",
+            isPresented: Binding(
+                get: { dictationError != nil },
+                set: { if !$0 { dictationError = nil } }
+            ),
+            presenting: dictationError
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { error in
+            Text(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Dictation Field
+
+    @ViewBuilder
+    private func dictationTextField(
+        placeholder: String,
+        text: Binding<String>,
+        field: DictationField,
+        axis: Axis
+    ) -> some View {
+        HStack(alignment: axis == .vertical ? .top : .center, spacing: DS.Spacing.sm) {
+            Group {
+                if axis == .vertical {
+                    TextField(placeholder, text: text, axis: .vertical)
+                        .lineLimit(3...6)
+                } else {
+                    TextField(placeholder, text: text)
+                }
+            }
+            .autocorrectionDisabled(false)
+
+            SpeechDictationMicButton(
+                isRecording: activeDictationField == field,
+                accessibilityLabel: field.micAccessibilityLabel
+            ) {
+                toggleDictation(for: field)
+            }
+        }
+    }
+
+    // MARK: - Dictation
+
+    private func toggleDictation(for field: DictationField) {
+        if activeDictationField == field {
+            stopDictation()
+            return
+        }
+
+        stopDictation()
+        activeDictationField = field
+        dictationBaseText = field == .name ? draftTitle : draftNote
+
+        Task {
+            do {
+                try await dictation.start { transcript in
+                    applyDictationTranscript(transcript, to: field)
+                }
+            } catch let error as SpeechDictationError {
+                activeDictationField = nil
+                dictationError = error
+            } catch {
+                activeDictationField = nil
+                dictationError = .audioEngineFailed
+            }
+        }
+    }
+
+    private func applyDictationTranscript(_ transcript: String, to field: DictationField) {
+        guard activeDictationField == field else { return }
+        let trimmedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTranscript.isEmpty else { return }
+
+        let base = dictationBaseText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let combined = base.isEmpty ? trimmedTranscript : "\(base) \(trimmedTranscript)"
+
+        switch field {
+        case .name:
+            draftTitle = combined
+        case .note:
+            draftNote = combined
+        }
+    }
+
+    private func stopDictation() {
+        dictation.stop()
+        activeDictationField = nil
+        dictationBaseText = ""
     }
 
     // MARK: - Save
 
     private func save() {
-        guard let parsed = parseTimestamp(draftTimestamp) else {
-            timestampError = "Use H:MM:SS or M:SS format (e.g. 1:23:45 or 4:32)"
-            return
-        }
+        stopDictation()
         viewModel.updateBookmark(
             bookmark,
             title: draftTitle.trimmingCharacters(in: .whitespaces),
             note: draftNote.trimmingCharacters(in: .whitespaces),
-            timestamp: parsed
+            timestamp: draftTimestamp
         )
         dismiss()
     }
+}
 
-    // MARK: - Timestamp Parsing
+// MARK: - Dictation Field
 
-    /// Parses "H:MM:SS" or "M:SS" (also "MM:SS", "H:M:S" etc.) into seconds.
-    /// Returns nil if the format is invalid or any component is out of range.
-    private func parseTimestamp(_ raw: String) -> TimeInterval? {
-        let trimmed = raw.trimmingCharacters(in: .whitespaces)
-        let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false)
-            .map { String($0) }
+private enum DictationField {
+    case name
+    case note
 
-        switch parts.count {
-        case 2:
-            guard let m = Int(parts[0]), let s = Int(parts[1]),
-                  m >= 0, s >= 0, s < 60 else { return nil }
-            return TimeInterval(m * 60 + s)
-        case 3:
-            guard let h = Int(parts[0]), let m = Int(parts[1]), let s = Int(parts[2]),
-                  h >= 0, m >= 0, m < 60, s >= 0, s < 60 else { return nil }
-            return TimeInterval(h * 3600 + m * 60 + s)
-        default:
-            return nil
+    var micAccessibilityLabel: String {
+        switch self {
+        case .name: return "Dictate bookmark name"
+        case .note: return "Dictate bookmark note"
         }
     }
 }

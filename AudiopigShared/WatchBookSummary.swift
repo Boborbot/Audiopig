@@ -40,4 +40,21 @@ public struct WatchRecentBooksPayload: Codable, Sendable, Equatable {
     public init(books: [WatchBookSummary]) {
         self.books = books
     }
+
+    /// Metadata-only copy for WatchConnectivity application context.
+    public func slimSyncCopy() -> WatchRecentBooksPayload {
+        WatchRecentBooksPayload(
+            books: books.map {
+                WatchBookSummary(
+                    id: $0.id,
+                    title: $0.title,
+                    author: $0.author,
+                    duration: $0.duration,
+                    currentPlaybackTime: $0.currentPlaybackTime,
+                    lastPlayedAt: $0.lastPlayedAt,
+                    thumbnailJPEG: nil
+                )
+            }
+        )
+    }
 }

@@ -132,10 +132,7 @@ final class AudioEngine: AudioEngineProtocol {
 
         _nowPlayingTitle = audiobook.title
         _nowPlayingAuthor = audiobook.author
-        _nowPlayingArtwork = audiobook.coverArtwork.flatMap { data in
-            guard let image = UIImage(data: data) else { return nil }
-            return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
-        }
+        _nowPlayingArtwork = Self.makeNowPlayingArtwork(from: audiobook)
 
         let resumeTime = max(0, min(audiobook.currentPlaybackTime, audiobook.duration))
 
@@ -186,6 +183,15 @@ final class AudioEngine: AudioEngineProtocol {
             currentChapterIndex = newIndex
         }
         updateNowPlayingInfo(elapsedTime: clampedTime)
+    }
+
+    func updateNowPlayingMetadata(from audiobook: Audiobook) {
+        guard _loadedAudiobookID == audiobook.id else { return }
+
+        _nowPlayingTitle = audiobook.title
+        _nowPlayingAuthor = audiobook.author
+        _nowPlayingArtwork = Self.makeNowPlayingArtwork(from: audiobook)
+        updateNowPlayingInfo(elapsedTime: _currentTime.value)
     }
 
     // MARK: - AudioEngineProtocol — Transport
@@ -754,6 +760,11 @@ final class AudioEngine: AudioEngineProtocol {
         }
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    private static func makeNowPlayingArtwork(from audiobook: Audiobook) -> MPMediaItemArtwork? {
+        guard let image = CoverArtCache.shared.image(for: audiobook) else { return nil }
+        return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
     }
 
     // MARK: - Private — AVAudioSession

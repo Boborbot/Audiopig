@@ -22,6 +22,7 @@ Device: _______________   iOS: _______________   Date: _______________
 
 - [ ] Import single `.mp3` from Files app
 - [ ] Import single `.m4b` from Files app
+- [ ] After a large library recovery, importing a new file still adds it to the list immediately
 - [ ] Import multiple audio files at once (each becomes a book, or merge afterward)
 - [ ] Cover art extracted from file metadata when present
 - [ ] Title and author populated from metadata when present
@@ -32,7 +33,10 @@ Device: _______________   iOS: _______________   Date: _______________
 ## Library
 
 - [ ] Search filters books and folders by title/author
-- [ ] Multi-select mode: select several books, bulk delete works
+- [ ] Multi-select mode: select several books, bulk delete works without a restart
+- [ ] Bulk delete of a large selection (20+ files) completes without crashing; remaining books stay in the library
+- [ ] After delete, import still works
+- [ ] Deleting the currently playing book unloads the player; other books still play
 - [ ] Merge: combine 2+ books into one multi-chapter timeline; chapter order correct
 - [ ] Create folder from selection; books move into folder
 - [ ] Folder drill-down shows contained books; back navigation works
@@ -127,7 +131,6 @@ Skip this section on iOS 17–25 — confirm the player shows "Subtitles Unavail
 - [ ] Subtitle search finds text and seeks on tap
 - [ ] Bookmark from subtitle line works
 - [ ] Export subtitles (share sheet); file readable
-- [ ] Settings → Subtitles → Auto-generate on import (optional) runs after import when playback pauses
 - [ ] Speech permission prompt appears on first generation; denying shows clear error
 - [ ] Language pack download on Wi‑Fi completes or surfaces error
 
@@ -191,7 +194,7 @@ Coffee ($2.99), Lunch ($6.99), and Today's Rent ($14.99).
 - [ ] AudioPig Plus section shows status, subscribe, manage, restore
 - [ ] Feed a Student tips show prices and thank-you on purchase
 - [ ] Apple Watch settings: artwork skip gestures toggle
-- [ ] Subtitles section copy visible; auto-generate toggle persists
+- [ ] Subtitles section: font picker shows each option in its typeface; footer copy visible
 - [ ] About section displays version 1.1.2
 
 ---

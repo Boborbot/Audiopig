@@ -99,6 +99,14 @@ struct MainTabView: View {
                 viewModel: viewModel.playerViewModel
             )
         )
+        .sheet(
+            isPresented: Binding(
+                get: { viewModel.isTranscriptionQueuePresented },
+                set: { viewModel.isTranscriptionQueuePresented = $0 }
+            )
+        ) {
+            WholeBookTranscriptionQueueView(viewModel: viewModel)
+        }
         .onChange(of: appSettings.orientationLock) { _, locked in
             OrientationLockController.shared.setLocked(locked)
         }

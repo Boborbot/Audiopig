@@ -14,29 +14,13 @@ struct PlayerCoverArt: View {
     let containerWidth: CGFloat
     let containerHeight: CGFloat
 
-    private var imageAspectRatio: CGFloat {
-        let size = image.size
-        guard size.height > 0 else { return 1 }
-        return size.width / size.height
-    }
-
     var body: some View {
-        ZStack {
-            if imageAspectRatio > 1 {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: containerWidth, height: containerHeight)
-                    .playerCoverArtClip()
-            } else {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: containerHeight)
-                    .playerCoverArtClip()
-            }
-        }
-        .frame(width: containerWidth, height: containerHeight)
-        .applyShadows(DS.Shadow.coverArt)
+        Image(uiImage: image)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: containerWidth, height: containerHeight)
+            .playerCoverArtClip()
+            .frame(width: containerWidth, height: containerHeight)
+            .applyShadows(DS.Shadow.coverArt)
     }
 }

@@ -19,6 +19,8 @@ struct SubtitlesPanel: View {
     @State private var viewportHeight: CGFloat = 0
     @State private var isProgrammaticScroll = false
     @State private var userScrollInProgress = false
+    @State private var subtitleLineTouchActive = false
+    @State private var subtitleTouchMoved = false
 
     enum Style {
         /// Frosted overlay on cover art — light text on dark scrim.
@@ -26,6 +28,8 @@ struct SubtitlesPanel: View {
     }
 
     @Bindable var viewModel: PlayerViewModel
+    @Binding var blocksSkim: Bool
+    var isSkimActive: Bool = false
     var style: Style = .artworkOverlay
 
     private var primaryTextColor: Color {
@@ -72,6 +76,14 @@ struct SubtitlesPanel: View {
         .padding(.horizontal, DS.Spacing.md)
         .padding(.top, DS.Spacing.xl)
         .padding(.bottom, DS.Spacing.lg)
+        .allowsHitTesting(!isSkimActive)
+        .onChange(of: isSkimActive) { _, active in
+            guard active else { return }
+            actionMenuLineID = nil
+            subtitleLineTouchActive = false
+            subtitleTouchMoved = false
+            syncSkimBlocking()
+        }
     }
 
     // MARK: - Ready state
@@ -94,6 +106,7 @@ struct SubtitlesPanel: View {
             .contentMargins(.top, DS.Spacing.lg, for: .scrollContent)
             .contentMargins(.bottom, DS.Spacing.lg, for: .scrollContent)
             .scrollClipDisabled(actionMenuLineID != nil)
+            .scrollDisabled(isSkimActive)
             .background {
                 GeometryReader { geometry in
                     Color.clear
@@ -113,6 +126,10 @@ struct SubtitlesPanel: View {
                 userScrollInProgress: $userScrollInProgress,
                 onInteractionEnded: reevaluateFollowMode
             )
+            .simultaneousGesture(subtitleScrollTouchGesture)
+            .onChange(of: userScrollInProgress) { _, _ in
+                syncSkimBlocking()
+            }
             .sensoryFeedback(.success, trigger: copiedSubtitleLineID)
             .sensoryFeedback(.success, trigger: bookmarkedSubtitleLineID)
             .onPreferenceChange(SubtitleLineFramesKey.self) { frames in
@@ -299,6 +316,7 @@ struct SubtitlesPanel: View {
                     }
                 }
                 .onTapGesture {
+                    guard !isSkimActive else { return }
                     if actionMenuLineID != nil {
                         actionMenuLineID = nil
                     } else if line.isActive {
@@ -308,12 +326,17 @@ struct SubtitlesPanel: View {
                         viewModel.seekToSubtitle(at: line.startTime)
                     }
                 }
-                .onLongPressGesture(minimumDuration: 0.45) {
+                .onLongPressGesture(minimumDuration: 0.45, pressing: { pressing in
+                    guard !isSkimActive else { return }
+                    subtitleLineTouchActive = pressing
+                    syncSkimBlocking()
+                }, perform: {
+                    guard !isSkimActive else { return }
                     Haptics.subtle()
                     withAnimation(DS.Animation.snappy) {
                         actionMenuLineID = line.id
                     }
-                }
+                })
 
             if actionMenuLineID == line.id {
                 SubtitleLineActionBubble(
@@ -356,6 +379,28 @@ struct SubtitlesPanel: View {
         bookmarkedSubtitleLineID = line.id
     }
 
+    private var subtitleScrollTouchGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard !isProgrammaticScroll, !isSkimActive else { return }
+                let distance = hypot(value.translation.width, value.translation.height)
+                if distance > SubtitleScrollMetrics.stationaryMovementThreshold {
+                    subtitleTouchMoved = true
+                    syncSkimBlocking()
+                }
+            }
+            .onEnded { _ in
+                subtitleTouchMoved = false
+                syncSkimBlocking()
+            }
+    }
+
+    private func syncSkimBlocking() {
+        blocksSkim = userScrollInProgress
+            || subtitleLineTouchActive
+            || subtitleTouchMoved
+    }
+
     // MARK: - Generation prompts
 
     private var needsGenerationContent: some View {
@@ -380,13 +425,19 @@ struct SubtitlesPanel: View {
     }
 
     private func loadingContent(message: String) -> some View {
-        VStack(spacing: DS.Spacing.sm) {
-            ProgressView()
-                .tint(DS.Color.coral)
-            Text(message)
-                .font(DS.Typography.caption)
-                .foregroundStyle(secondaryTextColor)
-                .multilineTextAlignment(.center)
+        VStack(spacing: DS.Spacing.md) {
+            VStack(spacing: DS.Spacing.sm) {
+                ProgressView()
+                    .tint(DS.Color.coral)
+                Text(message)
+                    .font(DS.Typography.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .multilineTextAlignment(.center)
+            }
+            Button("Cancel") {
+                viewModel.cancelSubtitleTranscriptionAndDismiss()
+            }
+            .buttonStyle(DS.ButtonStyle.ghost)
         }
     }
 
@@ -429,6 +480,8 @@ private struct SubtitleScrollState: Equatable {
 
 private enum SubtitleScrollMetrics {
     static let centerAnchor = UnitPoint(x: 0.5, y: 0.5)
+    /// Movement beyond this radius cancels a stationary Skim hold.
+    static let stationaryMovementThreshold: CGFloat = 10
 }
 
 private struct SubtitleLineFramesKey: PreferenceKey {

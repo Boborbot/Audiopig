@@ -5,6 +5,9 @@
 
 import Foundation
 import SwiftData
+import OSLog
+
+private let log = Logger(subsystem: "com.audiopig", category: "LibraryManager")
 
 @MainActor
 final class LibraryManager: LibraryManagerProtocol {
@@ -41,9 +44,12 @@ final class LibraryManager: LibraryManagerProtocol {
     }
 
     func importAudiobook(from sourceURL: URL) async throws -> AudiobookImportMetadata {
-        guard fileExists(at: sourceURL) else {
-            throw LibraryManagerError.fileNotFound
-        }
+        let destinationURL = try copyIntoLibrary(from: sourceURL)
+        return try await extractMetadata(from: destinationURL)
+    }
+
+    func copyIntoLibrary(from sourceURL: URL) throws -> URL {
+        try ensureLibraryDirectoryExists()
 
         guard SupportedAudioExtension.isSupported(sourceURL) else {
             throw LibraryManagerError.unsupportedFileFormat
@@ -53,18 +59,24 @@ final class LibraryManager: LibraryManagerProtocol {
         let resolvedLibraryURL = libraryDirectoryURL.standardizedFileURL
 
         if resolvedSourceURL.deletingLastPathComponent() == resolvedLibraryURL {
-            return try await extractMetadata(from: resolvedSourceURL)
+            guard fileExists(at: resolvedSourceURL) else {
+                throw LibraryManagerError.fileNotFound
+            }
+            return resolvedSourceURL
         }
 
         let destinationURL = uniqueDestinationURL(for: resolvedSourceURL.lastPathComponent)
-
         do {
-            try fileManager.copyItem(at: resolvedSourceURL, to: destinationURL)
+            try coordinatedCopy(from: resolvedSourceURL, to: destinationURL)
         } catch {
+            throw Self.mappedFileSystemError(error)
+        }
+
+        guard fileExists(at: destinationURL) else {
             throw LibraryManagerError.fileSystemOperationFailed
         }
 
-        return try await extractMetadata(from: destinationURL)
+        return destinationURL
     }
 
     func scanDirectory(at directoryURL: URL) async throws -> [AudiobookImportMetadata] {
@@ -133,6 +145,8 @@ final class LibraryManager: LibraryManagerProtocol {
         do {
             try context.save()
         } catch {
+            context.rollback()
+            log.error("SwiftData persist failed: \(error.localizedDescription, privacy: .public)")
             throw LibraryManagerError.importFailed
         }
 
@@ -165,8 +179,55 @@ final class LibraryManager: LibraryManagerProtocol {
         do {
             try fileManager.removeItem(at: fileURL)
         } catch {
-            throw LibraryManagerError.fileSystemOperationFailed
+            throw Self.mappedFileSystemError(error)
         }
+    }
+
+    func deleteUnreferencedFiles(_ fileURLs: [URL], in context: ModelContext) {
+        guard let referencedPaths = try? referencedFilePaths(in: context) else {
+            log.error("Skipped file cleanup because the library could not be read.")
+            return
+        }
+
+        let toRemove = LibraryFileReclamation.filesToRemove(
+            candidates: fileURLs,
+            referencedPaths: referencedPaths,
+            libraryDirectoryURL: libraryDirectoryURL
+        )
+        for url in toRemove {
+            do {
+                try fileManager.removeItem(at: url)
+            } catch {
+                log.error(
+                    "Failed to remove \(url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+    }
+
+    func persistUntrackedLibraryFiles(in context: ModelContext) async throws -> Int {
+        var referencedPaths = try referencedFilePaths(in: context)
+        let libraryPath = libraryDirectoryURL.standardizedFileURL.path
+        var recovered = 0
+
+        for fileURL in supportedAudioFiles(in: libraryDirectoryURL) {
+            let path = fileURL.standardizedFileURL.path
+            guard LibraryFileReclamation.isInsideLibraryDirectory(path, libraryPath: libraryPath) else { continue }
+            guard !referencedPaths.contains(path) else { continue }
+
+            do {
+                let metadata = try await extractMetadata(from: fileURL)
+                _ = try persist(metadata: metadata, in: context)
+                referencedPaths.insert(path)
+                recovered += 1
+            } catch {
+                log.error(
+                    "Failed to recover \(fileURL.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+
+        return recovered
     }
 
     func fileExists(at fileURL: URL) -> Bool {
@@ -290,6 +351,7 @@ final class LibraryManager: LibraryManagerProtocol {
         do {
             try context.save()
         } catch {
+            context.rollback()
             throw LibraryManagerError.mergeFailed
         }
 
@@ -316,8 +378,90 @@ final class LibraryManager: LibraryManagerProtocol {
                 withIntermediateDirectories: true
             )
         } catch {
-            throw LibraryManagerError.fileSystemOperationFailed
+            throw Self.mappedFileSystemError(error)
         }
+    }
+
+    private func referencedFilePaths(in context: ModelContext) throws -> Set<String> {
+        let audiobooks = try context.fetch(FetchDescriptor<Audiobook>())
+        var paths = Set<String>()
+        for audiobook in audiobooks {
+            paths.insert(audiobook.fileURL.standardizedFileURL.path)
+            for chapter in audiobook.chapters {
+                paths.insert(chapter.fileURL.standardizedFileURL.path)
+            }
+        }
+        return paths
+    }
+
+    private func supportedAudioFiles(in directoryURL: URL) -> [URL] {
+        guard let enumerator = fileManager.enumerator(
+            at: directoryURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        var urls: [URL] = []
+        var iterator = enumerator.makeIterator()
+        while let fileURL = iterator.next() as? URL {
+            guard SupportedAudioExtension.isSupported(fileURL) else { continue }
+            urls.append(fileURL)
+        }
+        return urls.sorted {
+            $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending
+        }
+    }
+
+    private func coordinatedCopy(from source: URL, to destination: URL) throws {
+        do {
+            try fileManager.copyItem(at: source, to: destination)
+            return
+        } catch {
+            log.error(
+                "Direct copy failed for \(source.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
+        }
+
+        var coordinationError: NSError?
+        var copyError: Error?
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        coordinator.coordinate(
+            readingItemAt: source,
+            options: [.withoutChanges],
+            error: &coordinationError
+        ) { readableURL in
+            do {
+                try FileManager.default.copyItem(at: readableURL, to: destination)
+            } catch {
+                copyError = error
+            }
+        }
+
+        if let coordinationError {
+            throw coordinationError
+        }
+        if let copyError {
+            throw copyError
+        }
+        if !fileManager.fileExists(atPath: destination.path) {
+            throw LibraryManagerError.fileNotFound
+        }
+    }
+
+    private static func mappedFileSystemError(_ error: Error) -> LibraryManagerError {
+        if let libraryError = error as? LibraryManagerError {
+            return libraryError
+        }
+        let nsError = error as NSError
+        if nsError.code == NSFileWriteOutOfSpaceError {
+            return .diskFull
+        }
+        if nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(ENOSPC) {
+            return .diskFull
+        }
+        return .fileSystemOperationFailed
     }
 
     private func fileAdditionDate(for url: URL) -> Date? {

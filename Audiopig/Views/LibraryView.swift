@@ -9,8 +9,10 @@ import UniformTypeIdentifiers
 struct LibraryView: View {
     @State private var viewModel: LibraryViewModel
     @FocusState private var isSearchFocused: Bool
+    @Environment(\.miniPlayerClearance) private var miniPlayerClearance
 
     @State private var isImporterPresented: Bool = false
+    @State private var isLibraryOrderPresented: Bool = false
 
     private static let allowedAudioTypes: [UTType] = {
         var types: [UTType] = [.mp3, .mpeg4Audio]
@@ -35,11 +37,11 @@ struct LibraryView: View {
             ) { result in
                 switch result {
                 case .success(let urls):
-                    Task { await viewModel.importFiles(urls) }
+                    viewModel.importFiles(urls)
                 case .failure(let error):
-                    if (error as NSError).code != NSUserCancelledError {
-                        viewModel.reportError("Could not open the selected files. Please try again.")
-                    }
+                    let nsError = error as NSError
+                    if nsError.code == NSUserCancelledError { return }
+                    viewModel.reportError("Could not open the selected files. Please try again.")
                 }
             }
             .alert("Delete Audiobook?", isPresented: $viewModel.isSwipeDeleteConfirmationPresented) {
@@ -100,6 +102,8 @@ struct LibraryView: View {
                 }
             }
             .overlay { importOverlay }
+            .overlay(alignment: .bottom) { missingCoverHintOverlay }
+            .animation(DS.Animation.standard, value: viewModel.missingCoverHint)
             .sheet(isPresented: $viewModel.isMergeSheetPresented) { mergeSheet }
             .sheet(isPresented: $viewModel.isFolderSheetPresented) { folderSheet }
             .sheet(item: $viewModel.bookPendingEdit) { audiobook in
@@ -140,8 +144,9 @@ struct LibraryView: View {
                         finishSwipeAction(for: audiobook)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        deleteSwipeAction(for: audiobook)
                         editSwipeAction(for: audiobook)
+                        deleteSwipeAction(for: audiobook)
+                        transcribeSwipeAction(for: audiobook)
                     }
 
                 case .folder(let folder):
@@ -202,6 +207,16 @@ struct LibraryView: View {
             }
             .tint(DS.Color.coral)
         }
+    }
+
+    @ViewBuilder
+    private func transcribeSwipeAction(for audiobook: Audiobook) -> some View {
+        Button {
+            viewModel.enqueueTranscription(for: audiobook)
+        } label: {
+            Label("Transcribe", systemImage: "text.word.spacing")
+        }
+        .tint(DS.Color.coral)
     }
 
     @ViewBuilder
@@ -354,6 +369,26 @@ struct LibraryView: View {
         }
     }
 
+    @ViewBuilder
+    private var missingCoverHintOverlay: some View {
+        if let hint = viewModel.missingCoverHint {
+            MissingCoverHintBanner(
+                title: hint.title,
+                onAddArtwork: { viewModel.openMissingCoverHintEdit() },
+                onDismiss: { viewModel.dismissMissingCoverHint() }
+            )
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.bottom, miniPlayerClearance + DS.Spacing.sm)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .task(id: hint.bookID) {
+                try? await Task.sleep(for: .seconds(6))
+                if viewModel.missingCoverHint?.bookID == hint.bookID {
+                    viewModel.dismissMissingCoverHint()
+                }
+            }
+        }
+    }
+
     // MARK: - Toolbar
 
     @ToolbarContentBuilder
@@ -386,22 +421,11 @@ struct LibraryView: View {
                 }
                 .transition(.opacity)
             } else if !viewModel.isSearchActive && (!viewModel.audiobooks.isEmpty || !viewModel.folders.isEmpty) {
-                LibraryOrderToolbarControl(viewModel: viewModel)
-                    .transition(.opacity)
-            }
-        }
-
-        ToolbarItem(placement: .navigationBarLeading) {
-            if !viewModel.isSelectionModeActive && !viewModel.isSearchActive {
-                Button {
-                    withAnimation(DS.Animation.standard) {
-                        viewModel.isSearchActive = true
-                    }
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
+                LibraryToolbarCapsule(
+                    viewModel: viewModel,
+                    isOrderPresented: $isLibraryOrderPresented
+                )
                 .transition(.opacity)
-                .accessibilityLabel("Search library")
             }
         }
 

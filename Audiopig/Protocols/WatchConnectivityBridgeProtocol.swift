@@ -4,7 +4,7 @@
 //
 
 import Foundation
-
+ 
 /// iPhone-side bridge to the paired Apple Watch. All WatchConnectivity types stay in the concrete service.
 @MainActor
 protocol WatchConnectivityBridgeProtocol: AnyObject {
@@ -18,7 +18,7 @@ protocol WatchConnectivityBridgeProtocol: AnyObject {
     func ensureSessionActivated(timeout: TimeInterval) async -> Bool
     func publishSnapshot(_ snapshot: WatchPlaybackSnapshot, includeArtwork: Bool)
     func publishChapters(_ payload: WatchChaptersPayload)
-    func publishRecentBooks(_ payload: WatchRecentBooksPayload)
+    func publishRecentBooks(_ payload: WatchRecentBooksPayload, contextIncludesThumbnails: Bool)
     func publishLocalBooks(_ payload: WatchLocalBooksPayload)
     func restoreLocalBooksCache(_ payload: WatchLocalBooksPayload)
     func publishSettings(_ settings: WatchSettingsSnapshot)
@@ -36,4 +36,10 @@ protocol WatchConnectivityBridgeProtocol: AnyObject {
     var fileProgressHandler: (@MainActor (UUID, Double) -> Void)? { get set }
     /// Called when Watch reachability changes after session activation.
     var reachabilityHandler: (@MainActor (Bool) -> Void)? { get set }
+}
+
+extension WatchConnectivityBridgeProtocol {
+    func publishRecentBooks(_ payload: WatchRecentBooksPayload) {
+        publishRecentBooks(payload, contextIncludesThumbnails: true)
+    }
 }

@@ -61,6 +61,7 @@ struct FolderContentView: View {
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     removeSwipeAction(for: audiobook)
                     deleteSwipeAction(for: audiobook)
+                    transcribeSwipeAction(for: audiobook)
                 }
             }
         }
@@ -140,6 +141,15 @@ struct FolderContentView: View {
             Label("Remove", systemImage: "folder.badge.minus")
         }
         .tint(Color(UIColor.systemOrange))
+    }
+
+    private func transcribeSwipeAction(for audiobook: Audiobook) -> some View {
+        Button {
+            viewModel.enqueueTranscription(for: audiobook)
+        } label: {
+            Label("Transcribe", systemImage: "text.word.spacing")
+        }
+        .tint(DS.Color.coral)
     }
 
     private func deleteSwipeAction(for audiobook: Audiobook) -> some View {

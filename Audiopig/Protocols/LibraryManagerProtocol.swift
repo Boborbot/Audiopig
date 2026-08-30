@@ -18,6 +18,10 @@ protocol LibraryManagerProtocol: AnyObject {
     /// Copies a file into the managed library directory and returns its metadata.
     func importAudiobook(from sourceURL: URL) async throws -> AudiobookImportMetadata
 
+    /// Copies a security-scoped or external audio file into the managed library directory.
+    /// This is synchronous so it can run before a document-picker URL is revoked.
+    func copyIntoLibrary(from sourceURL: URL) throws -> URL
+
     /// Scans a directory for supported audio files and returns metadata for each match.
     func scanDirectory(at directoryURL: URL) async throws -> [AudiobookImportMetadata]
 
@@ -32,6 +36,14 @@ protocol LibraryManagerProtocol: AnyObject {
 
     /// Removes an audiobook file from the library directory.
     func deleteAudiobookFile(at fileURL: URL) throws
+
+    /// Deletes candidate files that still live in the library directory and are not
+    /// referenced by any remaining audiobook or chapter.
+    func deleteUnreferencedFiles(_ fileURLs: [URL], in context: ModelContext)
+
+    /// Persists supported audio files that already exist in the library directory
+    /// but have no SwiftData record. Used to recover after a crashed delete.
+    func persistUntrackedLibraryFiles(in context: ModelContext) async throws -> Int
 
     /// Verifies that a file URL still resolves to an accessible resource on disk.
     func fileExists(at fileURL: URL) -> Bool

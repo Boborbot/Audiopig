@@ -24,7 +24,7 @@ struct SubtitlesListView: View {
                 disclaimerSection
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Subtitles")
+            .navigationTitle("Transcription")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -122,68 +122,87 @@ struct SubtitlesListView: View {
 
     private var wholeBookSection: some View {
         Section {
-            switch viewModel.wholeBookJobState {
-            case .idle:
-                if viewModel.hasUncoveredSubtitleWindows {
-                    Button {
-                        viewModel.generateSubtitlesWholeBook()
-                    } label: {
-                        Label("Transcribe Entire Book", systemImage: "text.append")
-                    }
-                    .disabled(!viewModel.subtitlesSupported)
-                } else {
-                    Label("Entire book transcribed", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(DS.Color.coral)
-                }
-
-            case .preparing:
-                HStack(spacing: DS.Spacing.sm) {
-                    ProgressView()
-                        .tint(DS.Color.coral)
-                    Text("Preparing transcription…")
-                        .font(DS.Typography.listBody)
-                        .foregroundStyle(DS.Color.secondary)
-                }
-
-            case .running(let completed, let total, let message):
+            if viewModel.isInWholeBookTranscriptionQueue, !viewModel.wholeBookJobState.isActive {
                 VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                    HStack(spacing: DS.Spacing.sm) {
-                        ProgressView()
-                            .tint(DS.Color.coral)
-                        Text(message)
+                    if let position = viewModel.wholeBookQueuePosition {
+                        Label("In transcription queue (#\(position))", systemImage: "clock")
                             .font(DS.Typography.listBody)
                             .foregroundStyle(DS.Color.secondary)
                     }
-                    ProgressView(value: Double(completed), total: Double(max(total, 1)))
-                        .tint(DS.Color.coral)
-                    wholeBookControlRow
-                }
-
-            case .paused(let completed, let total):
-                VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                    Text("Paused at section \(completed + 1) of \(total)")
-                        .font(DS.Typography.listBody)
-                        .foregroundStyle(DS.Color.secondary)
-                    ProgressView(value: Double(completed), total: Double(max(total, 1)))
-                        .tint(DS.Color.coral)
-                    wholeBookControlRow
-                }
-
-            case .failed(let message):
-                VStack(alignment: .leading, spacing: DS.Spacing.sm) {
-                    Text(message)
-                        .font(DS.Typography.caption)
-                        .foregroundStyle(DS.Color.secondary)
-                    Button("Try Again") {
-                        viewModel.generateSubtitlesWholeBook()
+                    Button("View Queue") {
+                        viewModel.onShowTranscriptionQueue?()
                     }
+                    .font(DS.Typography.caption)
                 }
+            } else {
+                wholeBookActiveSection
             }
         } header: {
             Text("Entire Book")
         } footer: {
-            Text("Runs in the background while you listen or browse. Progress stays here — the player overlay only shows subtitles near you.")
+            Text("Whole-book jobs run in a background queue while you listen or browse. Manage order and progress from the library transcription queue.")
                 .font(DS.Typography.caption)
+        }
+    }
+
+    @ViewBuilder
+    private var wholeBookActiveSection: some View {
+        switch viewModel.wholeBookJobState {
+        case .idle:
+            if viewModel.hasUncoveredSubtitleWindows {
+                Button {
+                    viewModel.generateSubtitlesWholeBook()
+                } label: {
+                    Label("Transcribe Entire Book", systemImage: "text.append")
+                }
+                .disabled(!viewModel.subtitlesSupported)
+            } else {
+                Label("Entire book transcribed", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(DS.Color.coral)
+            }
+
+        case .preparing:
+            HStack(spacing: DS.Spacing.sm) {
+                ProgressView()
+                    .tint(DS.Color.coral)
+                Text("Preparing transcription…")
+                    .font(DS.Typography.listBody)
+                    .foregroundStyle(DS.Color.secondary)
+            }
+
+        case .running(let completed, let total, let message):
+            VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+                HStack(spacing: DS.Spacing.sm) {
+                    ProgressView()
+                        .tint(DS.Color.coral)
+                    Text(message)
+                        .font(DS.Typography.listBody)
+                        .foregroundStyle(DS.Color.secondary)
+                }
+                ProgressView(value: Double(completed), total: Double(max(total, 1)))
+                    .tint(DS.Color.coral)
+                wholeBookControlRow
+            }
+
+        case .paused(let completed, let total):
+            VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+                Text("Paused at section \(completed + 1) of \(total)")
+                    .font(DS.Typography.listBody)
+                    .foregroundStyle(DS.Color.secondary)
+                ProgressView(value: Double(completed), total: Double(max(total, 1)))
+                    .tint(DS.Color.coral)
+                wholeBookControlRow
+            }
+
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+                Text(message)
+                    .font(DS.Typography.caption)
+                    .foregroundStyle(DS.Color.secondary)
+                Button("Try Again") {
+                    viewModel.generateSubtitlesWholeBook()
+                }
+            }
         }
     }
 

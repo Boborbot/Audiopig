@@ -183,6 +183,22 @@ enum DS {
                     : .system(.body, design: .monospaced)
             }
         }
+
+        /// Settings picker label — each option rendered in its own typeface.
+        static func subtitlePickerLabel(_ style: SubtitleFont) -> SwiftUI.Font {
+            switch style {
+            case .newYork:
+                return .system(.body, design: .serif)
+            case .sanFrancisco:
+                return .system(.body, design: .default)
+            case .sfRounded:
+                return .system(.body, design: .rounded)
+            case .charter:
+                return .custom("Charter-Roman", size: 0, relativeTo: .body)
+            case .sfMono:
+                return .system(.body, design: .monospaced)
+            }
+        }
     }
 
     // MARK: - Spacing (4-pt grid)
@@ -236,6 +252,23 @@ enum DS {
             let speed = playerSpeedPillWidth
             return ceil(height + (speed - height) * playerIconPillWidthBlend)
         }
+
+        private static let playerHeroArtworkScale: CGFloat = 0.925
+        private static let padPortraitArtworkHeightCap: CGFloat = 0.50
+
+        /// Portrait player hero artwork size — matches `PlayerView` layout math.
+        static func playerPortraitArtworkSize(containerSize: CGSize) -> CGSize {
+            let isPad = UIDevice.current.userInterfaceIdiom == .pad
+            let padding = isPad ? Spacing.md : Spacing.playerH
+            let contentWidth = containerSize.width - (padding * 2)
+            let heightCap = isPad ? containerSize.height * padPortraitArtworkHeightCap : .greatestFiniteMagnitude
+            let baseArtSize = min(contentWidth, heightCap)
+            let scaled = baseArtSize * playerHeroArtworkScale
+            return CGSize(width: scaled, height: scaled)
+        }
+
+        /// Circular artwork action control under the edit hero.
+        static let artworkActionButtonSize: CGFloat = 44
     }
 
     // MARK: - Corner Radius

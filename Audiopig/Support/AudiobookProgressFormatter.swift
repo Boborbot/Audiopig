@@ -11,10 +11,19 @@ enum AudiobookProgressFormatter {
 
     // MARK: - Progress Ratio
 
+    /// Listened fraction below which the library progress ring is hidden entirely.
+    /// At 0.5% the ring appears (rounds to 1% in the UI).
+    static let progressRingMinimumFraction = 0.005
+
     /// Returns a value in [0, 1] representing how much of the book has been played.
     static func progress(currentTime: TimeInterval, duration: TimeInterval) -> Double {
         guard duration > 0 else { return 0 }
         return max(0, min(1, currentTime / duration))
+    }
+
+    /// Whether the library row should show the donut progress ring (track + fill).
+    static func showsProgressRing(currentTime: TimeInterval, duration: TimeInterval) -> Bool {
+        progress(currentTime: currentTime, duration: duration) >= progressRingMinimumFraction
     }
 
     // MARK: - Formatted Strings

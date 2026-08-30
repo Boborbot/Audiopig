@@ -9,6 +9,7 @@ public enum WatchCommand: Codable, Sendable, Equatable {
     case requestRecentBooks
     case requestLocalBooks
     case requestSnapshot
+    case requestChapters
     case loadBook(bookID: UUID, autoPlay: Bool)
     case loadLocalBook(bookID: UUID, autoPlay: Bool)
     case togglePlayPause
@@ -48,6 +49,7 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case requestRecentBooks
         case requestLocalBooks
         case requestSnapshot
+        case requestChapters
         case loadBook
         case loadLocalBook
         case togglePlayPause
@@ -76,6 +78,7 @@ public enum WatchCommand: Codable, Sendable, Equatable {
         case .requestRecentBooks: self = .requestRecentBooks
         case .requestLocalBooks: self = .requestLocalBooks
         case .requestSnapshot: self = .requestSnapshot
+        case .requestChapters: self = .requestChapters
         case .loadBook:
             let id = try container.decode(UUID.self, forKey: .bookID)
             let autoPlay = try container.decode(Bool.self, forKey: .autoPlay)
@@ -129,6 +132,8 @@ public enum WatchCommand: Codable, Sendable, Equatable {
             try container.encode(Kind.requestLocalBooks, forKey: .kind)
         case .requestSnapshot:
             try container.encode(Kind.requestSnapshot, forKey: .kind)
+        case .requestChapters:
+            try container.encode(Kind.requestChapters, forKey: .kind)
         case .loadBook(let bookID, let autoPlay):
             try container.encode(Kind.loadBook, forKey: .kind)
             try container.encode(bookID, forKey: .bookID)
@@ -195,6 +200,8 @@ public struct WatchCommandResult: Codable, Sendable, Equatable {
     public let lullResult: WatchLullResult?
     public let localBooks: WatchLocalBooksPayload?
     public let recentBooks: WatchRecentBooksPayload?
+    /// Optional to allow older payloads to decode.
+    public let chapters: WatchChaptersPayload?
 
     public init(
         success: Bool,
@@ -202,7 +209,8 @@ public struct WatchCommandResult: Codable, Sendable, Equatable {
         snapshot: WatchPlaybackSnapshot? = nil,
         lullResult: WatchLullResult? = nil,
         localBooks: WatchLocalBooksPayload? = nil,
-        recentBooks: WatchRecentBooksPayload? = nil
+        recentBooks: WatchRecentBooksPayload? = nil,
+        chapters: WatchChaptersPayload? = nil
     ) {
         self.success = success
         self.errorMessage = errorMessage
@@ -210,20 +218,23 @@ public struct WatchCommandResult: Codable, Sendable, Equatable {
         self.lullResult = lullResult
         self.localBooks = localBooks
         self.recentBooks = recentBooks
+        self.chapters = chapters
     }
 
     public static func ok(
         snapshot: WatchPlaybackSnapshot? = nil,
         lullResult: WatchLullResult? = nil,
         localBooks: WatchLocalBooksPayload? = nil,
-        recentBooks: WatchRecentBooksPayload? = nil
+        recentBooks: WatchRecentBooksPayload? = nil,
+        chapters: WatchChaptersPayload? = nil
     ) -> WatchCommandResult {
         WatchCommandResult(
             success: true,
             snapshot: snapshot,
             lullResult: lullResult,
             localBooks: localBooks,
-            recentBooks: recentBooks
+            recentBooks: recentBooks,
+            chapters: chapters
         )
     }
 

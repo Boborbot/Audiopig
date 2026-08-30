@@ -11,6 +11,7 @@ struct PlayerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var paywallViewModel: PaywallViewModel?
     @State private var smartRewindScopeSheet: SmartRewindRange?
+    @State private var subtitleInteractionBlocksSkim = false
 
     private var usesFullScreenPresentation: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
@@ -79,6 +80,9 @@ struct PlayerView: View {
             if presented {
                 paywallViewModel = viewModel.makePaywallViewModel()
             }
+        }
+        .onDisappear {
+            viewModel.endSkim()
         }
     }
 
@@ -204,15 +208,69 @@ struct PlayerView: View {
             .animation(DS.Animation.fade, value: viewModel.isSubtitlesVisible)
 
             if viewModel.isSubtitlesVisible {
-                SubtitlesPanel(viewModel: viewModel, style: .artworkOverlay)
-                    .artworkSubtitlesScrim()
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                SubtitlesPanel(
+                    viewModel: viewModel,
+                    blocksSkim: $subtitleInteractionBlocksSkim,
+                    isSkimActive: viewModel.isSkimActive,
+                    style: .artworkOverlay
+                )
+                .artworkSubtitlesScrim()
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+
+            if viewModel.isSkimActive, case .playing = viewModel.playbackState {
+                RoundedRectangle(cornerRadius: DS.Radius.coverArt, style: .continuous)
+                    .strokeBorder(DS.Color.coral.opacity(0.85), lineWidth: 2)
+                    .allowsHitTesting(false)
+
+                VStack {
+                    HStack {
+                        Spacer()
+                        Text("Skim \(viewModel.skimLabel)")
+                            .font(DS.Typography.caption.weight(.semibold))
+                            .foregroundStyle(DS.Color.coral)
+                            .padding(.horizontal, DS.Spacing.sm)
+                            .padding(.vertical, DS.Spacing.xs)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .padding(DS.Spacing.sm)
+                    }
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+                .transition(.opacity)
             }
         }
+        .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: DS.Radius.coverArt, style: .continuous))
-        .scaleEffect(viewModel.playbackState == .playing ? 1.0 : 0.94)
+        .contentShape(RoundedRectangle(cornerRadius: DS.Radius.coverArt, style: .continuous))
+        .scaleEffect(artworkScale)
         .animation(DS.Animation.reveal, value: viewModel.playbackState == .playing)
+        .animation(DS.Animation.snappy, value: viewModel.isSkimActive)
         .animation(DS.Animation.fade, value: viewModel.isSubtitlesVisible)
+        .modifier(SkimHoldGesture(
+            isEnabled: viewModel.canActivateSkim,
+            isBlocked: subtitleInteractionBlocksSkim
+        ) {
+            viewModel.beginSkim()
+        } onRelease: {
+            viewModel.endSkim()
+        })
+        .onChange(of: viewModel.isSubtitlesVisible) { _, visible in
+            if !visible {
+                subtitleInteractionBlocksSkim = false
+            }
+        }
+        .accessibilityLabel("Cover art")
+        .accessibilityHint(
+            viewModel.canActivateSkim
+                ? "Press and hold for Skim at \(viewModel.skimLabel)"
+                : "Cover art"
+        )
+    }
+
+    private var artworkScale: CGFloat {
+        if viewModel.isSkimActive, case .playing = viewModel.playbackState { return 1.02 }
+        return viewModel.playbackState == .playing ? 1.0 : 0.94
     }
 
     private func artworkPlaceholder(width: CGFloat, height: CGFloat) -> some View {
@@ -468,19 +526,20 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Bottom Row (speed | chapters | bookmarks | sleep timer)
+    // MARK: - Bottom Row (speed | chapters | add bookmark | bookmarks list | sleep timer)
 
     private var bottomRow: some View {
         HStack(spacing: DS.Spacing.sm) {
             speedMenu
             chaptersButton
-            bookmarksButton
+            addBookmarkButton
+            bookmarksListButton
             sleepTimerMenu
         }
         .frame(maxWidth: .infinity)
     }
 
-    /// EQ, Subtitles, and Search hide while Look results expand the control stack.
+    /// EQ, Subtitles, Transcription, and Search hide while Look results expand the control stack.
     private var showsSecondaryPillRow: Bool {
         switch viewModel.lullAnalysisState {
         case .idle, .analyzing:
@@ -496,6 +555,7 @@ struct PlayerView: View {
         return HStack(spacing: DS.Spacing.sm) {
             eqPillButton(pillPadding: pillPadding)
             subtitlesPillButton(pillPadding: pillPadding)
+            transcriptionPillButton(pillPadding: pillPadding)
             searchPillButton(pillPadding: pillPadding)
         }
         .frame(maxWidth: .infinity)
@@ -517,34 +577,38 @@ struct PlayerView: View {
     }
 
     private func subtitlesPillButton(pillPadding: CGFloat) -> some View {
-        let isTranscribing = viewModel.isSubtitleTranscriptionActive
-        let isActive = viewModel.isSubtitlesVisible || isTranscribing
-
-        return Button {
+        Button {
             viewModel.toggleSubtitles()
         } label: {
             Image(systemName: viewModel.isSubtitlesVisible ? "captions.bubble.fill" : "captions.bubble")
                 .contentTransition(.symbolEffect(.replace))
+                .pillAppearance(isActive: viewModel.isSubtitlesVisible, verticalPadding: pillPadding)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(viewModel.isSubtitlesVisible ? "Hide subtitles" : "Show subtitles")
+    }
+
+    private func transcriptionPillButton(pillPadding: CGFloat) -> some View {
+        let isTranscribing = viewModel.isSubtitleTranscriptionActive
+
+        return Button {
+            Haptics.subtle()
+            viewModel.isSubtitlesPresented = true
+        } label: {
+            Image(systemName: "text.word.spacing")
                 .symbolEffect(
                     .variableColor.iterative.dimInactiveLayers,
                     options: .repeating.speed(0.35),
                     isActive: isTranscribing && !reduceMotion
                 )
-                .pillAppearance(isActive: isActive, verticalPadding: pillPadding)
+                .pillAppearance(isActive: isTranscribing, verticalPadding: pillPadding)
         }
         .buttonStyle(.plain)
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.5)
-                .onEnded { _ in
-                    Haptics.subtle()
-                    viewModel.isSubtitlesPresented = true
-                }
-        )
-        .accessibilityLabel(viewModel.isSubtitlesVisible ? "Hide subtitles" : "Show subtitles")
+        .accessibilityLabel("Transcription")
         .accessibilityHint(
             isTranscribing
-                ? "Transcription in progress. Long press for subtitles options."
-                : "Long press for subtitles options"
+                ? "Transcription in progress. Opens subtitle options."
+                : "Opens subtitle transcription options"
         )
     }
 
@@ -587,9 +651,9 @@ struct PlayerView: View {
         .accessibilityLabel("Chapters")
     }
 
-    // MARK: - Bookmarks Button
+    // MARK: - Bookmark Buttons
 
-    private var bookmarksButton: some View {
+    private var addBookmarkButton: some View {
         Button {
             Haptics.subtle()
             viewModel.addBookmarkForEditing()
@@ -598,15 +662,23 @@ struct PlayerView: View {
                 .playerAccessoryPill()
         }
         .buttonStyle(.plain)
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.5)
-                .onEnded { _ in
-                    Haptics.subtle()
-                    viewModel.isBookmarksPresented = true
-                }
-        )
+        .accessibilityLabel("Add bookmark")
+    }
+
+    private var bookmarksListButton: some View {
+        Button {
+            Haptics.subtle()
+            viewModel.isBookmarksPresented = true
+        } label: {
+            bookmarksListIcon
+                .playerAccessoryPill()
+        }
+        .buttonStyle(.plain)
         .accessibilityLabel("Bookmarks")
-        .accessibilityHint("Tap to add a bookmark. Hold to view all bookmarks.")
+    }
+
+    private var bookmarksListIcon: some View {
+        Image(systemName: "note.text")
     }
 
     // MARK: - Sleep Timer Menu
@@ -733,6 +805,41 @@ struct PlayerView: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Skim Hold Gesture
+
+private enum SkimMetrics {
+    static let holdDuration: TimeInterval = 0.5
+    /// Finger must stay within this radius for the full hold before Skim activates.
+    static let maximumFingerMovement: CGFloat = 10
+}
+
+private struct SkimHoldGesture: ViewModifier {
+    let isEnabled: Bool
+    let isBlocked: Bool
+    let onPress: () -> Void
+    let onRelease: () -> Void
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.onLongPressGesture(
+                minimumDuration: SkimMetrics.holdDuration,
+                maximumDistance: SkimMetrics.maximumFingerMovement,
+                pressing: { isPressing in
+                    if !isPressing {
+                        onRelease()
+                    }
+                },
+                perform: {
+                    guard !isBlocked else { return }
+                    onPress()
+                }
+            )
+        } else {
+            content
         }
     }
 }

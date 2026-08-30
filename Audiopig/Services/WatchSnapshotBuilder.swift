@@ -70,6 +70,32 @@ enum WatchSnapshotBuilder {
         )
     }
 
+    static func makeLoadingSnapshot(
+        revision: UInt64,
+        audiobook: Audiobook,
+        playbackSpeed: Float,
+        skipForwardSeconds: TimeInterval,
+        skipBackwardSeconds: TimeInterval,
+        playbackTimelineScope: PlaybackTimelineScope
+    ) -> WatchPlaybackSnapshot {
+        let chapters = audiobook.chapters.sorted { $0.orderIndex < $1.orderIndex }
+        return makeSnapshot(
+            revision: revision,
+            audiobook: audiobook,
+            chapters: chapters,
+            currentChapterIndex: 0,
+            playbackState: .loading,
+            playbackSpeed: playbackSpeed,
+            skipForwardSeconds: skipForwardSeconds,
+            skipBackwardSeconds: skipBackwardSeconds,
+            globalTime: audiobook.currentPlaybackTime,
+            globalDuration: audiobook.duration,
+            playbackTimelineScope: playbackTimelineScope,
+            coverImage: nil,
+            includeArtwork: false
+        )
+    }
+
     static func mapPlaybackState(_ state: PlaybackState) -> WatchPlaybackState {
         switch state {
         case .idle: return .idle
@@ -104,7 +130,7 @@ enum WatchSnapshotBuilder {
             duration: audiobook.duration,
             currentPlaybackTime: audiobook.currentPlaybackTime,
             lastPlayedAt: audiobook.lastPlayedAt,
-            thumbnailJPEG: coverImage.flatMap { ThumbnailEncoder.jpegData(from: $0, size: .list) }
+            thumbnailJPEG: coverImage.flatMap { ThumbnailEncoder.jpegData(from: $0, size: .watchList) }
         )
     }
 }

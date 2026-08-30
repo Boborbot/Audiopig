@@ -16,6 +16,7 @@ public enum SubtitleGenerationScope: String, Codable, Sendable, CaseIterable {
 public enum SubtitleGenerationStatus: String, Codable, Sendable, CaseIterable {
     case notGenerated
     case inProgress
+    case paused
     case partial
     case complete
     case failed

@@ -11,8 +11,12 @@ struct WatchVolumeCrownModifier: ViewModifier {
     let isActive: Bool
 
     @FocusState private var crownFocused: Bool
-    @State private var crownVolume: Float = 0.5
-    @State private var lastDetentVolume: Float = 0.5
+    @State private var crownAxis: Float = WatchVolumeRange.crownAxis(for: 0.5)
+    @State private var lastCrownAxis: Float = WatchVolumeRange.crownAxis(for: 0.5)
+    @State private var lastAppliedVolume: Float = 0.5
+    @State private var preActivationScroll: Float = 0
+    @State private var isCrownArmed = false
+    @State private var crownIdleTask: Task<Void, Never>?
 
     func body(content: Content) -> some View {
         content
@@ -23,54 +27,94 @@ struct WatchVolumeCrownModifier: ViewModifier {
             }
             .focusable(isActive)
             .focused($crownFocused)
-            .digitalCrownRotation(
-                $crownVolume,
-                from: 0,
-                through: 1,
+            .watchDigitalCrownLow(
+                isActive: isActive,
+                value: $crownAxis,
+                from: 1,
+                through: 0,
                 by: WatchVolumeRange.crownStep,
-                sensitivity: .medium,
                 isContinuous: false,
                 isHapticFeedbackEnabled: false
             )
-            .onChange(of: crownVolume) { _, newValue in
-                guard isActive else {
-                    lastDetentVolume = WatchVolumeRange.normalized(newValue)
-                    return
-                }
-                let normalized = WatchVolumeRange.normalized(newValue)
-                if normalized != crownVolume {
-                    crownVolume = normalized
-                }
-                guard normalized != lastDetentVolume else { return }
-                lastDetentVolume = normalized
-                viewModel.volumeDraft = normalized
-                viewModel.applyVolumeDraft()
+            .onChange(of: crownAxis) { _, newAxis in
+                handleCrownAxisChange(newAxis)
             }
             .onChange(of: viewModel.volumeDraft) { _, newValue in
                 guard !viewModel.isVolumeAdjustmentActive else { return }
-                let normalized = WatchVolumeRange.normalized(newValue)
-                lastDetentVolume = normalized
-                if abs(crownVolume - normalized) > WatchVolumeRange.tolerance {
-                    crownVolume = normalized
-                }
+                syncCrownFromViewModel(volume: newValue)
             }
             .onChange(of: isActive) { _, active in
                 if active {
+                    resetCrownGestureState()
                     claimCrownFocus()
                 } else {
                     crownFocused = false
+                    resetCrownGestureState()
                 }
             }
             .onAppear {
-                syncCrownFromViewModel()
+                resetCrownGestureState()
                 if isActive {
                     claimCrownFocus()
                 }
             }
+            .onDisappear {
+                crownIdleTask?.cancel()
+            }
+    }
+
+    private func handleCrownAxisChange(_ newAxis: Float) {
+        guard isActive else {
+            lastCrownAxis = newAxis
+            lastAppliedVolume = WatchVolumeRange.volume(fromCrownAxis: newAxis)
+            return
+        }
+
+        if !isCrownArmed {
+            let scrollDelta = abs(newAxis - lastCrownAxis)
+            lastCrownAxis = newAxis
+            preActivationScroll += scrollDelta
+
+            if preActivationScroll < WatchVolumeRange.crownActivationThreshold {
+                let lockedAxis = WatchVolumeRange.crownAxis(for: lastAppliedVolume)
+                if abs(crownAxis - lockedAxis) > WatchVolumeRange.tolerance {
+                    crownAxis = lockedAxis
+                }
+                lastCrownAxis = lockedAxis
+                return
+            }
+
+            isCrownArmed = true
+            preActivationScroll = 0
+        } else {
+            lastCrownAxis = newAxis
+        }
+
+        let normalized = WatchVolumeRange.volume(fromCrownAxis: newAxis)
+        guard normalized != lastAppliedVolume else {
+            scheduleCrownDisarm()
+            return
+        }
+
+        lastAppliedVolume = normalized
+        viewModel.volumeDraft = normalized
+        viewModel.applyVolumeDraft()
+        scheduleCrownDisarm()
+    }
+
+    private func scheduleCrownDisarm() {
+        crownIdleTask?.cancel()
+        crownIdleTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(900))
+            guard !Task.isCancelled else { return }
+            isCrownArmed = false
+            preActivationScroll = 0
+            syncCrownFromViewModel(volume: viewModel.volumeDraft)
+        }
     }
 
     private func claimCrownFocus() {
-        syncCrownFromViewModel()
+        syncCrownFromViewModel(volume: viewModel.volumeDraft)
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(50))
             guard isActive else { return }
@@ -78,10 +122,21 @@ struct WatchVolumeCrownModifier: ViewModifier {
         }
     }
 
-    private func syncCrownFromViewModel() {
-        let normalized = WatchVolumeRange.normalized(viewModel.volumeDraft)
-        crownVolume = normalized
-        lastDetentVolume = normalized
+    private func resetCrownGestureState() {
+        crownIdleTask?.cancel()
+        isCrownArmed = false
+        preActivationScroll = 0
+        syncCrownFromViewModel(volume: viewModel.volumeDraft)
+    }
+
+    private func syncCrownFromViewModel(volume: Float) {
+        let normalized = WatchVolumeRange.normalized(volume)
+        lastAppliedVolume = normalized
+        let axis = WatchVolumeRange.crownAxis(for: normalized)
+        lastCrownAxis = axis
+        if abs(crownAxis - axis) > WatchVolumeRange.tolerance {
+            crownAxis = axis
+        }
     }
 
     private var volumeOverlay: some View {
@@ -95,7 +150,7 @@ struct WatchVolumeCrownModifier: ViewModifier {
     }
 
     private var volumeSymbol: String {
-        let level = crownVolume
+        let level = lastAppliedVolume
         if level <= 0.01 { return "speaker.slash.fill" }
         if level < 0.34 { return "speaker.wave.1.fill" }
         if level < 0.67 { return "speaker.wave.2.fill" }

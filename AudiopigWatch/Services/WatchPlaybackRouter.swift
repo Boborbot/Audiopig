@@ -67,6 +67,9 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
         prefersLocalPlayback = preferred
         if preferred {
             activeSource = .local
+        } else if activeSource == .local {
+            local.stopPlaybackIfActive()
+            activeSource = .remote
         }
     }
 
@@ -94,10 +97,13 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
             activeSource = .remote
             return await remote.send(command)
 
-        case .requestRecentBooks, .requestSnapshot, .togglePlayPause, .play, .pause,
+        case .requestRecentBooks, .requestSnapshot, .requestChapters, .togglePlayPause, .play, .pause,
              .skipForward, .skipBackward, .setSpeed, .setVolume,
              .seekToChapterIndex, .seekToChapter, .setArtworkSkipGesturesEnabled,
              .setWatchArtworkViewMode:
+            if !prefersLocalPlayback, activeSource == .local {
+                activeSource = .remote
+            }
             return await activeCoordinator.send(command)
 
         case .analyzeLulls, .seekToLull:

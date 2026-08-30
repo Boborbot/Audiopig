@@ -27,7 +27,7 @@ enum WidgetSnapshotWriter {
             audiobookID: audiobookID?.uuidString,
             progress: progress
         )
-        if audiobookID != nil, let coverImage {
+        if audiobookID != nil {
             WidgetArtworkExporter.exportCover(image: coverImage)
         }
         reloadWidgets()

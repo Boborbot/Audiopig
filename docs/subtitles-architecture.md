@@ -30,8 +30,10 @@ Canonical reference for on-device subtitle transcription. Read this before chang
 | `AudiopigShared/SubtitleWindowPlanner.swift` | Window geometry constants only |
 | `AudiopigShared/SubtitleCoverageCalculator.swift` | Coverage metrics from segments |
 | `Services/SubtitleGenerationOrchestrator.swift` | ASR job queue (one window near playhead; all gaps whole-book) |
+| `Services/WholeBookTranscriptionQueueService.swift` | Global serial whole-book queue, persistence, worker |
 | `Services/SubtitleStore.swift` | SwiftData cues + segments |
-| `ViewModels/PlayerViewModel.swift` | Orchestration, paywall, epoch guards |
+| `ViewModels/PlayerViewModel.swift` | Near-playhead orchestration, paywall, epoch guards |
+| `ViewModels/LibraryViewModel.swift` | Library enqueue, queue sheet presentation |
 | `Views/Components/SubtitlesPanel.swift` | Presentation only |
 
 ## User scenarios
@@ -41,6 +43,8 @@ Canonical reference for on-device subtitle transcription. Read this before chang
 **Seek into a gap:** Overlay shows `.needsGeneration` (no lines). If Plus and subtitles visible, near-playhead generation starts for the playhead window.
 
 **Patchy file + whole book:** Whole-book queues every window not fully covered by segments (≥99% of window duration). Re-transcribes the full 10-minute window; cue dedupe prevents duplicates.
+
+**Multi-book queue:** User enqueues books from the subtitles sheet, library swipe (“Transcribe Book”), or queue retry. `WholeBookTranscriptionQueueService` processes one book at a time; order is persisted and reorderable from the library capsule queue sheet. The queue button appears in the library toolbar capsule only while work remains.
 
 **Silent ASR (no cues):** Segment still recorded so the window is not retried forever.
 
@@ -52,7 +56,9 @@ Canonical reference for on-device subtitle transcription. Read this before chang
 - Seek while generating — cancel + restart via `handleSubtitlesPlayheadJump`
 - Empty ASR — still persist segment; do not throw `transcriptionFailed`
 - Whole-book with nothing to do — success when `uncoveredWindows` is empty
-- Background — near-playhead generation suspended on resign active
+- Background — near-playhead generation suspended on resign active; whole-book queue continues
+- App relaunch — `restoreOnLaunch` re-queues orphaned `.inProgress` whole-book jobs
+- Near-playhead blocked while any whole-book queue job is active (ASR contention)
 
 ## Legacy backfill
 

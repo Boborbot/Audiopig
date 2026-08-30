@@ -39,7 +39,7 @@ struct MediaControlsView: View {
                 .transition(.opacity)
             }
         }
-        .watchVolumeCrown(viewModel: viewModel, isActive: isActive)
+        .watchVolumeCrown(viewModel: viewModel, isActive: false)
         .animation(.easeInOut(duration: 0.2), value: viewModel.connectionMessage)
     }
 

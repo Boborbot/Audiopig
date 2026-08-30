@@ -56,9 +56,10 @@ struct RecentBooksView: View {
         List {
             ForEach(libraryViewModel.books) { book in
                 Button {
-                    onBookSelected()
                     Task {
-                        _ = await libraryViewModel.selectBook(id: book.id)
+                        if await libraryViewModel.selectBook(id: book.id) {
+                            onBookSelected()
+                        }
                     }
                 } label: {
                     HStack(spacing: WDS.Spacing.sm) {
@@ -73,12 +74,8 @@ struct RecentBooksView: View {
                 .disabled(libraryViewModel.isLoading)
             }
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if let message = connectivityNoticeMessage {
-                WatchConnectivityBanner(message: message)
-                    .padding(.horizontal, WDS.Spacing.sm)
-                    .padding(.bottom, WDS.Spacing.xs)
-            }
+        .overlay(alignment: .bottom) {
+            statusFooter
         }
     }
 
@@ -97,8 +94,18 @@ struct RecentBooksView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let message = connectivityNoticeMessage {
-                WatchConnectivityBanner(message: message)
+            if let message = libraryViewModel.connectionStatusMessage {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            if let error = libraryViewModel.errorMessage {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
             }
 
             Button("Refresh") {
@@ -110,11 +117,14 @@ struct RecentBooksView: View {
         .padding()
     }
 
-    private var connectivityNoticeMessage: String? {
-        if let error = libraryViewModel.errorMessage {
-            return error
+    @ViewBuilder
+    private var statusFooter: some View {
+        if let error = libraryViewModel.errorMessage, !libraryViewModel.books.isEmpty {
+            Text(error)
+                .font(.caption2)
+                .foregroundStyle(.red)
+                .padding(.bottom, WDS.Spacing.xs)
         }
-        return libraryViewModel.connectionStatusMessage
     }
 
     @ViewBuilder

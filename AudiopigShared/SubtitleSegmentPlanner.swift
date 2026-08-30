@@ -133,6 +133,22 @@ public enum SubtitleSegmentPlanner {
         return nearest
     }
 
+    /// True when playback has reached or passed the forward edge of saved segments
+    /// and more transcription is still needed — not an inter-cue gap within saved coverage.
+    public static func isPlayheadAwaitingForwardTranscription(
+        playhead: TimeInterval,
+        bookDuration: TimeInterval,
+        segments: [SubtitleTranscriptionSegmentTiming],
+        cues: [SubtitleCueTiming]
+    ) -> Bool {
+        guard bookDuration > 0 else { return false }
+        guard !uncoveredWindows(bookDuration: bookDuration, segments: segments).isEmpty else { return false }
+        guard !SubtitleCueResolver.hasActiveCue(at: playhead, cues: cues) else { return false }
+
+        let forwardEdge = forwardSegmentCoverageEnd(from: playhead, segments: segments)
+        return playhead >= forwardEdge
+    }
+
     public static func shouldAutoGenerateNearPlayhead(
         playhead: TimeInterval,
         bookDuration: TimeInterval,

@@ -5,37 +5,32 @@
 
 import SwiftUI
 
-/// A pie + arc progress indicator: a tinted filled sector for "completed" volume
-/// overlaid with a crisp accent-colored arc, producing a layered, premium look.
+/// Salmon donut-band progress: a neutral track ring with a coral band that fills
+/// clockwise from 12 o'clock. At 100% the band is a complete ring.
 struct CircularProgressView: View {
     let progress: Double // 0…1
 
+    private static let donutFill = FillStyle(eoFill: true, antialiased: true)
+
     var body: some View {
         ZStack {
-            // Background track ring
-            Circle()
-                .stroke(Color(.systemGray5), lineWidth: 2.5)
+            DonutBandShape(progress: 1)
+                .fill(DS.Color.tertiary.opacity(0.25), style: Self.donutFill)
 
-            // Filled pie sector — tinted accent for mass/volume feel
-            PieSectorShape(progress: progress)
-                .fill(Color.accentColor.opacity(0.18))
-
-            // Crisp leading-edge arc on top
-            Circle()
-                .trim(from: 0, to: min(progress, 1))
-                .stroke(
-                    Color.accentColor,
-                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
+            DonutBandShape(progress: progress)
+                .fill(DS.Color.coral, style: Self.donutFill)
         }
     }
 }
 
-// MARK: - Pie Sector Shape
+// MARK: - Donut Band Shape
 
-private struct PieSectorShape: Shape {
+/// Annular band from 12 o'clock clockwise. `progress == 1` draws a full ring.
+private struct DonutBandShape: Shape {
     var progress: Double
+
+    /// Band width as a fraction of the view diameter (5 pt in a 36 pt frame).
+    private static let bandWidthFraction: CGFloat = 5.0 / 36.0
 
     var animatableData: Double {
         get { progress }
@@ -43,22 +38,60 @@ private struct PieSectorShape: Shape {
     }
 
     func path(in rect: CGRect) -> Path {
-        guard progress > 0 else { return Path() }
-
         let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2.0
-        let end    = Angle.degrees(-90 + 360 * min(progress, 1))
+        let outerRadius = min(rect.width, rect.height) / 2.0
+        let bandWidth = min(rect.width, rect.height) * Self.bandWidthFraction
+        let innerRadius = max(outerRadius - bandWidth, 0)
+        let clamped = max(0, min(progress, 1))
+
+        guard clamped > 0, innerRadius > 0 else { return Path() }
+
+        if clamped >= 1 {
+            return fullDonut(center: center, outerRadius: outerRadius, innerRadius: innerRadius)
+        }
+
+        let start = Angle.degrees(-90)
+        let end = Angle.degrees(-90 + 360 * clamped)
 
         var path = Path()
-        path.move(to: center)
         path.addArc(
-            center:     center,
-            radius:     radius,
-            startAngle: .degrees(-90),
-            endAngle:   end,
-            clockwise:  false
+            center: center,
+            radius: outerRadius,
+            startAngle: start,
+            endAngle: end,
+            clockwise: false
+        )
+        path.addArc(
+            center: center,
+            radius: innerRadius,
+            startAngle: end,
+            endAngle: start,
+            clockwise: true
         )
         path.closeSubpath()
+        return path
+    }
+
+    private func fullDonut(
+        center: CGPoint,
+        outerRadius: CGFloat,
+        innerRadius: CGFloat
+    ) -> Path {
+        var path = Path()
+        path.addArc(
+            center: center,
+            radius: outerRadius,
+            startAngle: .degrees(0),
+            endAngle: .degrees(360),
+            clockwise: false
+        )
+        path.addArc(
+            center: center,
+            radius: innerRadius,
+            startAngle: .degrees(0),
+            endAngle: .degrees(360),
+            clockwise: true
+        )
         return path
     }
 }

@@ -31,6 +31,16 @@ struct AudiopigApp: App {
             let watchTransferService = WatchTransferService(watchBridge: watchBridge)
             monetizationService.startTransactionListener()
 
+            let mainContext = modelContainer.mainContext
+            let subtitleStore = SubtitleStore(modelContext: mainContext)
+            let wholeBookQueue = WholeBookTranscriptionQueueService(
+                modelContext: mainContext,
+                subtitleStore: subtitleStore,
+                transcriptionService: SubtitleTranscriptionService(),
+                monetization: monetizationService,
+                localeProvider: { appSettings.subtitleLocaleIdentifier ?? Locale.current.identifier }
+            )
+
             let dc = DependencyContainer(
                 libraryManager: libraryManager,
                 audioEngine: audioEngine,
@@ -40,7 +50,8 @@ struct AudiopigApp: App {
                 watchBridge: watchBridge,
                 watchTransferService: watchTransferService,
                 volumeController: volumeController,
-                monetization: monetizationService
+                monetization: monetizationService,
+                wholeBookTranscriptionQueue: wholeBookQueue
             )
             DependencyContainer.shared = dc
             watchBridge.activate()
@@ -53,7 +64,8 @@ struct AudiopigApp: App {
                 watchBridge: dc.watchBridge,
                 watchTransferService: dc.watchTransferService,
                 volumeController: volumeController,
-                monetization: dc.monetization
+                monetization: dc.monetization,
+                wholeBookTranscriptionQueue: wholeBookQueue
             )
             self.container = dc
             self.libraryViewModel = libraryVM

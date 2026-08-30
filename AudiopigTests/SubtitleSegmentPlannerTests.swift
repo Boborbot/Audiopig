@@ -98,4 +98,41 @@ final class SubtitleSegmentPlannerTests: XCTestCase {
             )
         )
     }
+
+    func testIsPlayheadAwaitingForwardTranscriptionPastSavedEdge() {
+        let segments = [SubtitleTranscriptionSegmentTiming(startTime: 0, endTime: 600)]
+        XCTAssertTrue(
+            SubtitleSegmentPlanner.isPlayheadAwaitingForwardTranscription(
+                playhead: 650,
+                bookDuration: 3600,
+                segments: segments,
+                cues: []
+            )
+        )
+    }
+
+    func testIsPlayheadAwaitingForwardTranscriptionFalseWithinSavedGap() {
+        let segments = [SubtitleTranscriptionSegmentTiming(startTime: 0, endTime: 600)]
+        let cues = [SubtitleCueTiming(startTime: 0, endTime: 2, text: "A", orderIndex: 0)]
+        XCTAssertFalse(
+            SubtitleSegmentPlanner.isPlayheadAwaitingForwardTranscription(
+                playhead: 580,
+                bookDuration: 3600,
+                segments: segments,
+                cues: cues
+            )
+        )
+    }
+
+    func testIsPlayheadAwaitingForwardTranscriptionFalseWhenBookComplete() {
+        let segments = [SubtitleTranscriptionSegmentTiming(startTime: 0, endTime: 3600)]
+        XCTAssertFalse(
+            SubtitleSegmentPlanner.isPlayheadAwaitingForwardTranscription(
+                playhead: 3500,
+                bookDuration: 3600,
+                segments: segments,
+                cues: []
+            )
+        )
+    }
 }

@@ -22,7 +22,15 @@ final class WatchVolumeRangeTests: XCTestCase {
         }
     }
 
-    func test_crownStepIsSixTimesFinerThanVolumeStep() {
-        XCTAssertEqual(WatchVolumeRange.crownStep, WatchVolumeRange.step / 6, accuracy: 0.000001)
+    func test_crownStepIsThreeTimesCoarserThanOriginalFineStep() {
+        XCTAssertEqual(WatchVolumeRange.crownStep, WatchVolumeRange.step / 2, accuracy: 0.000001)
+        XCTAssertEqual(WatchVolumeRange.crownStep, WatchVolumeRange.step / 6 * 3, accuracy: 0.000001)
+    }
+
+    func test_crownAxisInvertsVolume() {
+        XCTAssertEqual(WatchVolumeRange.crownAxis(for: 0), 1, accuracy: 0.0001)
+        XCTAssertEqual(WatchVolumeRange.crownAxis(for: 1), 0, accuracy: 0.0001)
+        XCTAssertEqual(WatchVolumeRange.volume(fromCrownAxis: 1), 0, accuracy: 0.0001)
+        XCTAssertEqual(WatchVolumeRange.volume(fromCrownAxis: 0), 1, accuracy: 0.0001)
     }
 }

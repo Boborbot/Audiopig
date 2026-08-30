@@ -15,7 +15,6 @@ struct SpeedControlsView: View {
     }
 
     @State private var lastDetentSpeed: Float = 1.0
-    @FocusState private var crownFocused: Bool
 
     var body: some View {
         VStack(spacing: WDS.Spacing.md) {
@@ -37,7 +36,6 @@ struct SpeedControlsView: View {
         }
         .padding(.horizontal, WDS.Spacing.sm)
         .focusable(isActive)
-        .focused($crownFocused)
         .digitalCrownRotation(
             $viewModel.speedDraft,
             from: WatchSpeedRange.min,
@@ -45,13 +43,10 @@ struct SpeedControlsView: View {
             by: WatchSpeedRange.crownStep,
             sensitivity: .low,
             isContinuous: false,
-            isHapticFeedbackEnabled: false
+            isHapticFeedbackEnabled: true
         )
         .onChange(of: viewModel.speedDraft) { _, newValue in
-            guard isActive else {
-                lastDetentSpeed = normalizedSpeed(newValue)
-                return
-            }
+            guard isActive else { return }
             let normalized = normalizedSpeed(newValue)
             if normalized != lastDetentSpeed {
                 lastDetentSpeed = normalized
@@ -59,27 +54,8 @@ struct SpeedControlsView: View {
                 viewModel.applySpeedDraft()
             }
         }
-        .onChange(of: isActive) { _, active in
-            if active {
-                lastDetentSpeed = viewModel.speedDraft
-                claimCrownFocus()
-            } else {
-                crownFocused = false
-            }
-        }
         .onAppear {
             lastDetentSpeed = viewModel.speedDraft
-            if isActive {
-                claimCrownFocus()
-            }
-        }
-    }
-
-    private func claimCrownFocus() {
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(50))
-            guard isActive else { return }
-            crownFocused = true
         }
     }
 
@@ -107,10 +83,13 @@ struct SpeedControlsView: View {
     }
 
     private func presetLabel(_ speed: Float) -> String {
-        String(WatchSpeedRange.formatLabel(speed).dropLast())
+        speed.truncatingRemainder(dividingBy: 1) == 0
+            ? "\(Int(speed))"
+            : String(format: "%.2g", speed)
     }
 
     private func normalizedSpeed(_ speed: Float) -> Float {
-        WatchSpeedRange.normalized(speed)
+        let stepped = (speed / WatchSpeedRange.step).rounded() * WatchSpeedRange.step
+        return min(WatchSpeedRange.max, max(WatchSpeedRange.min, stepped))
     }
 }

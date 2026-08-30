@@ -32,13 +32,26 @@ final class WatchSnapshotFreshnessTests: XCTestCase {
         XCTAssertFalse(WatchSnapshotFreshness.shouldReject(incoming: incoming, comparedTo: last))
     }
 
+    func test_acceptsLowerRevisionWhenUpdatedAtIsNewer() {
+        let last = sample(revision: 500, bookID: bookA, source: .remote, updatedAt: Date(timeIntervalSince1970: 1_000))
+        let incoming = sample(revision: 1, bookID: bookA, source: .remote, updatedAt: Date(timeIntervalSince1970: 2_000))
+        XCTAssertFalse(WatchSnapshotFreshness.shouldReject(incoming: incoming, comparedTo: last))
+    }
+
+    func test_rejectsLowerRevisionWhenUpdatedAtIsOlder() {
+        let last = sample(revision: 500, bookID: bookA, source: .remote, updatedAt: Date(timeIntervalSince1970: 2_000))
+        let incoming = sample(revision: 1, bookID: bookA, source: .remote, updatedAt: Date(timeIntervalSince1970: 1_000))
+        XCTAssertTrue(WatchSnapshotFreshness.shouldReject(incoming: incoming, comparedTo: last))
+    }
+
     private let bookA = UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!
     private let bookB = UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!
 
     private func sample(
         revision: UInt64,
         bookID: UUID,
-        source: WatchPlaybackSource
+        source: WatchPlaybackSource,
+        updatedAt: Date = .now
     ) -> WatchPlaybackSnapshot {
         WatchPlaybackSnapshot(
             revision: revision,
@@ -59,7 +72,8 @@ final class WatchSnapshotFreshnessTests: XCTestCase {
             globalDuration: 100,
             systemVolume: 0.5,
             source: source,
-            artworkJPEG: nil
+            artworkJPEG: nil,
+            updatedAt: updatedAt
         )
     }
 }

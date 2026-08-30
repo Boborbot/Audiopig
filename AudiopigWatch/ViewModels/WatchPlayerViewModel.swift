@@ -34,6 +34,7 @@ final class WatchPlayerViewModel: ObservableObject {
     }
 
     private var pendingTransportState: PendingTransportState?
+    private var pendingTransportStartedAt: Date?
 
     @Published var speedDraft: Float = 1.0
     @Published var volumeDraft: Float = 0.5
@@ -48,6 +49,7 @@ final class WatchPlayerViewModel: ObservableObject {
     private let coordinator: any WatchPlaybackCoordinating
     private let client: WatchConnectivityClient
     private var interpolationCancellable: AnyCancellable?
+    private var remoteSyncTask: Task<Void, Never>?
     private var lastAuthoritativeSnapshot: WatchPlaybackSnapshot = .idle
     private var lastSentSpeed: Float?
     private var lastSentVolume: Float?
@@ -240,6 +242,23 @@ final class WatchPlayerViewModel: ObservableObject {
         isReachable = coordinator.isReachable
     }
 
+    func requestChaptersIfNeeded() async {
+        guard snapshot.bookID != nil else { return }
+        guard chapters.isEmpty || client.latestChapters?.bookID != snapshot.bookID else { return }
+        let result = await coordinator.send(.requestChapters)
+        if let payload = result.chapters {
+            applyChapters(payload)
+        }
+    }
+
+    /// Called when the Watch app returns to the foreground so timers and phone position resync.
+    func handleSceneBecameActive() {
+        refreshInterpolatedTimesFromWallClock()
+        restartInterpolationIfNeeded()
+        guard snapshot.source == .remote, snapshot.bookID != nil else { return }
+        Task { await refresh() }
+    }
+
     /// Fetches cover art from iPhone when artwork view is enabled but the cached JPEG was stripped.
     func ensureArtworkLoaded() async {
         guard effectiveArtworkViewMode != .off, artworkImage == nil, snapshot.bookID != nil else { return }
@@ -255,10 +274,12 @@ final class WatchPlayerViewModel: ObservableObject {
         case .playing:
             target = .paused
             pendingTransportState = .paused
+            pendingTransportStartedAt = .now
             WatchHaptics.pause()
         default:
             target = .playing
             pendingTransportState = .playing
+            pendingTransportStartedAt = .now
             WatchHaptics.play()
         }
         optimisticState = target
@@ -378,8 +399,12 @@ final class WatchPlayerViewModel: ObservableObject {
 
         var resolvedSnapshot = incoming
         if let pending = pendingTransportState {
-            if transportStateMatches(pending, incoming.playbackState) {
+            let pendingExpired = pendingTransportStartedAt.map {
+                Date().timeIntervalSince($0) > Self.pendingTransportTimeout
+            } ?? true
+            if pendingExpired || transportStateMatches(pending, incoming.playbackState) {
                 pendingTransportState = nil
+                pendingTransportStartedAt = nil
                 optimisticState = nil
             } else {
                 let optimistic = watchState(for: pending)
@@ -402,8 +427,10 @@ final class WatchPlayerViewModel: ObservableObject {
         lastAuthoritativeSnapshot = resolvedSnapshot
         snapshot = resolvedSnapshot
         connectionMessage = nil
-        interpolatedGlobalTime = incoming.globalCurrentTime
-        interpolatedChapterElapsed = incoming.chapterElapsed
+        syncInterpolationAnchors(
+            global: incoming.globalCurrentTime,
+            chapterElapsed: incoming.chapterElapsed
+        )
         isReachable = coordinator.isReachable
 
         if bookChanged {
@@ -424,6 +451,7 @@ final class WatchPlayerViewModel: ObservableObject {
             reconcileVolume(from: incoming.systemVolume)
         }
         restartInterpolationIfNeeded()
+        updateRemoteSyncPolling()
     }
 
     private func reconcileSpeed(from phoneSpeed: Float) {
@@ -500,7 +528,10 @@ final class WatchPlayerViewModel: ObservableObject {
         } else if !hasWatchArtworkViewAccess {
             watchArtworkViewMode = .off
         }
-        if effectiveArtworkViewMode != .off, artworkImage == nil, snapshot.bookID != nil {
+        if effectiveArtworkViewMode != .off,
+           artworkImage == nil,
+           snapshot.bookID != nil,
+           snapshot.playbackState == .playing || snapshot.playbackState == .paused {
             Task { await ensureArtworkLoaded() }
         }
         if let incomingPresets = settings.speedPresets, !incomingPresets.isEmpty {
@@ -516,6 +547,7 @@ final class WatchPlayerViewModel: ObservableObject {
             applyAuthoritativeSnapshot(snap)
         } else if !result.success {
             pendingTransportState = nil
+            pendingTransportStartedAt = nil
             optimisticState = nil
             lastSentSpeed = nil
             lastSentVolume = nil
@@ -580,30 +612,95 @@ final class WatchPlayerViewModel: ObservableObject {
 
     // MARK: - Local interpolation
 
+    private static let pendingTransportTimeout: TimeInterval = 3
+    private static let remoteSnapshotSyncInterval: TimeInterval = 30
+
     private var interpolatedGlobalTime: TimeInterval = 0
     private var interpolatedChapterElapsed: TimeInterval = 0
+    private var interpolationAnchorDate: Date?
+    private var interpolationAnchorGlobalTime: TimeInterval = 0
+    private var interpolationAnchorChapterElapsed: TimeInterval = 0
 
-    private func bumpInterpolatedTimes(by delta: TimeInterval) {
-        interpolatedGlobalTime = max(0, min(snapshot.globalDuration, interpolatedGlobalTime + delta))
+    private func syncInterpolationAnchors(global: TimeInterval, chapterElapsed: TimeInterval) {
+        interpolationAnchorDate = Date()
+        interpolationAnchorGlobalTime = global
+        interpolationAnchorChapterElapsed = chapterElapsed
+        interpolatedGlobalTime = global
+        interpolatedChapterElapsed = chapterElapsed
+    }
+
+    private func refreshInterpolatedTimesFromWallClock() {
+        guard displayState == .playing, let anchor = interpolationAnchorDate else { return }
+        let delta = Date().timeIntervalSince(anchor) * Double(snapshot.playbackSpeed)
+        interpolatedGlobalTime = min(
+            snapshot.globalDuration,
+            interpolationAnchorGlobalTime + delta
+        )
         if timebarUsesChapterScope {
-            interpolatedChapterElapsed = max(
-                0,
-                min(snapshot.chapterDuration, interpolatedChapterElapsed + delta)
+            interpolatedChapterElapsed = min(
+                snapshot.chapterDuration,
+                interpolationAnchorChapterElapsed + delta
             )
         }
+        playbackTick &+= 1
+    }
+
+    private func bumpInterpolatedTimes(by delta: TimeInterval) {
+        let newGlobal = max(0, min(snapshot.globalDuration, interpolatedGlobalTime + delta))
+        let newChapter: TimeInterval
+        if timebarUsesChapterScope {
+            newChapter = max(0, min(snapshot.chapterDuration, interpolatedChapterElapsed + delta))
+        } else {
+            newChapter = interpolatedChapterElapsed
+        }
+        syncInterpolationAnchors(global: newGlobal, chapterElapsed: newChapter)
         playbackTick &+= 1
     }
 
     private func restartInterpolationIfNeeded() {
         interpolationCancellable?.cancel()
         interpolationCancellable = nil
-        guard displayState == .playing else { return }
+
+        guard displayState == .playing else {
+            interpolationAnchorDate = nil
+            updateRemoteSyncPolling()
+            return
+        }
+
+        if interpolationAnchorDate == nil {
+            syncInterpolationAnchors(
+                global: snapshot.globalCurrentTime,
+                chapterElapsed: snapshot.chapterElapsed
+            )
+        }
+
         interpolationCancellable = Timer.publish(every: 0.25, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                guard let self, self.displayState == .playing else { return }
-                let delta = 0.25 * Double(self.snapshot.playbackSpeed)
-                self.bumpInterpolatedTimes(by: delta)
+                guard let self else { return }
+                if self.displayState == .playing {
+                    self.refreshInterpolatedTimesFromWallClock()
+                } else {
+                    self.interpolationAnchorDate = nil
+                }
             }
+        updateRemoteSyncPolling()
+    }
+
+    private func updateRemoteSyncPolling() {
+        remoteSyncTask?.cancel()
+        remoteSyncTask = nil
+        guard snapshot.source == .remote,
+              snapshot.bookID != nil,
+              displayState == .playing else { return }
+
+        remoteSyncTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Self.remoteSnapshotSyncInterval))
+                guard let self, !Task.isCancelled else { return }
+                guard self.snapshot.source == .remote, self.displayState == .playing else { return }
+                await self.refresh()
+            }
+        }
     }
 }

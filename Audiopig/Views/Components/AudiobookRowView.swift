@@ -122,12 +122,19 @@ struct AudiobookRowView: View {
     }
 
     private var progressIndicator: some View {
-        CircularProgressView(
-            progress: AudiobookProgressFormatter.progress(
+        Group {
+            if AudiobookProgressFormatter.showsProgressRing(
                 currentTime: audiobook.currentPlaybackTime,
                 duration: audiobook.duration
-            )
-        )
+            ) {
+                CircularProgressView(
+                    progress: AudiobookProgressFormatter.progress(
+                        currentTime: audiobook.currentPlaybackTime,
+                        duration: audiobook.duration
+                    )
+                )
+            }
+        }
         .frame(width: 36, height: 36)
     }
 }

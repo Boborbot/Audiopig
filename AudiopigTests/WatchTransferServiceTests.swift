@@ -132,6 +132,7 @@ private final class MockWatchBridge: WatchConnectivityBridgeProtocol {
     var isWatchAppInstalled = true
     var isReachable = true
     var latestLocalBooks: WatchLocalBooksPayload?
+    var lastChapters: WatchChaptersPayload?
     var commandHandler: (@MainActor (WatchCommand) async -> WatchCommandResult)?
     var transferCompletionHandler: (@MainActor (UUID, Bool, String?) -> Void)?
     var fileDeliveredHandler: (@MainActor (UUID) -> Void)?
@@ -143,9 +144,12 @@ private final class MockWatchBridge: WatchConnectivityBridgeProtocol {
 
     func publishSnapshot(_ snapshot: WatchPlaybackSnapshot, includeArtwork: Bool) {}
 
-    func publishChapters(_ payload: WatchChaptersPayload) {}
+    func publishChapters(_ payload: WatchChaptersPayload) {
+        lastChapters = payload
+        // Full chapter lists are fetched on demand; keeping them out of application context avoids size crashes.
+    }
 
-    func publishRecentBooks(_ payload: WatchRecentBooksPayload) {}
+    func publishRecentBooks(_ payload: WatchRecentBooksPayload, contextIncludesThumbnails: Bool) {}
 
     func publishLocalBooks(_ payload: WatchLocalBooksPayload) {
         latestLocalBooks = payload

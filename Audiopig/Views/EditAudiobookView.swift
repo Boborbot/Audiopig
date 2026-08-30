@@ -13,6 +13,7 @@ struct EditAudiobookView: View {
     let onSave: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var vm: EditAudiobookViewModel
     @State private var photoPickerItem: PhotosPickerItem?
 
@@ -32,8 +33,11 @@ struct EditAudiobookView: View {
                     isPhotoPickerPresented: $vm.isPhotoPickerPresented,
                     isCameraPresented: $vm.isCameraPresented,
                     isFileImporterPresented: $vm.isFileImporterPresented,
-                    hasClipboardImage: vm.hasClipboardImage,
-                    onPasteFromClipboard: { vm.pasteFromClipboard() }
+                    onPasteFromClipboard: { vm.pasteFromClipboard() },
+                    onCopyArtwork: { vm.copyArtworkToClipboard() },
+                    onRemoveArtwork: { vm.removeArtwork() },
+                    showsPastedFromClipboardNotice: vm.coverArtworkWasAutoPasted,
+                    onSearchForCover: { vm.openCoverSearch() }
                 ) {
                     ZStack {
                         audiobook.placeholderColor.opacity(0.75)
@@ -50,7 +54,7 @@ struct EditAudiobookView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(DS.Color.coral)
+                        .foregroundStyle(.white)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -59,7 +63,7 @@ struct EditAudiobookView: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(vm.canSave ? DS.Color.coral : DS.Color.secondary)
+                    .foregroundStyle(vm.canSave ? Color.green : DS.Color.secondary)
                     .disabled(!vm.canSave)
                 }
             }
@@ -73,14 +77,14 @@ struct EditAudiobookView: View {
                 Task {
                     if let data = try? await item.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
-                        vm.draftArtwork = image
+                        vm.applyArtworkFromSource(image)
                     }
                     photoPickerItem = nil
                 }
             }
             .sheet(isPresented: $vm.isCameraPresented) {
                 CameraPickerView { image in
-                    vm.draftArtwork = image
+                    vm.applyArtworkFromSource(image)
                 }
                 .ignoresSafeArea()
             }
@@ -90,6 +94,13 @@ struct EditAudiobookView: View {
                 allowsMultipleSelection: false
             ) { result in
                 vm.handleFileImport(result: result.map { $0[0] })
+            }
+            .onAppear {
+                vm.refreshClipboardState()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
+                vm.handleReturnToForeground()
             }
         }
     }

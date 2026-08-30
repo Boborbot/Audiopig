@@ -34,6 +34,24 @@ struct PlaybackControlsSettingsView: View {
                 speedSettingRow(.speedPreset2, value: settings.speedPreset2)
                 speedSettingRow(.speedPreset3, value: settings.speedPreset3)
 
+                NavigationLink {
+                    SkimSettingsView(settings: settings)
+                } label: {
+                    HStack {
+                        Text("Skim")
+                            .foregroundStyle(DS.Color.primary)
+                        Spacer()
+                        Text(skimSummary)
+                            .foregroundStyle(DS.Color.secondary)
+                    }
+                }
+                .tint(DS.Color.coral)
+            } header: {
+                Text("Speed")
+                    .sectionTitle()
+            }
+
+            Section {
                 Picker("Skip Forward", selection: $settings.skipForwardInterval) {
                     ForEach(Self.skipIntervalOptions, id: \.self) { seconds in
                         Text("\(Int(seconds))s").tag(seconds)
@@ -50,7 +68,7 @@ struct PlaybackControlsSettingsView: View {
                 .tint(DS.Color.coral)
                 .onChange(of: settings.skipBackwardInterval) { _, _ in onWatchSettingsChanged?() }
             } header: {
-                Text("Playback")
+                Text("Skip")
                     .sectionTitle()
             }
 
@@ -116,6 +134,12 @@ struct PlaybackControlsSettingsView: View {
                 onSpeedChanged: onWatchSettingsChanged
             )
         }
+    }
+
+    private var skimSummary: String {
+        settings.skimEnabled
+            ? WatchSpeedRange.formatLabel(settings.skim)
+            : "Off"
     }
 
     // MARK: - Speed Settings

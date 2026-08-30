@@ -47,26 +47,41 @@ final class WatchLibraryViewModel: ObservableObject {
     }
 
     func refresh() async {
-        isLoading = true
-        errorMessage = nil
-        connectionState = client.connectionState
+        refreshTask?.cancel()
+        refreshTask = Task {
+            isLoading = true
+            errorMessage = nil
+            connectionState = client.connectionState
 
-        let result = await coordinator.send(.requestRecentBooks)
-        connectionState = client.connectionState
+            guard !Task.isCancelled else { return }
 
-        if let payload = result.recentBooks {
-            books = payload.books
+            let result = await coordinator.send(.requestRecentBooks)
+            connectionState = client.connectionState
+
+            guard !Task.isCancelled else { return }
+
+            if let payload = result.recentBooks {
+                books = payload.books
+            }
+
+            isLoading = false
+
+            if !result.success {
+                errorMessage = result.errorMessage ?? client.connectionErrorMessage
+                WatchHaptics.error()
+            }
         }
-
-        isLoading = false
-
-        if !result.success {
-            errorMessage = result.errorMessage ?? client.connectionErrorMessage
-            WatchHaptics.error()
-        }
+        await refreshTask?.value
     }
 
+    @Published private(set) var isSelectingBook = false
+
+    private var refreshTask: Task<Void, Never>?
+
     func selectBook(id: UUID) async -> Bool {
+        refreshTask?.cancel()
+        isSelectingBook = true
+        defer { isSelectingBook = false }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -96,13 +111,30 @@ final class WatchLibraryViewModel: ObservableObject {
         let result = await coordinator.send(.loadBook(bookID: id, autoPlay: true))
         connectionState = client.connectionState
 
-        if result.success {
+        if await waitForRemoteBook(id: id) {
             WatchHaptics.play()
             return true
         }
 
         errorMessage = result.errorMessage ?? client.connectionErrorMessage
         WatchHaptics.error()
+        return false
+    }
+
+    private func waitForRemoteBook(id: UUID) async -> Bool {
+        for _ in 0..<45 {
+            if let snapshot = coordinator.snapshot, snapshot.bookID == id {
+                switch snapshot.playbackState {
+                case .playing, .paused:
+                    return true
+                case .loading:
+                    break
+                case .idle, .finished, .failed:
+                    return false
+                }
+            }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
         return false
     }
 

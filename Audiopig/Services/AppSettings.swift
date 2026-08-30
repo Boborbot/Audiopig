@@ -11,6 +11,33 @@ import Foundation
 import Observation
 import SwiftUI
 
+private func migratedFloatSetting(key: String, legacyKey: String, default defaultValue: Float) -> Float {
+    if UserDefaults.standard.object(forKey: key) != nil {
+        let stored = UserDefaults.standard.float(forKey: key)
+        return stored > 0 ? stored : defaultValue
+    }
+    if UserDefaults.standard.object(forKey: legacyKey) != nil {
+        let stored = UserDefaults.standard.float(forKey: legacyKey)
+        if stored > 0 {
+            UserDefaults.standard.set(stored, forKey: key)
+            return stored
+        }
+    }
+    return defaultValue
+}
+
+private func migratedBoolSetting(key: String, legacyKey: String, default defaultValue: Bool) -> Bool {
+    if UserDefaults.standard.object(forKey: key) != nil {
+        return UserDefaults.standard.bool(forKey: key)
+    }
+    if UserDefaults.standard.object(forKey: legacyKey) != nil {
+        let value = UserDefaults.standard.bool(forKey: legacyKey)
+        UserDefaults.standard.set(value, forKey: key)
+        return value
+    }
+    return defaultValue
+}
+
 private func migratedVoiceBoostLevel(levelKey: String, legacyEnabledKey: String) -> VoiceBoostLevel {
     if UserDefaults.standard.object(forKey: levelKey) != nil {
         return VoiceBoostLevel.validated(UserDefaults.standard.integer(forKey: levelKey))
@@ -95,6 +122,10 @@ final class AppSettings {
         static let speedPreset1         = "settings.speedPreset1"
         static let speedPreset2         = "settings.speedPreset2"
         static let speedPreset3         = "settings.speedPreset3"
+        static let skim                 = "settings.skim"
+        static let skimEnabled          = "settings.skimEnabled"
+        static let legacySkim           = "settings.superSpeed"
+        static let legacySkimEnabled    = "settings.superSpeedEnabled"
         static let skipForwardInterval  = "settings.skipForwardInterval"
         static let skipBackwardInterval = "settings.skipBackwardInterval"
         static let lullLookbackWindow   = "settings.lullLookbackWindow"
@@ -119,7 +150,6 @@ final class AppSettings {
         static let playbackTimelineScope    = "settings.playbackTimelineScope"
         static let leftTimeShowsRemaining   = "settings.leftTimeShowsRemaining"
         static let subtitleLocaleIdentifier = "settings.subtitleLocaleIdentifier"
-        static let subtitlesAutoGenerateOnImport = "settings.subtitlesAutoGenerateOnImport"
         static let subtitleFont = "settings.subtitleFont"
         static let defaultEQPresetID = "settings.defaultEQPresetID"
         static let rememberedDefaultEQPresetID = "settings.rememberedDefaultEQPresetID"
@@ -167,6 +197,16 @@ final class AppSettings {
     private var _speedPreset3: Float = {
         let stored = UserDefaults.standard.float(forKey: Keys.speedPreset3)
         return stored > 0 ? stored : 1.5
+    }()
+
+    @ObservationIgnored
+    private var _skim: Float = {
+        migratedFloatSetting(key: Keys.skim, legacyKey: Keys.legacySkim, default: 1.8)
+    }()
+
+    @ObservationIgnored
+    private var _skimEnabled: Bool = {
+        migratedBoolSetting(key: Keys.skimEnabled, legacyKey: Keys.legacySkimEnabled, default: true)
     }()
 
     @ObservationIgnored
@@ -334,11 +374,6 @@ final class AppSettings {
     )
 
     @ObservationIgnored
-    private var _subtitlesAutoGenerateOnImport: Bool = UserDefaults.standard.bool(
-        forKey: Keys.subtitlesAutoGenerateOnImport
-    )
-
-    @ObservationIgnored
     private var _subtitleFont: SubtitleFont = {
         guard let raw = UserDefaults.standard.string(forKey: Keys.subtitleFont),
               let font = SubtitleFont(rawValue: raw) else {
@@ -484,6 +519,35 @@ final class AppSettings {
             withMutation(keyPath: \.speedPreset3) {
                 _speedPreset3 = normalized
                 UserDefaults.standard.set(normalized, forKey: Keys.speedPreset3)
+            }
+        }
+    }
+
+    /// Temporary hold-to-boost speed on the phone player cover art. Range [0.25, 4.0]. Default: 1.8×.
+    var skim: Float {
+        get {
+            access(keyPath: \.skim)
+            return _skim
+        }
+        set {
+            let normalized = Self.normalizedSpeed(newValue)
+            withMutation(keyPath: \.skim) {
+                _skim = normalized
+                UserDefaults.standard.set(normalized, forKey: Keys.skim)
+            }
+        }
+    }
+
+    /// When enabled, press-and-hold on player cover art temporarily boosts to `skim`.
+    var skimEnabled: Bool {
+        get {
+            access(keyPath: \.skimEnabled)
+            return _skimEnabled
+        }
+        set {
+            withMutation(keyPath: \.skimEnabled) {
+                _skimEnabled = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.skimEnabled)
             }
         }
     }
@@ -919,19 +983,6 @@ final class AppSettings {
                 } else {
                     UserDefaults.standard.removeObject(forKey: Keys.subtitleLocaleIdentifier)
                 }
-            }
-        }
-    }
-
-    var subtitlesAutoGenerateOnImport: Bool {
-        get {
-            access(keyPath: \.subtitlesAutoGenerateOnImport)
-            return _subtitlesAutoGenerateOnImport
-        }
-        set {
-            withMutation(keyPath: \.subtitlesAutoGenerateOnImport) {
-                _subtitlesAutoGenerateOnImport = newValue
-                UserDefaults.standard.set(newValue, forKey: Keys.subtitlesAutoGenerateOnImport)
             }
         }
     }

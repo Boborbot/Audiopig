@@ -52,6 +52,10 @@ protocol AudioEngineProtocol: AnyObject {
     /// without tearing down the active AVPlayerItem.
     func updateResolvedChapters(from audiobook: Audiobook)
 
+    /// Refreshes lock-screen title, author, and artwork after the user edits book metadata
+    /// without tearing down the active AVPlayerItem.
+    func updateNowPlayingMetadata(from audiobook: Audiobook)
+
     // MARK: - Transport
 
     func play() throws

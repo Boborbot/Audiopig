@@ -11,6 +11,7 @@ struct AudiopigWatchApp: App {
     private let router: WatchPlaybackRouter
     private let playerViewModel: WatchPlayerViewModel
     private let libraryViewModel: WatchLibraryViewModel
+    private let localLibraryViewModel: WatchLocalLibraryViewModel
 
     init() {
         let remoteCoordinator = RemoteWatchPlaybackCoordinator(client: connectivityClient)
@@ -23,6 +24,11 @@ struct AudiopigWatchApp: App {
         router = WatchPlaybackRouter(remote: remoteCoordinator, local: localCoordinator)
         playerViewModel = WatchPlayerViewModel(coordinator: router, client: connectivityClient)
         libraryViewModel = WatchLibraryViewModel(coordinator: router, client: connectivityClient)
+        localLibraryViewModel = WatchLocalLibraryViewModel(
+            store: localStore,
+            coordinator: localCoordinator,
+            client: connectivityClient
+        )
         connectivityClient.configure(
             localStore: localStore,
             localCoordinator: localCoordinator,
@@ -36,7 +42,8 @@ struct AudiopigWatchApp: App {
             NavigationStack {
                 WatchRootView(
                     playerViewModel: playerViewModel,
-                    libraryViewModel: libraryViewModel
+                    libraryViewModel: libraryViewModel,
+                    localLibraryViewModel: localLibraryViewModel
                 )
             }
         }

@@ -21,10 +21,6 @@ final class EditFolderViewModel {
     var isCameraPresented: Bool = false
     var isFileImporterPresented: Bool = false
 
-    var hasClipboardImage: Bool {
-        UIPasteboard.general.hasImages
-    }
-
     // MARK: - Validation
 
     var canSave: Bool {
@@ -45,6 +41,15 @@ final class EditFolderViewModel {
         draftArtwork = image
     }
 
+    func copyArtworkToClipboard() {
+        guard let image = draftArtwork else { return }
+        UIPasteboard.general.image = image
+    }
+
+    func removeArtwork() {
+        draftArtwork = nil
+    }
+
     func handleFileImport(result: Result<URL, Error>) {
         guard case .success(let url) = result,
               url.startAccessingSecurityScopedResource() else { return }
@@ -61,7 +66,9 @@ final class EditFolderViewModel {
         if let image = draftArtwork,
            let jpeg = image.jpegData(compressionQuality: 0.85) {
             folder.coverArtwork = jpeg
-            CoverArtCache.shared.invalidate(for: folder.id)
+        } else {
+            folder.coverArtwork = nil
         }
+        CoverArtCache.shared.invalidate(for: folder.id)
     }
 }

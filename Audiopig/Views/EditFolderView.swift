@@ -32,8 +32,9 @@ struct EditFolderView: View {
                     isPhotoPickerPresented: $vm.isPhotoPickerPresented,
                     isCameraPresented: $vm.isCameraPresented,
                     isFileImporterPresented: $vm.isFileImporterPresented,
-                    hasClipboardImage: vm.hasClipboardImage,
-                    onPasteFromClipboard: { vm.pasteFromClipboard() }
+                    onPasteFromClipboard: { vm.pasteFromClipboard() },
+                    onCopyArtwork: { vm.copyArtworkToClipboard() },
+                    onRemoveArtwork: { vm.removeArtwork() }
                 ) {
                     ZStack {
                         DS.Color.coral.opacity(0.15)
@@ -50,7 +51,7 @@ struct EditFolderView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
-                        .foregroundStyle(DS.Color.coral)
+                        .foregroundStyle(.white)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -59,7 +60,7 @@ struct EditFolderView: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(vm.canSave ? DS.Color.coral : DS.Color.secondary)
+                    .foregroundStyle(vm.canSave ? Color.green : DS.Color.secondary)
                     .disabled(!vm.canSave)
                 }
             }

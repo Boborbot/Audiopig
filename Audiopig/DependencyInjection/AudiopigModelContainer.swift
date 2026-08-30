@@ -22,6 +22,7 @@ enum AudiopigModelContainer {
     private static let models: [any PersistentModel.Type] = [
         Audiobook.self, Chapter.self, Bookmark.self, SubtitleCue.self,
         SubtitleTranscriptionSegment.self,
+        WholeBookTranscriptionQueueEntry.self,
         FinishedRecord.self, Folder.self
     ]
 
@@ -31,6 +32,40 @@ enum AudiopigModelContainer {
             schema: schema,
             isStoredInMemoryOnly: isStoredInMemoryOnly
         )
-        return try ModelContainer(for: schema, configurations: configuration)
+
+        do {
+            return try ModelContainer(for: schema, configurations: configuration)
+        } catch {
+            guard !isStoredInMemoryOnly else { throw error }
+            log.error("ModelContainer open failed: \(error.localizedDescription, privacy: .public)")
+            try removeStoreFiles(at: try defaultStoreURL())
+            return try ModelContainer(for: schema, configurations: configuration)
+        }
+    }
+
+    private static func defaultStoreURL() throws -> URL {
+        let applicationSupportDirectory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        return applicationSupportDirectory.appendingPathComponent("default.store")
+    }
+
+    /// Last-resort recovery when the store cannot be opened.
+    /// Audio files in the managed library directory are left on disk for re-import.
+    private static func removeStoreFiles(at storeURL: URL) throws {
+        let fileManager = FileManager.default
+        for suffix in ["", "-wal", "-shm"] {
+            let url = URL(fileURLWithPath: storeURL.path + suffix)
+            if fileManager.fileExists(atPath: url.path) {
+                try fileManager.removeItem(at: url)
+            }
+        }
+        let externalStorage = URL(fileURLWithPath: storeURL.path + ".externalStorage")
+        if fileManager.fileExists(atPath: externalStorage.path) {
+            try fileManager.removeItem(at: externalStorage)
+        }
     }
 }

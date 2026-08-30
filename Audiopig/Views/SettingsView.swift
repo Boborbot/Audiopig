@@ -155,20 +155,15 @@ struct SettingsView: View {
                     Picker("Subtitle font", selection: $settings.subtitleFont) {
                         ForEach(SubtitleFont.allCases) { font in
                             Text(font.label)
-                                .font(DS.Typography.subtitle(font, active: false))
+                                .font(DS.Typography.subtitlePickerLabel(font))
                                 .tag(font)
                         }
                     }
-
-                    Toggle(isOn: $settings.subtitlesAutoGenerateOnImport) {
-                        Label("Auto-generate on import", systemImage: "captions.bubble")
-                    }
-                    .tint(DS.Color.coral)
                 } header: {
                     Text("Subtitles")
                         .sectionTitle()
                 } footer: {
-                    Text("On-device subtitles require iOS 26. Generation uses Apple’s speech models (downloaded once per language). Auto-generate runs when playback is paused after import.")
+                    Text("On-device subtitles require iOS 26. Generation uses Apple’s speech models (downloaded once per language).")
                         .font(DS.Typography.caption)
                         .foregroundStyle(DS.Color.tertiary)
                 }

@@ -139,6 +139,40 @@ final class WatchConnectivityClient: NSObject {
         recentBooksHandler?(payload)
     }
 
+    private func applyChapters(_ payload: WatchChaptersPayload) {
+        latestChapters = payload
+        chaptersHandler?(payload)
+    }
+
+    private func isFireAndForgetCommand(_ command: WatchCommand) -> Bool {
+        switch command {
+        case .play, .togglePlayPause, .pause, .skipForward, .skipBackward,
+             .setSpeed, .setVolume, .seekToChapterIndex, .seekToChapter:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func isTransferOnlyCommand(_ command: WatchCommand) -> Bool {
+        if case .loadBook = command { return true }
+        return false
+    }
+
+    private func deliverFireAndForget(_ payload: [String: Any]) {
+        if session.isReachable {
+            session.sendMessage(
+                payload,
+                replyHandler: nil,
+                errorHandler: { [session] _ in
+                    session.transferUserInfo(payload)
+                }
+            )
+        } else {
+            session.transferUserInfo(payload)
+        }
+    }
+
     private func deliverCommandToPhone(_ command: WatchCommand) async -> WatchCommandResult {
         guard session.activationState == .activated else {
             return .failure(connectionErrorMessage)
@@ -163,6 +197,17 @@ final class WatchConnectivityClient: NSObject {
             return .ok(snapshot: latestSnapshot)
         }
 
+        if isTransferOnlyCommand(command) {
+            WatchConnectivityDiagnostics.info("Watch sending loadBook via transferUserInfo (no reply)")
+            session.transferUserInfo(payload)
+            return .ok(snapshot: latestSnapshot)
+        }
+
+        if isFireAndForgetCommand(command) {
+            deliverFireAndForget(payload)
+            return .ok(snapshot: latestSnapshot)
+        }
+
         if session.isReachable {
             return await withCheckedContinuation { continuation in
                 session.sendMessage(payload, replyHandler: { reply in
@@ -175,6 +220,9 @@ final class WatchConnectivityClient: NSObject {
                             if let recentBooks = result.recentBooks {
                                 self.applyRecentBooks(recentBooks)
                             }
+                            if let chapters = result.chapters {
+                                self.applyChapters(chapters)
+                            }
                             continuation.resume(returning: result)
                         } else {
                             continuation.resume(returning: .failure("No response from iPhone"))
@@ -183,7 +231,7 @@ final class WatchConnectivityClient: NSObject {
                 }, errorHandler: { [session] _ in
                     Task { @MainActor in
                         session.transferUserInfo(payload)
-                        continuation.resume(returning: .ok(snapshot: self.latestSnapshot))
+                        continuation.resume(returning: .failure(self.connectionErrorMessage))
                     }
                 })
             }
@@ -194,8 +242,13 @@ final class WatchConnectivityClient: NSObject {
     }
 
     private func ingestContext(_ context: [String: Any]) {
+        guard !context.isEmpty else { return }
+
         if let data = context[WatchMessageKeys.snapshot] as? Data,
            let snapshot = try? WatchMessageCodec.decode(WatchPlaybackSnapshot.self, from: data) {
+            WatchConnectivityDiagnostics.info(
+                "Watch ingested snapshot book=\(snapshot.bookID?.uuidString ?? "nil") state=\(String(describing: snapshot.playbackState))"
+            )
             applySnapshot(snapshot)
         }
 
@@ -211,9 +264,9 @@ final class WatchConnectivityClient: NSObject {
         }
 
         if let data = context[WatchMessageKeys.chapters] as? Data,
+           data.count <= WatchApplicationContextBudget.contextMaxBytes,
            let payload = try? WatchMessageCodec.decode(WatchChaptersPayload.self, from: data) {
-            latestChapters = payload
-            chaptersHandler?(payload)
+            applyChapters(payload)
         }
 
         if let data = context[WatchMessageKeys.settings] as? Data,

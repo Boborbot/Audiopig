@@ -93,12 +93,15 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
 
     func publishChapters(_ payload: WatchChaptersPayload) {
         lastChapters = payload
-        pushToContext(key: WatchMessageKeys.chapters, encodable: payload)
+        // Chapter lists can exceed application-context limits; deliver via command replies instead.
     }
 
-    func publishRecentBooks(_ payload: WatchRecentBooksPayload) {
+    func publishRecentBooks(_ payload: WatchRecentBooksPayload, contextIncludesThumbnails: Bool) {
         lastRecentBooks = payload
-        pushToContext(key: WatchMessageKeys.recentBooks, encodable: payload)
+        let contextPayload = contextIncludesThumbnails
+            ? payload.contextSyncCopy()
+            : payload.metadataOnlyCopy()
+        pushToContext(key: WatchMessageKeys.recentBooks, encodable: contextPayload)
     }
 
     func publishLocalBooks(_ payload: WatchLocalBooksPayload) {
@@ -222,9 +225,68 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
         guard session.activationState == .activated else { return }
         do {
             outboundContext[key] = try WatchMessageCodec.encode(encodable)
-            try session.updateApplicationContext(outboundContext)
+            outboundContext.removeValue(forKey: WatchMessageKeys.chapters)
+            let trimmed = trimContextToBudget(outboundContext)
+            try session.updateApplicationContext(trimmed)
+            outboundContext = trimmed
         } catch {
             // Best-effort sync.
+        }
+    }
+
+    private func trimContextToBudget(_ context: [String: Any]) -> [String: Any] {
+        var ctx = context
+        ctx.removeValue(forKey: WatchMessageKeys.chapters)
+
+        if contextEncodedSize(ctx) <= WatchApplicationContextBudget.contextMaxBytes {
+            return ctx
+        }
+
+        if let data = ctx[WatchMessageKeys.recentBooks] as? Data,
+           let payload = try? WatchMessageCodec.decode(WatchRecentBooksPayload.self, from: data) {
+            for thumbCount in stride(from: payload.books.count, through: 0, by: -1) {
+                let candidate = payload.contextSyncCopy(thumbnailCount: thumbCount)
+                ctx[WatchMessageKeys.recentBooks] = try? WatchMessageCodec.encode(candidate)
+                if contextEncodedSize(ctx) <= WatchApplicationContextBudget.contextMaxBytes {
+                    break
+                }
+            }
+        }
+
+        if contextEncodedSize(ctx) <= WatchApplicationContextBudget.contextMaxBytes {
+            return ctx
+        }
+
+        ctx.removeValue(forKey: WatchMessageKeys.recentBooks)
+
+        if contextEncodedSize(ctx) <= WatchApplicationContextBudget.contextMaxBytes {
+            return ctx
+        }
+
+        if let data = ctx[WatchMessageKeys.snapshot] as? Data,
+           let snapshot = try? WatchMessageCodec.decode(WatchPlaybackSnapshot.self, from: data),
+           snapshot.artworkJPEG != nil {
+            ctx[WatchMessageKeys.snapshot] = try? WatchMessageCodec.encode(
+                snapshot.withArtworkJPEG(nil)
+            )
+        }
+
+        if contextEncodedSize(ctx) <= WatchApplicationContextBudget.contextMaxBytes {
+            return ctx
+        }
+
+        ctx.removeValue(forKey: WatchMessageKeys.localBooks)
+        return ctx
+    }
+
+    private func contextEncodedSize(_ context: [String: Any]) -> Int {
+        context.reduce(0) { total, entry in
+            let valueSize: Int = switch entry.value {
+            case let data as Data: data.count
+            case let string as String: string.utf8.count
+            default: 0
+            }
+            return total + entry.key.utf8.count + valueSize
         }
     }
 
@@ -236,8 +298,34 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
     }
 
     private func decodeCommand(from message: [String: Any]) -> WatchCommand? {
+        Self.decodeCommand(from: message)
+    }
+
+    private static nonisolated func decodeCommand(from message: [String: Any]) -> WatchCommand? {
         guard let data = message[WatchMessageKeys.command] as? Data else { return nil }
         return try? WatchMessageCodec.decode(WatchCommand.self, from: data)
+    }
+
+    /// Transport commands where the Watch should not block on a payload-bearing reply.
+    private static nonisolated func repliesImmediately(_ command: WatchCommand) -> Bool {
+        switch command {
+        case .loadBook, .play, .togglePlayPause, .pause, .skipForward, .skipBackward,
+             .setSpeed, .setVolume, .seekToChapterIndex, .seekToChapter:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static nonisolated func sendReply(
+        _ result: WatchCommandResult,
+        to replyHandler: @escaping ([String: Any]) -> Void
+    ) {
+        guard let data = try? WatchMessageCodec.encode(result) else {
+            replyHandler([:])
+            return
+        }
+        replyHandler([WatchMessageKeys.commandResult: data])
     }
 
     private func reply(
@@ -246,7 +334,8 @@ final class WatchConnectivityService: NSObject, WatchConnectivityBridgeProtocol 
     ) {
         guard let replyHandler else { return }
         do {
-            let data = try WatchMessageCodec.encode(result)
+            let payload = result.messageReplyPayload()
+            let data = try WatchMessageCodec.encode(payload)
             replyHandler([WatchMessageKeys.commandResult: data])
         } catch {
             replyHandler([:])
@@ -338,9 +427,6 @@ extension WatchConnectivityService: WCSessionDelegate {
         if let recentBooks = lastRecentBooks {
             publishRecentBooks(recentBooks)
         }
-        if let chapters = lastChapters {
-            publishChapters(chapters)
-        }
         if let snapshot = lastSnapshot {
             publishSnapshot(snapshot, includeArtwork: includeArtwork)
         }
@@ -373,6 +459,16 @@ extension WatchConnectivityService: WCSessionDelegate {
         didReceiveMessage message: [String: Any],
         replyHandler: @escaping ([String: Any]) -> Void
     ) {
+        if let command = Self.decodeCommand(from: message),
+           Self.repliesImmediately(command) {
+            WatchConnectivityDiagnostics.info("iPhone immediate reply for \(String(describing: command))")
+            Self.sendReply(WatchCommandResult(success: true), to: replyHandler)
+            Task { @MainActor in
+                _ = await self.handleCommand(command)
+            }
+            return
+        }
+
         Task { @MainActor in
             guard let command = decodeCommand(from: message) else {
                 replyHandler([:])
@@ -384,6 +480,9 @@ extension WatchConnectivityService: WCSessionDelegate {
     }
 
     nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        if let command = Self.decodeCommand(from: userInfo), case .loadBook = command {
+            WatchConnectivityDiagnostics.info("iPhone received loadBook via transferUserInfo")
+        }
         Task { @MainActor in
             guard let command = decodeCommand(from: userInfo) else { return }
             _ = await handleCommand(command)
