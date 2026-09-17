@@ -77,13 +77,7 @@ struct WholeBookTranscriptionQueueView: View {
                 }
             }
 
-            if item.status == .running || item.status == .paused {
-                ProgressView(
-                    value: Double(item.completedWindows),
-                    total: Double(max(item.totalWindows, 1))
-                )
-                .tint(DS.Color.coral)
-            }
+            SubtitleCoverageTimelineBar(timeline: item.coverageTimeline)
 
             if item.status == .running || item.status == .paused || item.status == .failed {
                 HStack(spacing: DS.Spacing.md) {

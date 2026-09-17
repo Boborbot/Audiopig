@@ -76,8 +76,10 @@ final class Audiobook {
     var subtitleGenerationStatusRaw: String = SubtitleGenerationStatus.notGenerated.rawValue
     /// BCP-47 locale used for on-device transcription, e.g. `en-US`.
     var subtitleLocaleIdentifier: String?
-    /// Raw `SubtitleGenerationScope` value (`nearPlayhead` or `wholeBook`).
+    /// Raw `SubtitleGenerationScope` value (`nearPlayhead`, `wholeBook`, or `fromCurrentPosition`).
     var subtitleGenerationScopeRaw: String?
+    /// Playhead captured for `fromCurrentPosition` jobs so relaunch never transcribes earlier sections.
+    var subtitleGenerationFromPlayhead: TimeInterval? = nil
     /// Whole-book mode resume checkpoint on the global timeline.
     var subtitleLastCoveredEndTime: TimeInterval = 0
     /// When true, near-playhead transcription starts automatically as the listener approaches saved coverage.

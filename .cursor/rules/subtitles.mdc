@@ -35,6 +35,7 @@ if !subtitleCues.isEmpty { /* skip transcription */ }
 - Segment recorded on **every** completed ASR window (`SubtitleStore.insertSegment`), even when cues are empty
 - Near-playhead: one window per pass; `nil` queue = success, not failure
 - Whole-book: `SubtitleSegmentPlanner.uncoveredWindows` — fills gaps in patchy files
+- From current position: same planner with `fromPlayhead` — current 10-minute section onward only
 - Async persists check `subtitleGenerationEpoch`
 - Planner changes need tests in `AudiopigTests/Subtitle*Tests.swift`
 - Generation and overlay require Plus (`PremiumFeature.subtitles`)

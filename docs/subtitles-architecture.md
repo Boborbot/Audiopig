@@ -29,7 +29,7 @@ Canonical reference for on-device subtitle transcription. Read this before chang
 | `AudiopigShared/SubtitleSegmentPlanner.swift` | Segment merge, uncovered windows, near-playhead queue |
 | `AudiopigShared/SubtitleWindowPlanner.swift` | Window geometry constants only |
 | `AudiopigShared/SubtitleCoverageCalculator.swift` | Coverage metrics from segments |
-| `Services/SubtitleGenerationOrchestrator.swift` | ASR job queue (one window near playhead; all gaps whole-book) |
+| `Services/SubtitleGenerationOrchestrator.swift` | ASR job queue (one window near playhead; all gaps whole-book; from-current skips earlier sections) |
 | `Services/WholeBookTranscriptionQueueService.swift` | Global serial whole-book queue, persistence, worker |
 | `Services/SubtitleStore.swift` | SwiftData cues + segments |
 | `ViewModels/PlayerViewModel.swift` | Near-playhead orchestration, paywall, epoch guards |
@@ -44,7 +44,9 @@ Canonical reference for on-device subtitle transcription. Read this before chang
 
 **Patchy file + whole book:** Whole-book queues every window not fully covered by segments (≥99% of window duration). Re-transcribes the full 10-minute window; cue dedupe prevents duplicates.
 
-**Multi-book queue:** User enqueues books from the subtitles sheet, library swipe (“Transcribe Book”), or queue retry. `WholeBookTranscriptionQueueService` processes one book at a time; order is persisted and reorderable from the library capsule queue sheet. The queue button appears in the library toolbar capsule only while work remains.
+**From current position:** Same queue as whole-book, but only the 10-minute section containing the playhead and every later uncovered window. Earlier sections are never queued, even if they have gaps. The playhead is captured at enqueue time and persisted so seek or relaunch cannot expand the job backward.
+
+**Multi-book queue:** User enqueues books from the subtitles sheet (player or library swipe), or queue retry. Library swipe opens the same transcription sheet without “transcribe as you go.” `WholeBookTranscriptionQueueService` processes one book at a time; order is persisted and reorderable from the library capsule queue sheet. Queue rows show the coverage timeline (which sections are saved) rather than a linear progress bar. The queue button appears in the library toolbar capsule only while work remains.
 
 **Silent ASR (no cues):** Segment still recorded so the window is not retried forever.
 
@@ -56,8 +58,9 @@ Canonical reference for on-device subtitle transcription. Read this before chang
 - Seek while generating — cancel + restart via `handleSubtitlesPlayheadJump`
 - Empty ASR — still persist segment; do not throw `transcriptionFailed`
 - Whole-book with nothing to do — success when `uncoveredWindows` is empty
+- From current position with nothing left ahead — enqueue returns complete for that range; does not mark the whole book complete
 - Background — near-playhead generation suspended on resign active; whole-book queue continues
-- App relaunch — `restoreOnLaunch` re-queues orphaned `.inProgress` whole-book jobs
+- App relaunch — `restoreOnLaunch` re-queues orphaned `.inProgress` whole-book and from-current-position jobs
 - Near-playhead blocked while any whole-book queue job is active (ASR contention)
 
 ## Legacy backfill

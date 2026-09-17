@@ -79,7 +79,7 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
     }
 
     @discardableResult
-    func enqueue(audiobookID: UUID) -> WholeBookEnqueueResult {
+    func enqueue(audiobookID: UUID, fromPlayhead: TimeInterval?) -> WholeBookEnqueueResult {
         guard transcriptionService.isSupported else { return .unsupported }
         guard monetization.hasAccess(to: .subtitles) else { return .paywallRequired }
         guard let audiobook = fetchAudiobook(id: audiobookID) else { return .alreadyComplete }
@@ -87,10 +87,13 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
         let segments = (try? subtitleStore.sortedSegments(for: audiobookID)) ?? []
         let uncovered = SubtitleSegmentPlanner.uncoveredWindows(
             bookDuration: audiobook.duration,
-            segments: segments
+            segments: segments,
+            fromPlayhead: fromPlayhead
         )
         guard !uncovered.isEmpty else {
-            markBookComplete(audiobook)
+            if fromPlayhead == nil {
+                markBookComplete(audiobook)
+            }
             return .alreadyComplete
         }
 
@@ -102,8 +105,12 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
         let entry = WholeBookTranscriptionQueueEntry(
             orderIndex: nextIndex,
             audiobook: audiobook,
-            status: .queued
+            status: .queued,
+            fromPlayhead: fromPlayhead
         )
+        if let fromPlayhead {
+            audiobook.subtitleGenerationFromPlayhead = fromPlayhead
+        }
         modelContext.insert(entry)
         try? modelContext.save()
         bumpRevision()
@@ -131,6 +138,7 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
             let cues = (try? subtitleStore.sortedCues(for: audiobook.id)) ?? []
             audiobook.subtitleGenerationStatus = cues.isEmpty ? .notGenerated : .partial
             audiobook.subtitleGenerationScope = nil
+            audiobook.subtitleGenerationFromPlayhead = nil
         }
 
         modelContext.delete(entry)
@@ -197,10 +205,20 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
         guard entries.indices.contains(sourceIndex) else { return }
 
         if entries[sourceIndex].status == .running { return }
+        let runningPositions = Dictionary(
+            uniqueKeysWithValues: entries.enumerated().compactMap { index, entry in
+                entry.status == .running ? (entry.id, index) : nil
+            }
+        )
 
         let item = entries.remove(at: sourceIndex)
         let insertAt = destination > sourceIndex ? destination - 1 : destination
         entries.insert(item, at: min(insertAt, entries.count))
+
+        let preservesRunningPositions = runningPositions.allSatisfy { id, originalIndex in
+            entries.firstIndex(where: { $0.id == id }) == originalIndex
+        }
+        guard preservesRunningPositions else { return }
 
         for (offset, entry) in entries.enumerated() {
             entry.orderIndex = offset
@@ -252,10 +270,12 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
         activeProgress.message = "Preparing transcription…"
         bumpRevision()
 
+        let fromPlayhead = entry.fromPlayhead
         let segments = (try? subtitleStore.sortedSegments(for: audiobook.id)) ?? []
         let uncovered = SubtitleSegmentPlanner.uncoveredWindows(
             bookDuration: audiobook.duration,
-            segments: segments
+            segments: segments,
+            fromPlayhead: fromPlayhead
         )
 
         if uncovered.isEmpty {
@@ -263,11 +283,21 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
             return
         }
 
-        let allWindows = SubtitleWindowPlanner.wholeBookWindows(bookDuration: audiobook.duration)
-        activeProgress.totalWindows = allWindows.count
-        activeProgress.completedWindows = allWindows.count - uncovered.count
+        let scopedWindows: [SubtitleTimeWindow]
+        if let fromPlayhead {
+            scopedWindows = SubtitleWindowPlanner.windowsFromCurrentSection(
+                playhead: fromPlayhead,
+                bookDuration: audiobook.duration
+            )
+        } else {
+            scopedWindows = SubtitleWindowPlanner.wholeBookWindows(bookDuration: audiobook.duration)
+        }
+        activeProgress.totalWindows = scopedWindows.count
+        activeProgress.completedWindows = scopedWindows.count - uncovered.count
 
-        audiobook.subtitleGenerationScope = .wholeBook
+        let scope: SubtitleGenerationScope = fromPlayhead == nil ? .wholeBook : .fromCurrentPosition
+        audiobook.subtitleGenerationScope = scope
+        audiobook.subtitleGenerationFromPlayhead = fromPlayhead
         audiobook.subtitleGenerationStatus = .inProgress
         let locale = localeProvider()
         audiobook.subtitleLocaleIdentifier = locale
@@ -284,8 +314,8 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
 
         do {
             try await orch.generate(
-                scope: .wholeBook,
-                playhead: 0,
+                scope: scope,
+                playhead: fromPlayhead ?? 0,
                 bookDuration: bookDuration,
                 chapters: resolvedChapters,
                 existingSegments: segments,
@@ -342,6 +372,7 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
             audiobook.subtitleGenerationStatus = cues.isEmpty && segments.isEmpty ? .failed : .partial
         }
         audiobook.subtitleGenerationScope = nil
+        audiobook.subtitleGenerationFromPlayhead = nil
 
         modelContext.delete(entry)
         try? modelContext.save()
@@ -358,6 +389,7 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
         let cues = (try? subtitleStore.sortedCues(for: audiobook.id)) ?? []
         audiobook.subtitleGenerationStatus = cues.isEmpty ? .failed : .partial
         audiobook.subtitleGenerationScope = nil
+        audiobook.subtitleGenerationFromPlayhead = nil
         try? modelContext.save()
         workerTask = nil
         orchestrator = nil
@@ -418,6 +450,7 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
         audiobook.subtitleGenerationStatus = .complete
         audiobook.subtitleLastCoveredEndTime = audiobook.duration
         audiobook.subtitleGenerationScope = nil
+        audiobook.subtitleGenerationFromPlayhead = nil
         try? modelContext.save()
         bumpRevision()
     }
@@ -425,19 +458,27 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
     private func reconcileOrphanedInProgressBooks() {
         let descriptor = FetchDescriptor<Audiobook>(
             predicate: #Predicate { book in
-                book.subtitleGenerationScopeRaw == "wholeBook"
-                    && book.subtitleGenerationStatusRaw == "inProgress"
+                book.subtitleGenerationStatusRaw == "inProgress"
             }
         )
-        let orphaned = (try? modelContext.fetch(descriptor)) ?? []
+        let orphaned = ((try? modelContext.fetch(descriptor)) ?? []).filter { book in
+            book.subtitleGenerationScope == .wholeBook || book.subtitleGenerationScope == .fromCurrentPosition
+        }
         let queuedIDs = Set(sortedEntries().compactMap(\.audiobook?.id))
 
         var nextIndex = (sortedEntries().map(\.orderIndex).max() ?? -1) + 1
         for book in orphaned where !queuedIDs.contains(book.id) {
+            let fromPlayhead: TimeInterval?
+            if book.subtitleGenerationScope == .fromCurrentPosition {
+                fromPlayhead = book.subtitleGenerationFromPlayhead ?? book.currentPlaybackTime
+            } else {
+                fromPlayhead = nil
+            }
             let entry = WholeBookTranscriptionQueueEntry(
                 orderIndex: nextIndex,
                 audiobook: book,
-                status: .queued
+                status: .queued,
+                fromPlayhead: fromPlayhead
             )
             modelContext.insert(entry)
             nextIndex += 1
@@ -459,7 +500,15 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
             bookDuration: audiobook.duration
         )
 
-        let allWindows = SubtitleWindowPlanner.wholeBookWindows(bookDuration: audiobook.duration)
+        let allWindows: [SubtitleTimeWindow]
+        if let fromPlayhead = entry.fromPlayhead {
+            allWindows = SubtitleWindowPlanner.windowsFromCurrentSection(
+                playhead: fromPlayhead,
+                bookDuration: audiobook.duration
+            )
+        } else {
+            allWindows = SubtitleWindowPlanner.wholeBookWindows(bookDuration: audiobook.duration)
+        }
         let isActive = audiobook.id == activeAudiobookID
 
         let completed: Int
@@ -473,11 +522,21 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
             message = activeProgress.message
             isPreparing = activeProgress.isPreparing
         } else {
-            completed = summary.coveredWindowCount
-            total = max(summary.totalWindowCount, 1)
+            let uncovered = SubtitleSegmentPlanner.uncoveredWindows(
+                bookDuration: audiobook.duration,
+                segments: segments,
+                fromPlayhead: entry.fromPlayhead
+            )
+            completed = max(0, allWindows.count - uncovered.count)
+            total = max(allWindows.count, 1)
             message = nil
             isPreparing = false
         }
+
+        let timeline = SubtitleCoverageTimelineMapper.timeline(
+            segments: segments,
+            bookDuration: audiobook.duration
+        )
 
         return WholeBookQueueItemSnapshot(
             id: entry.id,
@@ -488,6 +547,7 @@ final class WholeBookTranscriptionQueueService: WholeBookTranscriptionQueueServi
             status: entry.status,
             isPreparing: isPreparing,
             coverageFraction: summary.coverageFraction,
+            coverageTimeline: timeline,
             completedWindows: completed,
             totalWindows: total,
             progressMessage: message,

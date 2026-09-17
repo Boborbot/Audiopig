@@ -80,6 +80,7 @@ struct WatchLocalLibraryView: View {
                     Task {
                         let loaded = await libraryViewModel.selectBook(id: book.id)
                         if loaded {
+                            await Task.yield()
                             onBookSelected()
                         }
                     }

@@ -25,6 +25,12 @@ public struct WatchSettingsSnapshot: Codable, Sendable, Equatable {
     public let watchArtworkViewMode: WatchArtworkViewMode?
     /// Whether Watch Artwork View is unlocked on iPhone (Plus or trial).
     public let hasWatchArtworkViewAccess: Bool?
+    /// Whether the Watch transport page hides Find Breaks. Optional for older payloads.
+    public let findBreaksButtonHidden: Bool?
+
+    public var effectiveFindBreaksButtonHidden: Bool {
+        findBreaksButtonHidden ?? true
+    }
 
     public init(
         artworkSkipGesturesEnabled: Bool,
@@ -37,7 +43,8 @@ public struct WatchSettingsSnapshot: Codable, Sendable, Equatable {
         universalPlaybackSpeed: Float? = nil,
         hasParagraphBreaksAccess: Bool? = nil,
         watchArtworkViewMode: WatchArtworkViewMode? = nil,
-        hasWatchArtworkViewAccess: Bool? = nil
+        hasWatchArtworkViewAccess: Bool? = nil,
+        findBreaksButtonHidden: Bool? = nil
     ) {
         self.artworkSkipGesturesEnabled = artworkSkipGesturesEnabled
         self.skipForwardSeconds = skipForwardSeconds
@@ -50,5 +57,6 @@ public struct WatchSettingsSnapshot: Codable, Sendable, Equatable {
         self.hasParagraphBreaksAccess = hasParagraphBreaksAccess
         self.watchArtworkViewMode = watchArtworkViewMode
         self.hasWatchArtworkViewAccess = hasWatchArtworkViewAccess
+        self.findBreaksButtonHidden = findBreaksButtonHidden
     }
 }

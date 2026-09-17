@@ -13,7 +13,7 @@ struct SubtitleGenerationProgress: Sendable {
     let message: String
 }
 
-/// Coordinates window queueing and transcription for near-playhead and whole-book modes.
+/// Coordinates window queueing and transcription for near-playhead, whole-book, and from-current-position modes.
 actor SubtitleGenerationOrchestrator {
 
     private let transcriptionService: any SubtitleTranscriptionServiceProtocol
@@ -78,8 +78,9 @@ actor SubtitleGenerationOrchestrator {
                 onWindowComplete: onWindowComplete,
                 onProgress: onProgress
             )
-        case .wholeBook:
-            try await generateWholeBook(
+        case .wholeBook, .fromCurrentPosition:
+            try await generateQueuedWindows(
+                fromPlayhead: scope == .fromCurrentPosition ? playhead : nil,
                 bookDuration: bookDuration,
                 chapters: chapters,
                 existingSegments: existingSegments,
@@ -127,7 +128,8 @@ actor SubtitleGenerationOrchestrator {
         try await onWindowComplete(window, newCues)
     }
 
-    private func generateWholeBook(
+    private func generateQueuedWindows(
+        fromPlayhead: TimeInterval?,
         bookDuration: TimeInterval,
         chapters: [ResolvedChapter],
         existingSegments: [SubtitleTranscriptionSegmentTiming],
@@ -135,11 +137,24 @@ actor SubtitleGenerationOrchestrator {
         onWindowComplete: @escaping @Sendable (SubtitleTimeWindow, [SubtitleCueTiming]) async throws -> Void,
         onProgress: @escaping @Sendable (SubtitleGenerationProgress) -> Void
     ) async throws {
-        let allWindows = SubtitleWindowPlanner.wholeBookWindows(bookDuration: bookDuration)
+        let scopedWindows: [SubtitleTimeWindow]
+        if let fromPlayhead {
+            scopedWindows = SubtitleWindowPlanner.windowsFromCurrentSection(
+                playhead: fromPlayhead,
+                bookDuration: bookDuration
+            )
+        } else {
+            scopedWindows = SubtitleWindowPlanner.wholeBookWindows(bookDuration: bookDuration)
+        }
         let pending = SubtitleSegmentPlanner.uncoveredWindows(
             bookDuration: bookDuration,
-            segments: existingSegments
+            segments: existingSegments,
+            fromPlayhead: fromPlayhead
         )
+        let alreadyCovered = max(0, scopedWindows.count - pending.count)
+        let progressLabel = fromPlayhead == nil
+            ? "Transcribing entire book"
+            : "Transcribing from current position"
 
         for (index, window) in pending.enumerated() {
             try Task.checkCancellation()
@@ -148,9 +163,9 @@ actor SubtitleGenerationOrchestrator {
 
             onProgress(
                 SubtitleGenerationProgress(
-                    completedWindows: index,
-                    totalWindows: allWindows.count,
-                    message: "Transcribing entire book (\(index + 1) of \(pending.count))…"
+                    completedWindows: alreadyCovered + index,
+                    totalWindows: scopedWindows.count,
+                    message: "\(progressLabel) (\(index + 1) of \(pending.count))…"
                 )
             )
 

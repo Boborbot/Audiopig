@@ -20,10 +20,10 @@ public struct WatchStorageEntry: Sendable, Equatable {
 }
 
 public enum WatchStorageBudget {
-    public static let defaultBudgetBytes: Int64 = 2_147_483_648
+    public nonisolated static let defaultBudgetBytes: Int64 = 2_147_483_648
 
     /// Returns book IDs to evict (oldest / least-recently-used first) until `incomingBytes` fits.
-    public static func booksToEvict(
+    public nonisolated static func booksToEvict(
         entries: [WatchStorageEntry],
         incomingBytes: Int64,
         budget: Int64 = defaultBudgetBytes
@@ -47,7 +47,7 @@ public enum WatchStorageBudget {
         return evictions
     }
 
-    public static func canFit(
+    public nonisolated static func canFit(
         entries: [WatchStorageEntry],
         incomingBytes: Int64,
         budget: Int64 = defaultBudgetBytes

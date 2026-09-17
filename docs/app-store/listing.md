@@ -30,10 +30,10 @@ Local audiobooks, beautifully
 ## Promotional Text (170 characters max, editable without new version)
 
 ```
-v1.1.2: Stronger Voice Boost levels, EQ remembers your preset when toggled back on, and playback polish. Core player free — try Plus free for 7 days.
+v1.1.3: Reliable Apple Watch playback with speed, transport, chapters, and Digital Crown controls. Core player free — try Plus free for 7 days.
 ```
 
-(149 characters)
+(143 characters)
 
 **v1.1.1 alternate:**
 
@@ -55,6 +55,21 @@ v1.1: Smart Rewind, on-device subtitles (iOS 26+), and chapter editing. Core pla
 
 ```
 Core player free. Try Smart Rewind, Speech EQ, and subtitles free for 7 days with AudioPig Plus. Your library stays on your device.
+```
+
+---
+
+## What's New (v1.1.3 — paste into App Store Connect)
+
+```
+• Apple Watch — tapping a recent book now opens the player reliably
+• Watch controls — move between speed, transport, and chapters
+• Digital Crown — adjust speed or volume and scroll the chapter list
+• Watch navigation — return directly to Recent Books with Back or a rightward swipe
+• Cleaner controls — Find Breaks is hidden by default and can be restored in settings
+• Companion packaging — consistent versions across the iPhone, widget, and Watch apps
+• Subtitles — start transcription from the current position without filling earlier gaps
+• Transcription queue — coverage timelines show which sections are already saved
 ```
 
 ---
@@ -83,7 +98,7 @@ Core player free. Try Smart Rewind, Speech EQ, and subtitles free for 7 days wit
 
 ```
 • Smart Rewind — Look Far and Look Near find silence before you drifted off so you can jump back to a natural break
-• Live subtitles — on-device transcription near the playhead or for the whole book (iOS 26+; AudioPig Plus)
+• Live subtitles — on-device transcription near the playhead, from the current section onward, or for the whole book (iOS 26+; AudioPig Plus)
 • Edit chapter titles, start times, and order from the chapter list
 • New secret icons: Sher Pig (Sherlock Holmes) and Pig Sawyer (Tom Sawyer)
 • New listening milestones at 2000 and 2500 hours
@@ -208,13 +223,13 @@ To test:
 3. Select one or more MP3 or M4B files from Files / iCloud Drive
 4. Tap the book to play; use the player sheet for speed, bookmarks, sleep timer, Smart Rewind, and subtitles
 5. Smart Rewind — tap Look Far or Look Near (without Plus, trial paywall appears; with StoreKit testing or sandbox Plus, analysis runs and shows break points)
-6. Subtitles (iOS 26+ device recommended) — tap the captions button; long-press for generate near playhead or whole book. Speech recognition runs on-device only; first use may download a language pack on Wi‑Fi.
+6. Subtitles (iOS 26+ device recommended) — tap the transcription button for generate near playhead, from current position, or whole book. Speech recognition runs on-device only; first use may download a language pack on Wi‑Fi.
 7. Chapters — open chapter list → Edit to rename chapters or adjust start times
 8. Settings → AudioPig Plus / Feed a Student for subscription management and optional tips
 
 StoreKit: Xcode scheme uses Audiopig.storekit for local testing. Sandbox account required on device for real IAP QA.
 
-Apple Watch: the companion app supports remote iPhone playback (recent books, controls, chapters). The "Watch playback" option on the source picker is intentionally disabled (under-construction UI with hammer icon). On-Watch local library and iPhone-to-Watch transfer are not available.
+Apple Watch: the companion app supports remote iPhone playback (recent books; swipe between speed, transport controls, and chapters). The "Watch playback" option on the source picker is intentionally disabled (under-construction UI with hammer icon). On-Watch local library and iPhone-to-Watch transfer are not available.
 
 Photo library, camera, and speech recognition are used only for cover art (your choice) and on-device subtitle transcription. Audio is not uploaded to our servers.
 

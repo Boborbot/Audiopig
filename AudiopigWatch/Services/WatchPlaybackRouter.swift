@@ -35,7 +35,7 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
             guard let self, snap.source == .remote else { return }
             guard !self.prefersLocalPlayback else { return }
 
-            if let bookID = snap.bookID {
+            if snap.bookID != nil {
                 if self.activeSource == .local {
                     self.local.stopPlaybackIfActive()
                 }
@@ -100,7 +100,7 @@ final class WatchPlaybackRouter: WatchPlaybackCoordinating {
         case .requestRecentBooks, .requestSnapshot, .requestChapters, .togglePlayPause, .play, .pause,
              .skipForward, .skipBackward, .setSpeed, .setVolume,
              .seekToChapterIndex, .seekToChapter, .setArtworkSkipGesturesEnabled,
-             .setWatchArtworkViewMode:
+             .setWatchArtworkViewMode, .setWatchFindBreaksButtonHidden:
             if !prefersLocalPlayback, activeSource == .local {
                 activeSource = .remote
             }

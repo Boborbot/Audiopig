@@ -21,6 +21,7 @@ public struct WholeBookQueueItemSnapshot: Sendable, Equatable, Identifiable {
     public let status: WholeBookQueueEntryStatus
     public let isPreparing: Bool
     public let coverageFraction: Double
+    public let coverageTimeline: SubtitleCoverageTimeline
     public let completedWindows: Int
     public let totalWindows: Int
     public let progressMessage: String?
@@ -35,6 +36,7 @@ public struct WholeBookQueueItemSnapshot: Sendable, Equatable, Identifiable {
         status: WholeBookQueueEntryStatus,
         isPreparing: Bool = false,
         coverageFraction: Double,
+        coverageTimeline: SubtitleCoverageTimeline = .empty,
         completedWindows: Int,
         totalWindows: Int,
         progressMessage: String?,
@@ -48,6 +50,7 @@ public struct WholeBookQueueItemSnapshot: Sendable, Equatable, Identifiable {
         self.status = status
         self.isPreparing = isPreparing
         self.coverageFraction = coverageFraction
+        self.coverageTimeline = coverageTimeline
         self.completedWindows = completedWindows
         self.totalWindows = totalWindows
         self.progressMessage = progressMessage

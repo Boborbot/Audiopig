@@ -23,6 +23,7 @@ final class WatchPlayerViewModel: ObservableObject {
     @Published private(set) var chapters: [WatchChapterSummary] = []
     @Published var artworkSkipGesturesEnabled = false
     @Published var watchArtworkViewMode: WatchArtworkViewMode = .off
+    @Published var findBreaksButtonHidden = true
     @Published private(set) var speedPresets: [Float] = WatchSpeedRange.presets
 
     /// Optimistic transport state for instant button feedback.
@@ -108,6 +109,7 @@ final class WatchPlayerViewModel: ObservableObject {
         snapshot.bookID != nil
             && snapshot.source == .remote
             && hasParagraphBreaksAccess
+            && !findBreaksButtonHidden
     }
 
     var effectiveArtworkViewMode: WatchArtworkViewMode {
@@ -115,23 +117,17 @@ final class WatchPlayerViewModel: ObservableObject {
         return watchArtworkViewMode
     }
 
-    /// Default pager page for the main transport controls (media or artwork-replace).
-    var mainControlsPageIndex: Int {
-        switch effectiveArtworkViewMode {
-        case .off, .replaceStandardControls:
-            return 1
-        case .add:
-            return 2
-        }
+    var playerPages: [WatchPlayerPageKind] {
+        WatchPlayerPageLayout.pages(artworkViewMode: effectiveArtworkViewMode)
     }
 
-    var chaptersPageIndex: Int {
-        switch effectiveArtworkViewMode {
-        case .off, .replaceStandardControls:
-            return 2
-        case .add:
-            return 3
-        }
+    /// Page shown when opening the player from the library.
+    var mainControlsPage: WatchPlayerPageKind {
+        WatchPlayerPageLayout.mainControlsPage(artworkViewMode: effectiveArtworkViewMode)
+    }
+
+    func resolvedPlayerPage(_ page: WatchPlayerPageKind) -> WatchPlayerPageKind {
+        WatchPlayerPageLayout.resolve(page, artworkViewMode: effectiveArtworkViewMode)
     }
 
     func lullLabel(for lull: WatchLullResult) -> String {
@@ -385,6 +381,10 @@ final class WatchPlayerViewModel: ObservableObject {
         await coordinator.send(.setWatchArtworkViewMode(mode))
     }
 
+    func sendFindBreaksButtonHiddenSetting(_ hidden: Bool) async -> WatchCommandResult {
+        await coordinator.send(.setWatchFindBreaksButtonHidden(hidden))
+    }
+
     func preferLocalPlayback(_ preferred: Bool) {
         (coordinator as? WatchPlaybackRouter)?.preferLocalPlayback(preferred)
     }
@@ -520,7 +520,8 @@ final class WatchPlayerViewModel: ObservableObject {
         artworkSkipGesturesEnabled = settings.artworkSkipGesturesEnabled
         hasParagraphBreaksAccess = settings.hasParagraphBreaksAccess ?? false
         hasWatchArtworkViewAccess = settings.hasWatchArtworkViewAccess ?? false
-        if !hasParagraphBreaksAccess {
+        findBreaksButtonHidden = settings.effectiveFindBreaksButtonHidden
+        if !hasParagraphBreaksAccess || findBreaksButtonHidden {
             lullState = .idle
         }
         if let mode = settings.watchArtworkViewMode {

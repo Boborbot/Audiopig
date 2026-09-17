@@ -14,49 +14,35 @@ struct SpeedControlsView: View {
         self.isActive = isActive
     }
 
-    @State private var lastDetentSpeed: Float = 1.0
-
     var body: some View {
         VStack(spacing: WDS.Spacing.md) {
-            Text(viewModel.speedLabel)
-                .font(.title2.monospacedDigit().weight(.semibold))
-                .foregroundStyle(WDS.Color.coral)
-
-            Slider(
-                value: Binding(
-                    get: { Double(viewModel.speedDraft) },
-                    set: { viewModel.speedDraft = Float($0) }
-                ),
+            Stepper(
+                value: speedBinding,
                 in: Double(WatchSpeedRange.min)...Double(WatchSpeedRange.max),
                 step: Double(WatchSpeedRange.step)
-            )
+            ) {
+                Text(viewModel.speedLabel)
+                    .font(.title2.monospacedDigit().weight(.semibold))
+                    .foregroundStyle(WDS.Color.coral)
+            }
             .tint(WDS.Color.coral)
+            .disabled(!isActive)
+            .accessibilityLabel("Playback speed")
+            .accessibilityValue(viewModel.speedLabel)
 
             presetRow
         }
         .padding(.horizontal, WDS.Spacing.sm)
-        .focusable(isActive)
-        .digitalCrownRotation(
-            $viewModel.speedDraft,
-            from: WatchSpeedRange.min,
-            through: WatchSpeedRange.max,
-            by: WatchSpeedRange.crownStep,
-            sensitivity: .low,
-            isContinuous: false,
-            isHapticFeedbackEnabled: true
-        )
-        .onChange(of: viewModel.speedDraft) { _, newValue in
-            guard isActive else { return }
-            let normalized = normalizedSpeed(newValue)
-            if normalized != lastDetentSpeed {
-                lastDetentSpeed = normalized
-                viewModel.speedDraft = normalized
+    }
+
+    private var speedBinding: Binding<Double> {
+        Binding(
+            get: { Double(viewModel.speedDraft) },
+            set: { newValue in
+                viewModel.speedDraft = WatchSpeedRange.normalized(Float(newValue))
                 viewModel.applySpeedDraft()
             }
-        }
-        .onAppear {
-            lastDetentSpeed = viewModel.speedDraft
-        }
+        )
     }
 
     private var presetRow: some View {
@@ -64,7 +50,6 @@ struct SpeedControlsView: View {
             ForEach(viewModel.speedPresets, id: \.self) { preset in
                 Button {
                     viewModel.selectSpeedPreset(preset)
-                    lastDetentSpeed = preset
                 } label: {
                     Text(presetLabel(preset))
                         .font(.caption2.monospacedDigit())
@@ -86,10 +71,5 @@ struct SpeedControlsView: View {
         speed.truncatingRemainder(dividingBy: 1) == 0
             ? "\(Int(speed))"
             : String(format: "%.2g", speed)
-    }
-
-    private func normalizedSpeed(_ speed: Float) -> Float {
-        let stepped = (speed / WatchSpeedRange.step).rounded() * WatchSpeedRange.step
-        return min(WatchSpeedRange.max, max(WatchSpeedRange.min, stepped))
     }
 }

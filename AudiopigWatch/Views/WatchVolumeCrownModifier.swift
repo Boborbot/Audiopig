@@ -5,137 +5,58 @@
 
 import SwiftUI
 
-/// Captures Digital Crown input for volume on transport pages inside a vertical `TabView`.
+/// Pager-owned Digital Crown input for transport-page volume.
 struct WatchVolumeCrownModifier: ViewModifier {
     @ObservedObject var viewModel: WatchPlayerViewModel
     let isActive: Bool
 
-    @FocusState private var crownFocused: Bool
-    @State private var crownAxis: Float = WatchVolumeRange.crownAxis(for: 0.5)
-    @State private var lastCrownAxis: Float = WatchVolumeRange.crownAxis(for: 0.5)
+    @State private var crownValue: Float = WatchVolumeRange.crownValue(for: 0.5)
     @State private var lastAppliedVolume: Float = 0.5
-    @State private var preActivationScroll: Float = 0
-    @State private var isCrownArmed = false
-    @State private var crownIdleTask: Task<Void, Never>?
 
     func body(content: Content) -> some View {
         content
             .overlay {
-                if viewModel.showVolumeOverlay {
+                if isActive, viewModel.showVolumeOverlay {
                     volumeOverlay
                 }
             }
             .focusable(isActive)
-            .focused($crownFocused)
             .watchDigitalCrownLow(
                 isActive: isActive,
-                value: $crownAxis,
-                from: 1,
-                through: 0,
+                value: $crownValue,
+                from: WatchVolumeRange.crownMinimum,
+                through: WatchVolumeRange.crownMaximum,
                 by: WatchVolumeRange.crownStep,
                 isContinuous: false,
                 isHapticFeedbackEnabled: false
             )
-            .onChange(of: crownAxis) { _, newAxis in
-                handleCrownAxisChange(newAxis)
+            .onChange(of: crownValue) { _, newValue in
+                applyCrownValue(newValue)
             }
             .onChange(of: viewModel.volumeDraft) { _, newValue in
                 guard !viewModel.isVolumeAdjustmentActive else { return }
                 syncCrownFromViewModel(volume: newValue)
             }
-            .onChange(of: isActive) { _, active in
-                if active {
-                    resetCrownGestureState()
-                    claimCrownFocus()
-                } else {
-                    crownFocused = false
-                    resetCrownGestureState()
-                }
-            }
             .onAppear {
-                resetCrownGestureState()
-                if isActive {
-                    claimCrownFocus()
-                }
-            }
-            .onDisappear {
-                crownIdleTask?.cancel()
+                syncCrownFromViewModel(volume: viewModel.volumeDraft)
             }
     }
 
-    private func handleCrownAxisChange(_ newAxis: Float) {
-        guard isActive else {
-            lastCrownAxis = newAxis
-            lastAppliedVolume = WatchVolumeRange.volume(fromCrownAxis: newAxis)
-            return
-        }
-
-        if !isCrownArmed {
-            let scrollDelta = abs(newAxis - lastCrownAxis)
-            lastCrownAxis = newAxis
-            preActivationScroll += scrollDelta
-
-            if preActivationScroll < WatchVolumeRange.crownActivationThreshold {
-                let lockedAxis = WatchVolumeRange.crownAxis(for: lastAppliedVolume)
-                if abs(crownAxis - lockedAxis) > WatchVolumeRange.tolerance {
-                    crownAxis = lockedAxis
-                }
-                lastCrownAxis = lockedAxis
-                return
-            }
-
-            isCrownArmed = true
-            preActivationScroll = 0
-        } else {
-            lastCrownAxis = newAxis
-        }
-
-        let normalized = WatchVolumeRange.volume(fromCrownAxis: newAxis)
-        guard normalized != lastAppliedVolume else {
-            scheduleCrownDisarm()
-            return
-        }
+    private func applyCrownValue(_ newValue: Float) {
+        let normalized = WatchVolumeRange.volume(fromCrownValue: newValue)
+        guard isActive, normalized != lastAppliedVolume else { return }
 
         lastAppliedVolume = normalized
         viewModel.volumeDraft = normalized
         viewModel.applyVolumeDraft()
-        scheduleCrownDisarm()
-    }
-
-    private func scheduleCrownDisarm() {
-        crownIdleTask?.cancel()
-        crownIdleTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(900))
-            guard !Task.isCancelled else { return }
-            isCrownArmed = false
-            preActivationScroll = 0
-            syncCrownFromViewModel(volume: viewModel.volumeDraft)
-        }
-    }
-
-    private func claimCrownFocus() {
-        syncCrownFromViewModel(volume: viewModel.volumeDraft)
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(50))
-            guard isActive else { return }
-            crownFocused = true
-        }
-    }
-
-    private func resetCrownGestureState() {
-        crownIdleTask?.cancel()
-        isCrownArmed = false
-        preActivationScroll = 0
-        syncCrownFromViewModel(volume: viewModel.volumeDraft)
     }
 
     private func syncCrownFromViewModel(volume: Float) {
         let normalized = WatchVolumeRange.normalized(volume)
         lastAppliedVolume = normalized
-        let axis = WatchVolumeRange.crownAxis(for: normalized)
-        lastCrownAxis = axis
-        if abs(crownAxis - axis) > WatchVolumeRange.tolerance {
-            crownAxis = axis
+        let value = WatchVolumeRange.crownValue(for: normalized)
+        if abs(crownValue - value) > WatchVolumeRange.tolerance {
+            crownValue = value
         }
     }
 

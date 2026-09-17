@@ -7,6 +7,7 @@ import SwiftUI
 
 struct PlayerView: View {
     @Bindable var viewModel: PlayerViewModel
+    @Bindable var settings: AppSettings
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var paywallViewModel: PaywallViewModel?
@@ -24,7 +25,11 @@ struct PlayerView: View {
                 .playerBackground(image: viewModel.coverImage)
 
             GeometryReader { geometry in
-                let metrics = PlayerLayoutMetrics(geometry: geometry)
+                let showsLandscapeTitle = !settings.landscapePlayerHidesTitle
+                let metrics = PlayerLayoutMetrics(
+                    geometry: geometry,
+                    showsLandscapeTitle: showsLandscapeTitle
+                )
                 Group {
                     if metrics.isLandscape {
                         landscapeLayout(metrics: metrics, geometry: geometry)
@@ -153,16 +158,38 @@ struct PlayerView: View {
     }
 
     private func artworkColumn(metrics: PlayerLayoutMetrics) -> some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
+        GeometryReader { geo in
+            let border = DS.Layout.centimeter
+            let showsTitle = !settings.landscapePlayerHidesTitle
+            let horizontalInset = showsTitle ? metrics.horizontalPadding : 0
+            let titleReserve = showsTitle ? DS.Layout.playerLandscapeTitleBlockHeight : 0
+            let availableWidth = geo.size.width - (horizontalInset * 2) - (border * 2)
+            let availableHeight = geo.size.height - (border * 2) - titleReserve
+            let artSize = max(0, min(availableWidth, availableHeight))
 
-            artworkSection(width: metrics.artworkWidth, height: metrics.artworkHeight)
+            VStack(spacing: 0) {
+                if showsTitle {
+                    Spacer(minLength: border)
 
-            titleSection(compact: true)
+                    artworkSection(width: artSize, height: artSize)
 
-            Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+
+                    titleSection(compact: true)
+
+                    Spacer(minLength: border)
+                } else {
+                    Spacer(minLength: 0)
+
+                    artworkSection(width: artSize, height: artSize)
+
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.horizontal, horizontalInset)
+            .frame(width: geo.size.width, height: geo.size.height)
+            .animation(DS.Animation.standard, value: settings.landscapePlayerHidesTitle)
         }
-        .padding(.horizontal, metrics.horizontalPadding)
         .frame(width: metrics.columnWidth, height: metrics.screenSize.height)
     }
 
@@ -851,6 +878,8 @@ private struct PlayerLayoutMetrics {
     private static let artworkScale: CGFloat = 0.925
     /// iPad portrait height cap — between uncapped width-based square and the 0.42 tight cap.
     private static let padPortraitHeightCap: CGFloat = 0.50
+    /// Tighter horizontal inset in landscape so cover art can grow.
+    private static let landscapeHorizontalPadding: CGFloat = DS.Spacing.sm
 
     let isLandscape: Bool
     let isPad: Bool
@@ -860,27 +889,36 @@ private struct PlayerLayoutMetrics {
     let columnWidth: CGFloat
     let horizontalPadding: CGFloat
     let bottomInset: CGFloat
+    let artworkBorder: CGFloat
+    let showsLandscapeTitle: Bool
     let screenSize: CGSize
 
-    init(geometry: GeometryProxy) {
+    init(geometry: GeometryProxy, showsLandscapeTitle: Bool) {
         let size = geometry.size
         isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let padding = isPad ? DS.Spacing.md : DS.Spacing.playerH
+        self.showsLandscapeTitle = showsLandscapeTitle
         isLandscape = size.width > size.height
-        horizontalPadding = padding
         screenSize = size
         artworkOnLeading = geometry.safeAreaInsets.leading >= geometry.safeAreaInsets.trailing
         bottomInset = max(geometry.safeAreaInsets.bottom, DS.Spacing.md)
 
         if isLandscape {
             columnWidth = size.width / 2
-            let columnInner = columnWidth - (padding * 2)
-            let baseArtSize = min(columnInner, size.height * 0.62)
-            artworkWidth = baseArtSize * Self.artworkScale
-            artworkHeight = baseArtSize * Self.artworkScale
+            horizontalPadding = isPad ? DS.Spacing.md : Self.landscapeHorizontalPadding
+            artworkBorder = DS.Layout.centimeter
+            let border = artworkBorder
+            let titleBlock = showsLandscapeTitle ? DS.Layout.playerLandscapeTitleBlockHeight : 0
+            let horizontalInset = showsLandscapeTitle ? horizontalPadding : CGFloat(0)
+            let availableWidth = columnWidth - (horizontalInset * 2) - (border * 2)
+            let availableHeight = size.height - (border * 2) - titleBlock
+            let baseArtSize = min(availableWidth, availableHeight)
+            artworkWidth = baseArtSize
+            artworkHeight = baseArtSize
         } else {
+            horizontalPadding = isPad ? DS.Spacing.md : DS.Spacing.playerH
+            artworkBorder = 0
             columnWidth = size.width
-            let contentWidth = size.width - (padding * 2)
+            let contentWidth = size.width - (horizontalPadding * 2)
             let heightCap = isPad ? size.height * Self.padPortraitHeightCap : .greatestFiniteMagnitude
             let baseArtSize = min(contentWidth, heightCap)
             artworkWidth = baseArtSize * Self.artworkScale

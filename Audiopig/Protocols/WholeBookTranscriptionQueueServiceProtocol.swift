@@ -25,10 +25,17 @@ protocol WholeBookTranscriptionQueueServiceProtocol: AnyObject {
     func queuePosition(for audiobookID: UUID) -> Int?
 
     @discardableResult
-    func enqueue(audiobookID: UUID) -> WholeBookEnqueueResult
+    func enqueue(audiobookID: UUID, fromPlayhead: TimeInterval?) -> WholeBookEnqueueResult
     func cancel(audiobookID: UUID)
     func pause(audiobookID: UUID)
     func resume(audiobookID: UUID)
     func moveEntry(from source: IndexSet, to destination: Int)
     func restoreOnLaunch()
+}
+
+extension WholeBookTranscriptionQueueServiceProtocol {
+    @discardableResult
+    func enqueue(audiobookID: UUID) -> WholeBookEnqueueResult {
+        enqueue(audiobookID: audiobookID, fromPlayhead: nil)
+    }
 }

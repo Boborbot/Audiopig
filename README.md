@@ -22,7 +22,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Sleep timer** — off, N minutes, or end of current chapter; persists across app restarts
 - **Smart Rewind** — Look Far and Look Near scan silence in a window before the playhead to jump back to a natural break; dual-thumb range slider to set the window in settings or via long press (AudioPig Plus; 7-day free trial)
 - **Speech EQ & Voice Boost** — EQ presets tuned for narration clarity (Plus); free Voice Boost levels lift quiet passages (Settings and player sheet; per-book or universal defaults)
-- **Live subtitles** — on-device transcription near the playhead or for the whole book; search, export, bookmark from a line (AudioPig Plus; requires iOS 26+)
+- **Live subtitles** — on-device transcription near the playhead, from the current section onward, or for the whole book; search, export, bookmark from a line (AudioPig Plus; requires iOS 26+)
 - **Chapter editing** — rename chapters and adjust start times / order in the chapter list
 - **Background audio** — continues playing when the screen is off or the app is backgrounded
 - **Lock screen controls** — play/pause, skip forward/back, and scrubbing via `MPRemoteCommandCenter`
@@ -34,7 +34,7 @@ A focused local-file audiobook player for iOS — built with SwiftUI, SwiftData,
 - **Appearance** — system, light, or dark mode; optional portrait orientation lock
 - **Landscape player** — when orientation lock is off, the full player splits into artwork+title and controls columns (cover art on the notch side); no scrolling required
 - **AudioPig Plus** — monthly subscription unlocks Smart Rewind, Speech EQ, and on-device subtitles; optional "Feed a Student" consumable tips ($2.99 / $6.99 / $14.99) in Settings
-- **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback (recent books, controls, chapters, artwork skip gestures). On-Watch local library transfer is archived until a future release (`WatchFeatures.localPlaybackEnabled`).
+- **Apple Watch companion** (`AudiopigWatch`) — remote iPhone playback: recent books, then a vertical player pager (speed, transport, chapters). Digital Crown adjusts speed, volume, or chapter scroll on the visible page only. Optional artwork page with AudioPig Plus. On-Watch local library transfer is archived until a future release (`WatchFeatures.localPlaybackEnabled`).
 - **Home screen widgets** (`AudiopigWidget`) — listening stats, artwork, recent books, hour-club progress, and a lock screen **Continue Listening** circular widget (progress ring + pig glyph; tap resumes last book and opens the player)
 - **Lock screen control** (iOS 18+) — optional bottom-corner control to resume the last audiobook (`ContinueListeningControl`)
 - **Volume control** — hardware volume integration through `SystemVolumeController`
@@ -100,6 +100,9 @@ Audiopig/
 2. Open `Audiopig/Audiopig.xcodeproj` in Xcode
 3. Select a simulator or device running iOS 17+
 4. `Cmd+R`
+
+Watch player architecture, build-number rules, and the simulator smoke test are
+documented in [`docs/watch-development.md`](docs/watch-development.md).
 
 ### Running tests
 

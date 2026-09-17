@@ -39,4 +39,21 @@ public enum SubtitleWindowPlanner {
         }
         return windows
     }
+
+    /// Fixed windows from the section containing `playhead` through the end of the book.
+    /// Sections entirely behind the playhead are omitted.
+    public static func windowsFromCurrentSection(
+        playhead: TimeInterval,
+        bookDuration: TimeInterval,
+        windowDuration: TimeInterval = defaultWindowDuration
+    ) -> [SubtitleTimeWindow] {
+        let windows = wholeBookWindows(bookDuration: bookDuration, windowDuration: windowDuration)
+        let clamped = max(0, playhead)
+        guard let startIndex = windows.firstIndex(where: { window in
+            window.contains(clamped) || window.globalStart >= clamped
+        }) else {
+            return []
+        }
+        return Array(windows[startIndex...])
+    }
 }

@@ -218,10 +218,13 @@ final class LibraryViewModel {
     private let volumeController: SystemVolumeController
     private let monetization: any MonetizationServiceProtocol
     private let wholeBookTranscriptionQueue: any WholeBookTranscriptionQueueServiceProtocol
+    private let subtitleStore: any SubtitleStoreProtocol
+    private let subtitleTranscriptionService: any SubtitleTranscriptionServiceProtocol
 
     /// Observable mirror of queue service revision for library UI.
     private(set) var transcriptionQueueRevision: UInt64 = 0
     var isTranscriptionQueuePresented: Bool = false
+    var presentedBookTranscription: BookTranscriptionViewModel?
 
     /// Called after listening stats change (playback saves, book finish, merge cleanup, etc.).
     @ObservationIgnored
@@ -254,10 +257,12 @@ final class LibraryViewModel {
         self.volumeController = volumeController
         self.monetization = monetization
         self.wholeBookTranscriptionQueue = wholeBookTranscriptionQueue
+        let subtitleStore = SubtitleStore(modelContext: modelContext)
+        self.subtitleStore = subtitleStore
+        self.subtitleTranscriptionService = SubtitleTranscriptionService()
         self.librarySortOrder = appSettings.librarySortOrder
         self.libraryBookFilter = appSettings.libraryBookFilter
         self.librarySortDirection = appSettings.librarySortDirection
-        let subtitleStore = SubtitleStore(modelContext: modelContext)
         self.playerViewModel = PlayerViewModel(
             audioEngine: audioEngine,
             modelContext: modelContext,
@@ -559,6 +564,11 @@ final class LibraryViewModel {
                     snapshot: playerViewModel.watchSnapshotForReply(includeArtwork: true)
                 )
             }
+            return .ok()
+
+        case .setWatchFindBreaksButtonHidden(let hidden):
+            appSettings.watchFindBreaksButtonHidden = hidden
+            syncWatchSettings()
             return .ok()
 
         case .analyzeLulls:
@@ -1203,6 +1213,33 @@ final class LibraryViewModel {
 
     // MARK: - Transcription Queue
 
+    func presentTranscriptionOptions(for audiobook: Audiobook) {
+        presentedBookTranscription = BookTranscriptionViewModel(
+            audiobook: audiobook,
+            modelContext: modelContext,
+            subtitleStore: subtitleStore,
+            transcriptionService: subtitleTranscriptionService,
+            wholeBookQueue: wholeBookTranscriptionQueue,
+            monetization: monetization,
+            playheadProvider: { [weak self] in
+                self?.playhead(for: audiobook) ?? audiobook.currentPlaybackTime
+            },
+            onShowTranscriptionQueue: { [weak self] in
+                self?.presentedBookTranscription = nil
+                self?.presentTranscriptionQueue()
+            },
+            onPaywallRequired: { [weak self] in
+                self?.playerViewModel.presentSubtitlesPaywall()
+            },
+            onWillDeleteTranscription: { [weak self] in
+                self?.playerViewModel.cancelNearPlayheadGenerationIfCurrent(audiobookID: audiobook.id)
+            },
+            onTranscriptionDataChanged: { [weak self] in
+                self?.syncTranscriptionQueueRevision()
+            }
+        )
+    }
+
     @discardableResult
     func enqueueTranscription(for audiobook: Audiobook) -> WholeBookEnqueueResult {
         let result = wholeBookTranscriptionQueue.enqueue(audiobookID: audiobook.id)
@@ -1243,6 +1280,14 @@ final class LibraryViewModel {
     func syncTranscriptionQueueRevision() {
         transcriptionQueueRevision = wholeBookTranscriptionQueue.revision
         playerViewModel.syncWholeBookQueueRevision()
+        presentedBookTranscription?.refresh()
+    }
+
+    private func playhead(for audiobook: Audiobook) -> TimeInterval {
+        if playerViewModel.audiobook?.id == audiobook.id {
+            return playerViewModel.currentTime
+        }
+        return audiobook.currentPlaybackTime
     }
 
     // MARK: - Search

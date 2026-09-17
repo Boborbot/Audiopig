@@ -55,9 +55,10 @@ final class SubtitleCueResolverTests: XCTestCase {
             SubtitleCueTiming(startTime: 5, endTime: 8, text: "Line two", orderIndex: 1),
         ]
         let window = SubtitleCueResolver.visibleWindow(at: 3, cues: gappedCues, radius: 1)
-        XCTAssertEqual(window.cues.count, 1)
+        XCTAssertEqual(window.cues.count, 2)
         XCTAssertEqual(window.activeIndex, 0)
         XCTAssertEqual(window.cues[0].text, "Line one")
+        XCTAssertEqual(window.cues[1].text, "Line two")
     }
 
     func testVisibleWindowReturnsEmptyBeforeFirstCue() {

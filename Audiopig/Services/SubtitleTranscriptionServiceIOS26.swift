@@ -51,6 +51,8 @@ actor SubtitleTranscriptionServiceIOS26 {
             progress?(SubtitleLocaleDownloadProgress(fractionCompleted: 1))
         case .unsupported:
             throw SubtitleTranscriptionError.localeNotInstalled
+        @unknown default:
+            throw SubtitleTranscriptionError.localeNotInstalled
         }
         #else
         throw SubtitleTranscriptionError.unsupportedOS

@@ -43,7 +43,7 @@ final class PaywallViewModel {
         case .paragraphBreaks:
             return "Look Far and Look Near scan silence in the minutes before you drifted off so you can jump back to a natural break."
         case .subtitles:
-            return "Generate on-device subtitles near where you are listening, fill gaps in partial transcriptions, or transcribe an entire book in the background."
+            return "Generate on-device subtitles near where you are listening, fill gaps in partial transcriptions, transcribe from your current position, or transcribe an entire book in the background."
         case .eq:
             return "Shape dialogue with speech-tuned EQ presets so narrators stay clear in noisy environments."
         }

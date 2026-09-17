@@ -6,9 +6,9 @@
 import Foundation
 
 public enum WatchTransferStaging {
-    private static let outgoingRootName = "WatchOutgoingTransfers"
+    private nonisolated static let outgoingRootName = "WatchOutgoingTransfers"
 
-    public static func stageOutgoingFile(
+    public nonisolated static func stageOutgoingFile(
         bookID: UUID,
         sourceURL: URL,
         fileExtension: String,
@@ -24,14 +24,20 @@ public enum WatchTransferStaging {
         return destination
     }
 
-    public static func removeOutgoingStage(bookID: UUID, fileManager: FileManager = .default) {
+    public nonisolated static func removeOutgoingStage(
+        bookID: UUID,
+        fileManager: FileManager = .default
+    ) {
         guard let root = try? outgoingRootURL(fileManager: fileManager) else { return }
         let bookDir = root.appendingPathComponent(bookID.uuidString, isDirectory: true)
         try? fileManager.removeItem(at: bookDir)
     }
 
     /// Copies an incoming `WCSession` file before the delegate returns (the system deletes the original immediately after).
-    public static func copyIncomingFile(from sourceURL: URL, fileManager: FileManager = .default) throws -> URL {
+    public nonisolated static func copyIncomingFile(
+        from sourceURL: URL,
+        fileManager: FileManager = .default
+    ) throws -> URL {
         let destination = fileManager.temporaryDirectory
             .appendingPathComponent("watch-incoming-\(UUID().uuidString)")
             .appendingPathExtension(sourceURL.pathExtension)
@@ -42,7 +48,7 @@ public enum WatchTransferStaging {
         return destination
     }
 
-    private static func outgoingRootURL(fileManager: FileManager) throws -> URL {
+    private nonisolated static func outgoingRootURL(fileManager: FileManager) throws -> URL {
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let root = appSupport.appendingPathComponent(outgoingRootName, isDirectory: true)
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)

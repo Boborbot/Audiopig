@@ -500,7 +500,7 @@ private struct SubtitleScrollInteractionModifier: ViewModifier {
     func body(content: Content) -> some View {
         content.onScrollPhaseChange { _, phase in
             switch phase {
-            case .interacting, .decelerating:
+            case .tracking, .interacting, .decelerating:
                 userScrollInProgress = true
             case .idle:
                 userScrollInProgress = false

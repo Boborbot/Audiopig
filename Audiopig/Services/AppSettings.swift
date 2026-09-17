@@ -136,6 +136,7 @@ final class AppSettings {
         static let smartRewindNearEndOffset   = "settings.smartRewindNearEndOffset"
         static let appearance           = "settings.appearance"
         static let orientationLock      = "settings.orientationLock"
+        static let landscapePlayerHidesTitle = "settings.landscapePlayerHidesTitle"
         static let autoDeleteOnFinish   = "settings.autoDeleteOnFinish"
         static let trackReadingStats    = "settings.trackReadingStats"
         static let autoExportOnFinish   = "settings.autoExportOnFinish"
@@ -144,6 +145,7 @@ final class AppSettings {
         static let sleepTimerExpiry     = "settings.sleepTimerExpiry"
         static let watchArtworkSkipGestures = "settings.watchArtworkSkipGestures"
         static let watchArtworkViewMode = "settings.watchArtworkViewMode"
+        static let watchFindBreaksButtonHidden = "settings.watchFindBreaksButtonHidden"
         static let librarySortOrder         = "settings.librarySortOrder"
         static let libraryBookFilter        = "settings.libraryBookFilter"
         static let librarySortDirection     = "settings.librarySortDirection"
@@ -288,6 +290,12 @@ final class AppSettings {
     }()
 
     @ObservationIgnored
+    private var _landscapePlayerHidesTitle: Bool = {
+        guard UserDefaults.standard.object(forKey: Keys.landscapePlayerHidesTitle) != nil else { return false }
+        return UserDefaults.standard.bool(forKey: Keys.landscapePlayerHidesTitle)
+    }()
+
+    @ObservationIgnored
     private var _autoDeleteOnFinish: Bool = {
         // Key must exist; absence means the default (false) applies.
         guard UserDefaults.standard.object(forKey: Keys.autoDeleteOnFinish) != nil else { return false }
@@ -325,6 +333,14 @@ final class AppSettings {
             return .off
         }
         return mode
+    }()
+
+    @ObservationIgnored
+    private var _watchFindBreaksButtonHidden: Bool = {
+        guard UserDefaults.standard.object(forKey: Keys.watchFindBreaksButtonHidden) != nil else {
+            return true
+        }
+        return UserDefaults.standard.bool(forKey: Keys.watchFindBreaksButtonHidden)
     }()
 
     @ObservationIgnored
@@ -870,6 +886,21 @@ final class AppSettings {
         }
     }
 
+    /// When `true`, chapter title and author are hidden on the landscape player artwork column.
+    /// Default: `false`.
+    var landscapePlayerHidesTitle: Bool {
+        get {
+            access(keyPath: \.landscapePlayerHidesTitle)
+            return _landscapePlayerHidesTitle
+        }
+        set {
+            withMutation(keyPath: \.landscapePlayerHidesTitle) {
+                _landscapePlayerHidesTitle = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.landscapePlayerHidesTitle)
+            }
+        }
+    }
+
     /// When `true`, double/triple-tap on the Watch player artwork zone skips forward/back.
     /// Default: `false`.
     var watchArtworkSkipGesturesEnabled: Bool {
@@ -895,6 +926,20 @@ final class AppSettings {
             withMutation(keyPath: \.watchArtworkViewMode) {
                 _watchArtworkViewMode = newValue
                 UserDefaults.standard.set(newValue.rawValue, forKey: Keys.watchArtworkViewMode)
+            }
+        }
+    }
+
+    /// When `true`, the Watch transport page omits the Find Breaks control. Default: `true`.
+    var watchFindBreaksButtonHidden: Bool {
+        get {
+            access(keyPath: \.watchFindBreaksButtonHidden)
+            return _watchFindBreaksButtonHidden
+        }
+        set {
+            withMutation(keyPath: \.watchFindBreaksButtonHidden) {
+                _watchFindBreaksButtonHidden = newValue
+                UserDefaults.standard.set(newValue, forKey: Keys.watchFindBreaksButtonHidden)
             }
         }
     }
@@ -1015,7 +1060,8 @@ final class AppSettings {
             universalPlaybackSpeed: universalPlaybackSpeedEnabled ? universalPlaybackSpeed : nil,
             hasParagraphBreaksAccess: hasParagraphBreaksAccess,
             watchArtworkViewMode: watchArtworkViewMode,
-            hasWatchArtworkViewAccess: hasWatchArtworkViewAccess
+            hasWatchArtworkViewAccess: hasWatchArtworkViewAccess,
+            findBreaksButtonHidden: watchFindBreaksButtonHidden
         )
     }
 

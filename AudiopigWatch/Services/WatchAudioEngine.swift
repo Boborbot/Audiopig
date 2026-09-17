@@ -123,11 +123,13 @@ final class WatchAudioEngine {
     private func installObservers(for item: AVPlayerItem) {
         let interval = CMTime(seconds: 1.0, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            guard let self, self.playbackState == .playing else { return }
             let seconds = CMTimeGetSeconds(time)
             guard seconds.isFinite else { return }
-            self.currentTime = seconds
-            self.onTimeUpdate?(seconds)
+            Task { @MainActor [weak self] in
+                guard let self, self.playbackState == .playing else { return }
+                self.currentTime = seconds
+                self.onTimeUpdate?(seconds)
+            }
         }
 
         endObserver = NotificationCenter.default.addObserver(
@@ -135,9 +137,11 @@ final class WatchAudioEngine {
             object: item,
             queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
-            self.playbackState = .finished
-            self.onStateChange?(.finished)
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.playbackState = .finished
+                self.onStateChange?(.finished)
+            }
         }
     }
 

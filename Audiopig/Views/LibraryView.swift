@@ -212,7 +212,7 @@ struct LibraryView: View {
     @ViewBuilder
     private func transcribeSwipeAction(for audiobook: Audiobook) -> some View {
         Button {
-            viewModel.enqueueTranscription(for: audiobook)
+            viewModel.presentTranscriptionOptions(for: audiobook)
         } label: {
             Label("Transcribe", systemImage: "text.word.spacing")
         }

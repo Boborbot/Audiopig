@@ -61,7 +61,6 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "C1D8ECB32FD6BA000023D41A"
             BuildableName = "AudiopigWatch.app"
-            BlueprintName = "AudiopigWatch"
             ReferencedContainer = "container:Audiopig.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -78,7 +77,6 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "C1D8ECB32FD6BA000023D41A"
             BuildableName = "AudiopigWatch.app"
-            BlueprintName = "AudiopigWatch"
             ReferencedContainer = "container:Audiopig.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

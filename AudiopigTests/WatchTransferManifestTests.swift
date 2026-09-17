@@ -56,6 +56,37 @@ final class WatchTransferManifestTests: XCTestCase {
         XCTAssertEqual(decoded, payload)
     }
 
+    func test_watchSettingsFindBreaksPreferenceRoundTrip() throws {
+        let settings = WatchSettingsSnapshot(
+            artworkSkipGesturesEnabled: false,
+            skipForwardSeconds: 30,
+            skipBackwardSeconds: 15,
+            findBreaksButtonHidden: false
+        )
+
+        let data = try WatchMessageCodec.encode(settings)
+        let decoded = try WatchMessageCodec.decode(WatchSettingsSnapshot.self, from: data)
+
+        XCTAssertFalse(decoded.effectiveFindBreaksButtonHidden)
+    }
+
+    func test_legacyWatchSettingsHideFindBreaksByDefault() throws {
+        let legacyJSON = try XCTUnwrap("""
+        {
+          "artworkSkipGesturesEnabled": false,
+          "skipForwardSeconds": 30,
+          "skipBackwardSeconds": 15
+        }
+        """.data(using: .utf8))
+
+        let decoded = try WatchMessageCodec.decode(
+            WatchSettingsSnapshot.self,
+            from: legacyJSON
+        )
+
+        XCTAssertTrue(decoded.effectiveFindBreaksButtonHidden)
+    }
+
     func test_newWatchCommandsRoundTrip() throws {
         let bookID = UUID()
         let commands: [WatchCommand] = [
@@ -67,7 +98,8 @@ final class WatchTransferManifestTests: XCTestCase {
             .reportTransferIngestFailed(bookID: bookID, errorMessage: "Checksum mismatch"),
             .requestChapters,
             .analyzeLulls,
-            .seekToLull(endTime: 123.5)
+            .seekToLull(endTime: 123.5),
+            .setWatchFindBreaksButtonHidden(false)
         ]
 
         for command in commands {

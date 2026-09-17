@@ -73,6 +73,54 @@ final class WholeBookTranscriptionQueueTests: XCTestCase {
         XCTAssertFalse(queue.hasQueueUI)
     }
 
+    func test_enqueueFromPlayhead_skipsEarlierUncoveredWindows() throws {
+        let book = makeAudiobook(duration: 40 * 60)
+        context.insert(book)
+        let earlyGapCoveredLater = SubtitleTranscriptionSegment(
+            startTime: 20 * 60,
+            endTime: 40 * 60,
+            audiobook: book
+        )
+        context.insert(earlyGapCoveredLater)
+        try context.save()
+
+        XCTAssertEqual(
+            queue.enqueue(audiobookID: book.id, fromPlayhead: 25 * 60),
+            .alreadyComplete
+        )
+        XCTAssertEqual(queue.queueCount, 0)
+        XCTAssertNotEqual(book.subtitleGenerationStatus, .complete)
+        XCTAssertEqual(queue.enqueue(audiobookID: book.id), .enqueued)
+    }
+
+    func test_enqueueFromPlayhead_storesBoundAndSkipsEarlierGaps() throws {
+        let book = makeAudiobook(duration: 40 * 60)
+        context.insert(book)
+        try context.save()
+
+        XCTAssertEqual(queue.enqueue(audiobookID: book.id, fromPlayhead: 25 * 60), .enqueued)
+        let entry = try XCTUnwrap(fetchEntries().first)
+        XCTAssertEqual(entry.fromPlayhead ?? -1, 25 * 60, accuracy: 0.001)
+        XCTAssertEqual(book.subtitleGenerationFromPlayhead ?? -1, 25 * 60, accuracy: 0.001)
+    }
+
+    func test_enqueueFromPlayhead_alreadyCompleteDoesNotMarkWholeBookComplete() throws {
+        let book = makeAudiobook(duration: 30 * 60)
+        context.insert(book)
+        context.insert(SubtitleTranscriptionSegment(
+            startTime: 10 * 60,
+            endTime: 30 * 60,
+            audiobook: book
+        ))
+        try context.save()
+
+        XCTAssertEqual(
+            queue.enqueue(audiobookID: book.id, fromPlayhead: 15 * 60),
+            .alreadyComplete
+        )
+        XCTAssertEqual(book.subtitleGenerationStatus, .notGenerated)
+    }
+
     func test_snapshotMapper_mapsRunningToJobState() {
         let snapshot = WholeBookQueueItemSnapshot(
             id: UUID(),
@@ -83,6 +131,7 @@ final class WholeBookTranscriptionQueueTests: XCTestCase {
             status: .running,
             isPreparing: false,
             coverageFraction: 0.25,
+            coverageTimeline: .empty,
             completedWindows: 2,
             totalWindows: 8,
             progressMessage: "Transcribing entire book (3 of 6)…",

@@ -19,7 +19,8 @@ enum WidgetSnapshotWriter {
         author: String,
         audiobookID: UUID? = nil,
         progress: Double = 0,
-        coverImage: UIImage? = nil
+        coverImage: UIImage? = nil,
+        updateCoverArtwork: Bool = false
     ) {
         WidgetListeningSnapshot.updateLastPlayed(
             title: title,
@@ -27,7 +28,7 @@ enum WidgetSnapshotWriter {
             audiobookID: audiobookID?.uuidString,
             progress: progress
         )
-        if audiobookID != nil {
+        if updateCoverArtwork, audiobookID != nil {
             WidgetArtworkExporter.exportCover(image: coverImage)
         }
         reloadWidgets()

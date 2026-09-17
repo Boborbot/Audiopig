@@ -22,15 +22,16 @@ final class WatchVolumeRangeTests: XCTestCase {
         }
     }
 
-    func test_crownStepIsThreeTimesCoarserThanOriginalFineStep() {
-        XCTAssertEqual(WatchVolumeRange.crownStep, WatchVolumeRange.step / 2, accuracy: 0.000001)
-        XCTAssertEqual(WatchVolumeRange.crownStep, WatchVolumeRange.step / 6 * 3, accuracy: 0.000001)
+    func test_crownStepIsOneThirdPreviousSensitivity() {
+        XCTAssertEqual(WatchVolumeRange.crownStep, WatchVolumeRange.step / 6, accuracy: 0.000001)
+        XCTAssertEqual(WatchVolumeRange.crownStep * 3, WatchVolumeRange.step / 2, accuracy: 0.000001)
     }
 
-    func test_crownAxisInvertsVolume() {
-        XCTAssertEqual(WatchVolumeRange.crownAxis(for: 0), 1, accuracy: 0.0001)
-        XCTAssertEqual(WatchVolumeRange.crownAxis(for: 1), 0, accuracy: 0.0001)
-        XCTAssertEqual(WatchVolumeRange.volume(fromCrownAxis: 1), 0, accuracy: 0.0001)
-        XCTAssertEqual(WatchVolumeRange.volume(fromCrownAxis: 0), 1, accuracy: 0.0001)
+    func test_crownRangeIsAscendingAndMapsDirectlyToVolume() {
+        XCTAssertLessThan(WatchVolumeRange.crownMinimum, WatchVolumeRange.crownMaximum)
+        XCTAssertEqual(WatchVolumeRange.crownValue(for: 0), 0, accuracy: 0.0001)
+        XCTAssertEqual(WatchVolumeRange.crownValue(for: 1), 1, accuracy: 0.0001)
+        XCTAssertEqual(WatchVolumeRange.volume(fromCrownValue: 0), 0, accuracy: 0.0001)
+        XCTAssertEqual(WatchVolumeRange.volume(fromCrownValue: 1), 1, accuracy: 0.0001)
     }
 }

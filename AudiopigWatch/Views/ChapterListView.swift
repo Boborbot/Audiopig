@@ -7,18 +7,14 @@ import SwiftUI
 
 struct ChapterListView: View {
     @ObservedObject var viewModel: WatchPlayerViewModel
-    let isActive: Bool
     var onChapterSelected: () -> Void
 
-    init(viewModel: WatchPlayerViewModel, isActive: Bool, onChapterSelected: @escaping () -> Void) {
+    init(viewModel: WatchPlayerViewModel, onChapterSelected: @escaping () -> Void) {
         _viewModel = ObservedObject(wrappedValue: viewModel)
-        self.isActive = isActive
         self.onChapterSelected = onChapterSelected
     }
 
     @State private var scrollPosition: Int?
-    @State private var crownScrollIndex: Float = 0
-    @FocusState private var crownFocused: Bool
 
     var body: some View {
         Group {
@@ -65,50 +61,16 @@ struct ChapterListView: View {
                 }
                 .listStyle(.plain)
                 .scrollPosition(id: $scrollPosition)
-                .focusable(isActive)
-                .focused($crownFocused)
-                .watchDigitalCrownMedium(
-                    isActive: isActive,
-                    value: $crownScrollIndex,
-                    from: 0,
-                    through: Float(max(0, viewModel.chapters.count - 1)),
-                    by: 1,
-                    isContinuous: false,
-                    isHapticFeedbackEnabled: false
-                )
-                .onChange(of: crownScrollIndex) { _, newValue in
-                    scrollPosition = Int(newValue.rounded())
-                }
             }
         }
         .onAppear {
             scrollPosition = viewModel.snapshot.chapterIndex
-            crownScrollIndex = Float(viewModel.snapshot.chapterIndex)
-            if isActive {
-                claimCrownFocus()
-            }
             Task {
                 await viewModel.requestChaptersIfNeeded()
             }
         }
-        .onChange(of: isActive) { _, active in
-            if active {
-                claimCrownFocus()
-            } else {
-                crownFocused = false
-            }
-        }
         .onChange(of: viewModel.snapshot.chapterIndex) { _, newIndex in
             scrollPosition = newIndex
-            crownScrollIndex = Float(newIndex)
-        }
-    }
-
-    private func claimCrownFocus() {
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(50))
-            guard isActive else { return }
-            crownFocused = true
         }
     }
 }

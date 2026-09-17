@@ -45,6 +45,31 @@ final class SubtitleSegmentPlannerTests: XCTestCase {
         XCTAssertEqual(gap.globalEnd, 1200, accuracy: 0.001)
     }
 
+    func testUncoveredWindowsFromPlayheadSkipsEarlierGaps() {
+        let segments = [
+            SubtitleTranscriptionSegmentTiming(startTime: 0, endTime: 600)
+        ]
+        let uncovered = SubtitleSegmentPlanner.uncoveredWindows(
+            bookDuration: 40 * 60,
+            segments: segments,
+            fromPlayhead: 25 * 60
+        )
+        XCTAssertEqual(uncovered.map(\.globalStart), [20 * 60, 30 * 60])
+        XCTAssertFalse(uncovered.contains { $0.globalStart < 20 * 60 })
+    }
+
+    func testUncoveredWindowsFromPlayheadEmptyWhenRemainingCovered() {
+        let segments = [
+            SubtitleTranscriptionSegmentTiming(startTime: 1200, endTime: 3600)
+        ]
+        let uncovered = SubtitleSegmentPlanner.uncoveredWindows(
+            bookDuration: 60 * 60,
+            segments: segments,
+            fromPlayhead: 25 * 60
+        )
+        XCTAssertTrue(uncovered.isEmpty)
+    }
+
     func testLegacyBackfillSkipsSparseWindow() {
         let cues = [SubtitleCueTiming(startTime: 590, endTime: 595, text: "Tail", orderIndex: 0)]
         let inferred = SubtitleSegmentPlanner.inferredSegmentsFromLegacyCues(

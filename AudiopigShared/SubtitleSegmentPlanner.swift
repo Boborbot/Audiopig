@@ -68,10 +68,23 @@ public enum SubtitleSegmentPlanner {
     public static func uncoveredWindows(
         bookDuration: TimeInterval,
         segments: [SubtitleTranscriptionSegmentTiming],
-        windowDuration: TimeInterval = SubtitleWindowPlanner.defaultWindowDuration
+        windowDuration: TimeInterval = SubtitleWindowPlanner.defaultWindowDuration,
+        fromPlayhead: TimeInterval? = nil
     ) -> [SubtitleTimeWindow] {
-        SubtitleWindowPlanner.wholeBookWindows(bookDuration: bookDuration, windowDuration: windowDuration)
-            .filter { needsTranscription(window: $0, segments: segments) }
+        let windows: [SubtitleTimeWindow]
+        if let fromPlayhead {
+            windows = SubtitleWindowPlanner.windowsFromCurrentSection(
+                playhead: fromPlayhead,
+                bookDuration: bookDuration,
+                windowDuration: windowDuration
+            )
+        } else {
+            windows = SubtitleWindowPlanner.wholeBookWindows(
+                bookDuration: bookDuration,
+                windowDuration: windowDuration
+            )
+        }
+        return windows.filter { needsTranscription(window: $0, segments: segments) }
     }
 
     public static func forwardSegmentCoverageEnd(

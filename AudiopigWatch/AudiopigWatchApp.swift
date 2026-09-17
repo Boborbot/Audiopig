@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Foundation
 
 @main
 struct AudiopigWatchApp: App {
@@ -12,6 +13,9 @@ struct AudiopigWatchApp: App {
     private let playerViewModel: WatchPlayerViewModel
     private let libraryViewModel: WatchLibraryViewModel
     private let localLibraryViewModel: WatchLocalLibraryViewModel
+#if DEBUG
+    private let smokeTestPlayerViewModel: WatchPlayerViewModel?
+#endif
 
     init() {
         let remoteCoordinator = RemoteWatchPlaybackCoordinator(client: connectivityClient)
@@ -29,6 +33,16 @@ struct AudiopigWatchApp: App {
             coordinator: localCoordinator,
             client: connectivityClient
         )
+#if DEBUG
+        if Self.smokeTestPage != nil {
+            smokeTestPlayerViewModel = WatchPlayerViewModel(
+                coordinator: WatchPlayerSmokeTestCoordinator(),
+                client: connectivityClient
+            )
+        } else {
+            smokeTestPlayerViewModel = nil
+        }
+#endif
         connectivityClient.configure(
             localStore: localStore,
             localCoordinator: localCoordinator,
@@ -39,13 +53,40 @@ struct AudiopigWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                WatchRootView(
-                    playerViewModel: playerViewModel,
-                    libraryViewModel: libraryViewModel,
-                    localLibraryViewModel: localLibraryViewModel
+#if DEBUG
+            if let smokeTestPage = Self.smokeTestPage,
+               let smokeTestPlayerViewModel {
+                WatchPlayerSmokeTestView(
+                    viewModel: smokeTestPlayerViewModel,
+                    page: smokeTestPage
                 )
+            } else {
+                rootView
             }
+#else
+            rootView
+#endif
         }
     }
+
+    private var rootView: some View {
+        WatchRootView(
+            playerViewModel: playerViewModel,
+            libraryViewModel: libraryViewModel,
+            localLibraryViewModel: localLibraryViewModel
+        )
+    }
+
+#if DEBUG
+    private static var smokeTestPage: WatchPlayerPageKind? {
+        let prefix = "--watch-player-smoke-page="
+        guard let argument = ProcessInfo.processInfo.arguments.first(where: {
+            $0.hasPrefix(prefix)
+        }) else {
+            return nil
+        }
+
+        return WatchPlayerPageKind(rawValue: String(argument.dropFirst(prefix.count)))
+    }
+#endif
 }

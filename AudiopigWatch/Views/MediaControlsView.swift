@@ -7,11 +7,9 @@ import SwiftUI
 
 struct MediaControlsView: View {
     @ObservedObject var viewModel: WatchPlayerViewModel
-    var isActive: Bool = true
 
-    init(viewModel: WatchPlayerViewModel, isActive: Bool = true) {
+    init(viewModel: WatchPlayerViewModel) {
         _viewModel = ObservedObject(wrappedValue: viewModel)
-        self.isActive = isActive
     }
 
     @State private var tapCount = 0
@@ -20,7 +18,6 @@ struct MediaControlsView: View {
     var body: some View {
         ZStack {
             VStack(spacing: WDS.Spacing.sm) {
-                artworkTapZone
                 lullSection
                 titleBlock
                 timebar
@@ -39,39 +36,36 @@ struct MediaControlsView: View {
                 .transition(.opacity)
             }
         }
-        .watchVolumeCrown(viewModel: viewModel, isActive: false)
         .animation(.easeInOut(duration: 0.2), value: viewModel.connectionMessage)
+        .onDisappear {
+            tapTask?.cancel()
+        }
     }
 
-    private var artworkTapZone: some View {
-        Color.clear
-            .frame(height: 56)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                guard viewModel.artworkSkipGesturesEnabled else { return }
-                tapCount += 1
-                tapTask?.cancel()
-                tapTask = Task {
-                    try? await Task.sleep(for: .milliseconds(400))
-                    guard !Task.isCancelled else { return }
-                    let count = tapCount
-                    tapCount = 0
-                    switch count {
-                    case 2:
-                        viewModel.handleArtworkDoubleTap()
-                    case 3:
-                        viewModel.handleArtworkTripleTap()
-                    default:
-                        break
-                    }
-                }
+    private func registerArtworkGestureTap() {
+        guard viewModel.artworkSkipGesturesEnabled else { return }
+        tapCount += 1
+        tapTask?.cancel()
+        tapTask = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            let count = tapCount
+            tapCount = 0
+            switch count {
+            case 2:
+                viewModel.handleArtworkDoubleTap()
+            case 3:
+                viewModel.handleArtworkTripleTap()
+            default:
+                break
             }
-            .accessibilityLabel("Artwork gestures")
-            .accessibilityHint(
-                viewModel.artworkSkipGesturesEnabled
-                    ? "Double-tap skip forward, triple-tap skip back"
-                    : "Disabled in settings"
-            )
+        }
+    }
+
+    private var artworkGestureAccessibilityHint: String {
+        viewModel.artworkSkipGesturesEnabled
+            ? "Double-tap skip forward, triple-tap skip back"
+            : "Artwork gestures disabled in settings"
     }
 
     @ViewBuilder
@@ -158,6 +152,12 @@ struct MediaControlsView: View {
                     .lineLimit(1)
             }
         }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            registerArtworkGestureTap()
+        }
+        .accessibilityHint(artworkGestureAccessibilityHint)
     }
 
     private var timebar: some View {

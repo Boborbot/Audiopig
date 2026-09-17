@@ -125,7 +125,10 @@ Skip this section on iOS 17–25 — confirm the player shows "Subtitles Unavail
 - [ ] Captions button toggles subtitle panel on cover art
 - [ ] Without Plus: generate shows subtitles paywall
 - [ ] With Plus: generate near playhead transcribes and synced lines appear
-- [ ] Long press captions → options: near playhead, whole book, export, delete saved transcription
+- [ ] Transcription sheet: Transcribe Entire Book and Transcribe from Current Position
+- [ ] From current position: starts at the current 10-minute section and never transcribes earlier gaps
+- [ ] Library swipe Transcribe opens the transcription sheet (no transcribe-as-you-go); does not enqueue immediately
+- [ ] Transcription queue rows show coverage timeline (transcribed spans), not a linear progress bar
 - [ ] Whole-book generation: progress shown; pause / resume / cancel work
 - [ ] Tap a subtitle line → seeks correctly
 - [ ] Subtitle search finds text and seeks on tap
@@ -193,9 +196,9 @@ Coffee ($2.99), Lunch ($6.99), and Today's Rent ($14.99).
 - [ ] Track reading stats toggle behaves as expected
 - [ ] AudioPig Plus section shows status, subscribe, manage, restore
 - [ ] Feed a Student tips show prices and thank-you on purchase
-- [ ] Apple Watch settings: artwork skip gestures toggle
+- [ ] Apple Watch settings: artwork skip gestures toggle; artwork view picker (Off / Replace / Add) when Plus is active
 - [ ] Subtitles section: font picker shows each option in its typeface; footer copy visible
-- [ ] About section displays version 1.1.2
+- [ ] About section displays version 1.1.3
 
 ---
 
@@ -208,10 +211,21 @@ Test with iPhone paired and AudioPig installed on both.
 - [ ] Watch app launches; source picker shows **iPhone playback** and **Watch playback**
 - [ ] Watch playback option shows under-construction state and is not tappable
 - [ ] iPhone playback → recent books list loads from iPhone
-- [ ] Tap book → player; play / pause works
-- [ ] Skip forward / back; speed controls
-- [ ] Chapter list loads and seek works
+- [ ] Tap book → player opens on transport controls (not speed or chapters) and does not crash
+- [ ] Tap the up/down chevrons (or swipe on controls/speed): **speed** ↔ **controls** ↔ **chapters**
+- [ ] Player Back button returns directly to Recent Books on the first tap
+- [ ] Rightward finger swipe exits any player page directly to Recent Books
+- [ ] Play / pause works on the controls page
+- [ ] Skip forward / back
+- [ ] Speed page: stepper, presets, and Digital Crown change iPhone playback speed
+- [ ] Controls page: Digital Crown changes volume gradually at the reduced sensitivity (overlay appears)
+- [ ] Chapter list loads; tap seeks; Digital Crown scrolls the list
+- [ ] Find Breaks is hidden by default; disabling **Hide Find Breaks** in Watch or iPhone settings restores it
 - [ ] Artwork skip gestures (if enabled in iPhone Settings → Apple Watch)
+- [ ] Plus artwork view: Replace swaps the controls page for artwork+transport; Add inserts artwork between speed and controls
+- [ ] Watch Settings → About displays version 1.1.3 (6)
+- [ ] iPhone, widget, and Watch bundles have the same build number
+- [ ] Installing a higher iPhone build updates the Watch companion without deleting the iPhone app
 - [ ] iPhone unreachable → sensible connection message
 
 ### Watch local transfer (archived — skip until re-enabled)

@@ -47,11 +47,16 @@ struct SettingsView: View {
                         Label("Lock orientation", systemImage: "lock.rotation")
                     }
                     .tint(DS.Color.coral)
+
+                    Toggle(isOn: $settings.landscapePlayerHidesTitle) {
+                        Label("Hide title in landscape", systemImage: "rectangle.landscape.rotate")
+                    }
+                    .tint(DS.Color.coral)
                 } header: {
                     Text("Appearance")
                         .sectionTitle()
                 } footer: {
-                    Text("When enabled, the app stays in portrait orientation.")
+                    Text("Lock orientation keeps the app in portrait. Hide title removes the chapter name and author from the landscape player so cover art can use more space.")
                         .font(DS.Typography.caption)
                         .foregroundStyle(DS.Color.tertiary)
                 }
@@ -142,11 +147,19 @@ struct SettingsView: View {
                     .onChange(of: settings.watchArtworkSkipGesturesEnabled) { _, _ in
                         onWatchSettingsChanged?()
                     }
+
+                    Toggle(isOn: $settings.watchFindBreaksButtonHidden) {
+                        Label("Hide Find Breaks", systemImage: "waveform.and.magnifyingglass")
+                    }
+                    .tint(DS.Color.coral)
+                    .onChange(of: settings.watchFindBreaksButtonHidden) { _, _ in
+                        onWatchSettingsChanged?()
+                    }
                 } header: {
                     Text("Apple Watch")
                         .sectionTitle()
                 } footer: {
-                    Text("Artwork view shows cover art with play and skip controls on the Watch player. Off leaves controls unchanged. Replace swaps the main controls screen; Add inserts an extra screen between controls and speed.")
+                    Text("Artwork view controls the Watch player cover screen. Hide Find Breaks is enabled by default; turn it off to restore that player control.")
                         .font(DS.Typography.caption)
                         .foregroundStyle(DS.Color.tertiary)
                 }

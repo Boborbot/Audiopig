@@ -9,14 +9,16 @@ import XCTest
 final class WatchSnapshotFreshnessTests: XCTestCase {
 
     func test_rejectsOlderRevisionForSameBookAndSource() {
-        let last = sample(revision: 10, bookID: bookA, source: .remote)
-        let incoming = sample(revision: 9, bookID: bookA, source: .remote)
+        let timestamp = Date(timeIntervalSince1970: 1_000)
+        let last = sample(revision: 10, bookID: bookA, source: .remote, updatedAt: timestamp)
+        let incoming = sample(revision: 9, bookID: bookA, source: .remote, updatedAt: timestamp)
         XCTAssertTrue(WatchSnapshotFreshness.shouldReject(incoming: incoming, comparedTo: last))
     }
 
     func test_acceptsNewerRevisionForSameBookAndSource() {
-        let last = sample(revision: 10, bookID: bookA, source: .remote)
-        let incoming = sample(revision: 11, bookID: bookA, source: .remote)
+        let timestamp = Date(timeIntervalSince1970: 1_000)
+        let last = sample(revision: 10, bookID: bookA, source: .remote, updatedAt: timestamp)
+        let incoming = sample(revision: 11, bookID: bookA, source: .remote, updatedAt: timestamp)
         XCTAssertFalse(WatchSnapshotFreshness.shouldReject(incoming: incoming, comparedTo: last))
     }
 

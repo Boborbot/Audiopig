@@ -40,6 +40,13 @@ public struct SubtitleCoverageTimeline: Sendable, Equatable {
         self.coverageFraction = coverageFraction
         self.uncoveredWindowCount = uncoveredWindowCount
     }
+
+    public static let empty = SubtitleCoverageTimeline(
+        bookDuration: 0,
+        runs: [],
+        coverageFraction: 0,
+        uncoveredWindowCount: 0
+    )
 }
 
 public enum SubtitleCoverageTimelineMapper {

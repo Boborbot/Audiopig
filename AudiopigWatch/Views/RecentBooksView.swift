@@ -58,6 +58,7 @@ struct RecentBooksView: View {
                 Button {
                     Task {
                         if await libraryViewModel.selectBook(id: book.id) {
+                            await Task.yield()
                             onBookSelected()
                         }
                     }

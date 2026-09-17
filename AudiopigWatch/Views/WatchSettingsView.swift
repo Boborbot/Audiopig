@@ -31,8 +31,32 @@ struct WatchSettingsView: View {
                 Text("Double-tap skips forward; triple-tap skips back on the player artwork zone.")
                     .font(.caption2)
             }
+
+            Section {
+                Toggle(isOn: findBreaksHiddenBinding) {
+                    Text("Hide Find Breaks")
+                        .font(.caption)
+                }
+                .tint(WDS.Color.coral)
+            } footer: {
+                Text("Turn off to show Find Breaks on the player controls.")
+                    .font(.caption2)
+            }
+
+            Section("About") {
+                Label(Self.versionLabel, systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .navigationTitle("Settings")
+    }
+
+    private static var versionLabel: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let build = info?["CFBundleVersion"] as? String ?? "Unknown"
+        return "Version \(version) (\(build))"
     }
 
     private var artworkViewModePicker: some View {
@@ -64,6 +88,18 @@ struct WatchSettingsView: View {
                 playerViewModel.artworkSkipGesturesEnabled = newValue
                 Task {
                     _ = await playerViewModel.sendArtworkGesturesSetting(newValue)
+                }
+            }
+        )
+    }
+
+    private var findBreaksHiddenBinding: Binding<Bool> {
+        Binding(
+            get: { playerViewModel.findBreaksButtonHidden },
+            set: { hidden in
+                playerViewModel.findBreaksButtonHidden = hidden
+                Task {
+                    _ = await playerViewModel.sendFindBreaksButtonHiddenSetting(hidden)
                 }
             }
         )

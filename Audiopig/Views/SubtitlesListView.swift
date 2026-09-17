@@ -5,8 +5,9 @@
 
 import SwiftUI
 
-struct SubtitlesListView: View {
-    @Bindable var viewModel: PlayerViewModel
+struct SubtitlesListView<Model: TranscriptionSheetModeling & Observable>: View {
+    @Bindable var viewModel: Model
+    var showsTranscribeAsYouGo: Bool = true
     @Environment(\.dismiss) private var dismiss
     @State private var shareItems: [Any]?
     @State private var isShareSheetPresented = false
@@ -16,7 +17,9 @@ struct SubtitlesListView: View {
     var body: some View {
         NavigationStack {
             List {
-                transcribeAsYouGoSection
+                if showsTranscribeAsYouGo {
+                    transcribeAsYouGoSection
+                }
                 coverageSection
                 wholeBookSection
                 exportSection
@@ -107,7 +110,7 @@ struct SubtitlesListView: View {
                 }
             } else {
                 Section {
-                    Text("No subtitles saved yet. Generate near your position from the player, or transcribe the entire book below.")
+                    Text("No subtitles saved yet. Generate near your position from the player, or transcribe the entire book or from your current position below.")
                         .font(DS.Typography.caption)
                         .foregroundStyle(DS.Color.secondary)
                 } header: {
@@ -140,7 +143,7 @@ struct SubtitlesListView: View {
         } header: {
             Text("Entire Book")
         } footer: {
-            Text("Whole-book jobs run in a background queue while you listen or browse. Manage order and progress from the library transcription queue.")
+            Text("These jobs run in a background queue while you listen or browse. Transcribe from current position starts at this section and never fills earlier gaps. Manage order and progress from the library transcription queue.")
                 .font(DS.Typography.caption)
         }
     }
@@ -156,6 +159,15 @@ struct SubtitlesListView: View {
                     Label("Transcribe Entire Book", systemImage: "text.append")
                 }
                 .disabled(!viewModel.subtitlesSupported)
+
+                if viewModel.hasUncoveredSubtitleWindowsFromCurrentPosition {
+                    Button {
+                        viewModel.generateSubtitlesFromCurrentPosition()
+                    } label: {
+                        Label("Transcribe from Current Position", systemImage: "arrow.forward.to.line")
+                    }
+                    .disabled(!viewModel.subtitlesSupported)
+                }
             } else {
                 Label("Entire book transcribed", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(DS.Color.coral)
@@ -200,7 +212,7 @@ struct SubtitlesListView: View {
                     .font(DS.Typography.caption)
                     .foregroundStyle(DS.Color.secondary)
                 Button("Try Again") {
-                    viewModel.generateSubtitlesWholeBook()
+                    viewModel.resumeWholeBookTranscription()
                 }
             }
         }

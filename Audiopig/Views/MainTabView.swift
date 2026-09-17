@@ -24,6 +24,7 @@ struct MainTabView: View {
 
     @State private var viewModel: LibraryViewModel
     @State private var isPlayerPresented: Bool = false
+    @State private var libraryPaywallViewModel: PaywallViewModel?
     @Bindable var appSettings: AppSettings
     private let statsViewModel: StatsViewModel
     private let appIconManager: AppIconManager
@@ -96,7 +97,8 @@ struct MainTabView: View {
         .modifier(
             PlayerPresentationModifier(
                 isPresented: $isPlayerPresented,
-                viewModel: viewModel.playerViewModel
+                viewModel: viewModel.playerViewModel,
+                settings: appSettings
             )
         )
         .sheet(
@@ -106,6 +108,25 @@ struct MainTabView: View {
             )
         ) {
             WholeBookTranscriptionQueueView(viewModel: viewModel)
+        }
+        .sheet(item: $viewModel.presentedBookTranscription) { transcriptionViewModel in
+            SubtitlesListView(viewModel: transcriptionViewModel, showsTranscribeAsYouGo: false)
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { viewModel.playerViewModel.isPaywallPresented && !isPlayerPresented },
+                set: { viewModel.playerViewModel.isPaywallPresented = $0 }
+            ),
+            onDismiss: { libraryPaywallViewModel = nil }
+        ) {
+            if let libraryPaywallViewModel {
+                PaywallSheet(viewModel: libraryPaywallViewModel)
+            }
+        }
+        .onChange(of: viewModel.playerViewModel.isPaywallPresented) { _, presented in
+            if presented && !isPlayerPresented {
+                libraryPaywallViewModel = viewModel.playerViewModel.makePaywallViewModel()
+            }
         }
         .onChange(of: appSettings.orientationLock) { _, locked in
             OrientationLockController.shared.setLocked(locked)
@@ -144,6 +165,7 @@ struct MainTabView: View {
 private struct PlayerPresentationModifier: ViewModifier {
     @Binding var isPresented: Bool
     let viewModel: PlayerViewModel
+    @Bindable var settings: AppSettings
 
     private var usesFullScreenCover: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
@@ -166,10 +188,10 @@ private struct PlayerPresentationModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .fullScreenCover(isPresented: fullScreenBinding) {
-                PlayerView(viewModel: viewModel)
+                PlayerView(viewModel: viewModel, settings: settings)
             }
             .sheet(isPresented: sheetBinding) {
-                PlayerView(viewModel: viewModel)
+                PlayerView(viewModel: viewModel, settings: settings)
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }

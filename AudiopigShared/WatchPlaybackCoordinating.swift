@@ -17,10 +17,10 @@ public protocol WatchPlaybackCoordinating: AnyObject {
 public enum WatchVolumeRange {
     /// Matches iOS system output volume granularity (~16 steps).
     public static let step: Float = 1.0 / 16.0
-    /// Crown detent size for media controls — 3× coarser than the original fine crown step.
-    public static let crownStep: Float = step / 2
-    /// Crown travel (in inverted axis units) required before volume begins changing.
-    public static let crownActivationThreshold: Float = step
+    /// Three Crown detents move through half of one system-volume step.
+    public static let crownStep: Float = step / 6
+    public static let crownMinimum: Float = 0
+    public static let crownMaximum: Float = 1
     public static let tolerance: Float = step / 2
 
     public static func normalized(_ volume: Float) -> Float {
@@ -28,14 +28,13 @@ public enum WatchVolumeRange {
         return min(1, max(0, stepped))
     }
 
-    /// Maps output volume to the inverted crown axis (`1` = quiet, `0` = loud).
-    public static func crownAxis(for volume: Float) -> Float {
-        1 - normalized(volume)
+    /// Crown values use an ascending range, as required by `digitalCrownRotation`.
+    public static func crownValue(for volume: Float) -> Float {
+        normalized(volume)
     }
 
-    /// Maps inverted crown axis back to output volume.
-    public static func volume(fromCrownAxis axis: Float) -> Float {
-        normalized(1 - axis)
+    public static func volume(fromCrownValue value: Float) -> Float {
+        normalized(value)
     }
 }
 

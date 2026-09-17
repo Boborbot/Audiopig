@@ -18,7 +18,7 @@ struct WatchRootView: View {
     @ObservedObject var localLibraryViewModel: WatchLocalLibraryViewModel
 
     @State private var screen: WatchScreen
-    @State private var selectedPage = 1
+    @State private var selectedPage: WatchPlayerPageKind = .media
 
     init(
         playerViewModel: WatchPlayerViewModel,
@@ -30,10 +30,11 @@ struct WatchRootView: View {
         _localLibraryViewModel = ObservedObject(wrappedValue: localLibraryViewModel)
         let initial: WatchScreen = playerViewModel.shouldLaunchToPlayer ? .player : .sourcePicker
         _screen = State(initialValue: initial)
+        _selectedPage = State(initialValue: playerViewModel.mainControlsPage)
     }
 
     var body: some View {
-        Group {
+        NavigationStack {
             switch screen {
             case .sourcePicker:
                 PlaybackSourcePickerView(
@@ -44,30 +45,25 @@ struct WatchRootView: View {
                 RecentBooksView(
                     libraryViewModel: libraryViewModel,
                     playerViewModel: playerViewModel,
-                    onBookSelected: {
-                        screen = .player
-                        selectedPage = 1
-                    },
+                    onBookSelected: openPlayer,
                     onBack: { screen = .sourcePicker }
                 )
             case .watchLocalLibrary:
                 WatchLocalLibraryView(
                     libraryViewModel: localLibraryViewModel,
                     playerViewModel: playerViewModel,
-                    onBookSelected: {
-                        screen = .player
-                        selectedPage = 1
-                    },
+                    onBookSelected: openPlayer,
                     onBack: { screen = .sourcePicker }
                 )
             case .player:
-                WatchPlayerPagerView(viewModel: playerViewModel, selectedPage: $selectedPage)
-                    .overlay(alignment: .topLeading) {
-                        backButton
-                    }
+                WatchPlayerPagerView(
+                    viewModel: playerViewModel,
+                    selectedPage: $selectedPage,
+                    onExit: showRecentBooks
+                )
+                    .toolbar(.hidden, for: .navigationBar)
             }
         }
-        .toolbar(screen == .sourcePicker || screen == .player ? .hidden : .visible, for: .navigationBar)
         .onChange(of: playerViewModel.snapshot.bookID) { _, bookID in
             if bookID == nil, screen == .player {
                 screen = .sourcePicker
@@ -75,16 +71,12 @@ struct WatchRootView: View {
         }
     }
 
-    private var backButton: some View {
-        Button {
-            screen = .sourcePicker
-        } label: {
-            Image(systemName: "chevron.left")
-                .font(.caption.weight(.semibold))
-                .padding(8)
-        }
-        .buttonStyle(.plain)
-        .padding(.leading, 2)
-        .padding(.top, 2)
+    private func openPlayer() {
+        selectedPage = playerViewModel.mainControlsPage
+        screen = .player
+    }
+
+    private func showRecentBooks() {
+        screen = .phoneRecentBooks
     }
 }

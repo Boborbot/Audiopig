@@ -8,14 +8,14 @@ import os
 
 enum WatchConnectivityDiagnostics {
     /// Bump when changing Watch sync behavior so device logs prove the new build is running.
-    static let buildTag = "Audiopig-WC-v4-transfer-loadBook"
+    nonisolated static let buildTag = "Audiopig-Watch-1.1.3"
 
-    private static let logger = Logger(
+    private nonisolated static let logger = Logger(
         subsystem: "com.nitay.Audiopig",
         category: "WatchConnectivity"
     )
 
-    static func info(_ message: String) {
+    nonisolated static func info(_ message: String) {
         logger.info("\(Self.buildTag, privacy: .public): \(message, privacy: .public)")
     }
 }

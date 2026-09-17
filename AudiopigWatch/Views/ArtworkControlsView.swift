@@ -7,11 +7,9 @@ import SwiftUI
 
 struct ArtworkControlsView: View {
     @ObservedObject var viewModel: WatchPlayerViewModel
-    var isActive: Bool = true
 
-    init(viewModel: WatchPlayerViewModel, isActive: Bool = true) {
+    init(viewModel: WatchPlayerViewModel) {
         _viewModel = ObservedObject(wrappedValue: viewModel)
-        self.isActive = isActive
     }
 
     var body: some View {
@@ -20,7 +18,6 @@ struct ArtworkControlsView: View {
             transportRow
         }
         .padding(.horizontal, WDS.Spacing.sm)
-        .watchVolumeCrown(viewModel: viewModel, isActive: isActive)
         .task(id: viewModel.snapshot.bookID) {
             await viewModel.ensureArtworkLoaded()
         }

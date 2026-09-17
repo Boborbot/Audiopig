@@ -11,6 +11,8 @@ public enum SubtitleGenerationScope: String, Codable, Sendable, CaseIterable {
     case nearPlayhead
     /// Transcribe the full book timeline in fixed windows from start to end.
     case wholeBook
+    /// Transcribe from the 10-minute section containing the playhead through the end of the book.
+    case fromCurrentPosition
 }
 
 public enum SubtitleGenerationStatus: String, Codable, Sendable, CaseIterable {

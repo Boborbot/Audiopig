@@ -253,8 +253,18 @@ enum DS {
             return ceil(height + (speed - height) * playerIconPillWidthBlend)
         }
 
+        /// ~1 cm in logical points (72 pt/in ÷ 2.54 cm/in).
+        static let centimeter: CGFloat = 72.0 / 2.54
+
         private static let playerHeroArtworkScale: CGFloat = 0.925
         private static let padPortraitArtworkHeightCap: CGFloat = 0.50
+
+        /// Title + author block reserved under landscape hero art (two title lines + author).
+        static var playerLandscapeTitleBlockHeight: CGFloat {
+            let titleLineHeight = ceil(UIFont.preferredFont(forTextStyle: .title2).lineHeight)
+            let authorLineHeight = ceil(UIFont.preferredFont(forTextStyle: .callout).lineHeight)
+            return titleLineHeight * 2 + authorLineHeight + Spacing.xs + Spacing.sm
+        }
 
         /// Portrait player hero artwork size — matches `PlayerView` layout math.
         static func playerPortraitArtworkSize(containerSize: CGSize) -> CGSize {
